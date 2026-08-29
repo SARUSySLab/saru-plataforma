@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "fixture": "node scripts/gerar-fixture.mjs",
+    "dev": "npm run fixture && vite",
+    "build": "npm run fixture && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },

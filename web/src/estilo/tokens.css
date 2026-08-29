@@ -1,0 +1,61 @@
+/* Identidade herdada do catalogo de entidades e do prototipo SARU Analyzer.
+   Os tres estados de tema: :root e a paleta clara completa; a media query
+   redefine so os tokens e e guardada por :not([data-theme="light"]) pra a
+   escolha explicita vencer o sistema; e [data-theme="dark"] redefine de novo
+   pra o toggle vencer nos dois sentidos. Nenhuma cor nasce dentro de um
+   bloco de tema, senao ela nao existe no estado sem marcacao. */
+:root {
+  --bg: hsl(40 14% 96%); --surface: hsl(36 12% 92%); --raised: hsl(30 9% 87%);
+  --border: hsl(30 8% 75%); --border-strong: hsl(31 10% 52%);
+  --text: hsl(240 10% 10%); --muted: hsl(240 8% 32%); --faint: hsl(240 6% 42%);
+  --brand: hsl(344 70% 38%); --brand-soft: hsl(344 70% 38% / .12);
+  --ok: hsl(170 89% 22%); --ok-soft: hsl(170 89% 22% / .12);
+  --warn: hsl(38 94% 28%); --warn-soft: hsl(38 94% 28% / .12);
+  --danger: hsl(14 88% 38%);
+
+  /* duas series sobrepostas: a cor identifica a VOLTA; o canal e identificado
+     pela faixa e pelo rotulo, que e onde a identidade dele ja morava */
+  --lap-a: #a51d41; --lap-b: #235da9;
+  --ch-thr: #0c8746; --ch-spd: #235da9; --ch-brk: #a51d41; --ch-str: #8b5904;
+  --d-gain: #0c8746; --d-mid: hsl(30 6% 62%); --d-loss: #a51d41;
+  --seq-1: #cfdcec; --seq-2: #93b0d2; --seq-3: #5382b8; --seq-4: #235da9; --seq-5: #14396a;
+
+  --display: "Outfit", system-ui, -apple-system, sans-serif;
+  --data: "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --r-sm: 5px; --r-md: 8px; --r-lg: 12px;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --rail: 300px;
+  --grid: hsl(30 8% 75% / .55);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: hsl(345 8% 4%); --surface: hsl(345 6% 10%); --raised: hsl(345 6% 16%);
+    --border: hsl(345 6% 22%); --border-strong: hsl(346 8% 42%);
+    --text: hsl(20 15% 92%); --muted: hsl(28 8% 68%); --faint: hsl(28 6% 51%);
+    --brand: hsl(340 85% 62%); --brand-soft: hsl(340 85% 62% / .16);
+    --ok: hsl(155 72% 56%); --ok-soft: hsl(155 72% 56% / .14);
+    --warn: hsl(38 85% 58%); --warn-soft: hsl(38 85% 58% / .14);
+    --danger: hsl(14 85% 58%);
+    --lap-a: #f04c83; --lap-b: #5e96de;
+    --ch-thr: #28ad72; --ch-spd: #5e96de; --ch-brk: #f04c83; --ch-str: #b0761c;
+    --d-gain: #28ad72; --d-mid: hsl(345 5% 45%); --d-loss: #f04c83;
+    --seq-1: #1d2b3d; --seq-2: #274259; --seq-3: #3a6a99; --seq-4: #5e96de; --seq-5: #a8c8ee;
+    --grid: hsl(345 6% 22% / .8);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: hsl(345 8% 4%); --surface: hsl(345 6% 10%); --raised: hsl(345 6% 16%);
+  --border: hsl(345 6% 22%); --border-strong: hsl(346 8% 42%);
+  --text: hsl(20 15% 92%); --muted: hsl(28 8% 68%); --faint: hsl(28 6% 51%);
+  --brand: hsl(340 85% 62%); --brand-soft: hsl(340 85% 62% / .16);
+  --ok: hsl(155 72% 56%); --ok-soft: hsl(155 72% 56% / .14);
+  --warn: hsl(38 85% 58%); --warn-soft: hsl(38 85% 58% / .14);
+  --danger: hsl(14 85% 58%);
+  --lap-a: #f04c83; --lap-b: #5e96de;
+  --ch-thr: #28ad72; --ch-spd: #5e96de; --ch-brk: #f04c83; --ch-str: #b0761c;
+  --d-gain: #28ad72; --d-mid: hsl(345 5% 45%); --d-loss: #f04c83;
+  --seq-1: #1d2b3d; --seq-2: #274259; --seq-3: #3a6a99; --seq-4: #5e96de; --seq-5: #a8c8ee;
+  --grid: hsl(345 6% 22% / .8);
+}
