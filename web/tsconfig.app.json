@@ -6,6 +6,9 @@
     "module": "esnext",
     "types": ["vite/client"],
     "allowArbitraryExtensions": true,
+    /* o fixture e importado como modulo e checado contra o contrato na
+       importacao: se o JSON sair do shape, o build quebra */
+    "resolveJsonModule": true,
     "skipLibCheck": true,
 
     /* Bundler mode */
