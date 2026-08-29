@@ -13,7 +13,10 @@ const FAIXAS = [
   { id: "velocidade", nome: "Velocidade", unidade: "km/h", lo: 0, hi: 240 },
   { id: "acelerador", nome: "Acelerador", unidade: "%", lo: 0, hi: 105 },
   { id: "freio", nome: "Freio", unidade: "%", lo: 0, hi: 105 },
-  { id: "direcao", nome: "Direção", unidade: "°", lo: -105, hi: 105 },
+  // direção vem NORMALIZADA em % do esterço máximo da gravação (o canal
+  // AiM é deslocamento de cremalheira, sem relação pra grau; ver
+  // APRESENTACAO no backend)
+  { id: "direcao", nome: "Direção", unidade: "%", lo: -105, hi: 105 },
 ];
 
 export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
@@ -34,6 +37,43 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
   const gesto = useRef<{ de: number; ate: number } | null>(null);
   const [faixa, setFaixa] = useState<{ de: number; ate: number } | null>(null);
   const [cursor, setCursor] = useState<{ k: number; xPx: number; yPx: number } | null>(null);
+  // AQUI, antes do return de degradacao: hook depois de return condicional
+  // muda a contagem entre renders e derruba o app inteiro (regra de hooks).
+  // Foi exatamente o par deste bug em AppComSessao que causou a tela branca
+  // pos-login de 29/08.
+  const W = useLargura(host, 900);
+
+  // Degradacao explicita (a mesma regra do bug B2): moldura sem nada dentro e
+  // sem dizer por que e proibido. Duas causas distintas, mensagem distinta
+  // pra cada uma: a serie nao chegou (prop ausente ou sem ponto nenhum), ou
+  // chegou mas nenhum dos 4 canais que este grafico desenha (velocidade,
+  // acelerador, freio, direcao) tem valor. So depois de descartar as duas e
+  // que o resto do componente pode assumir que ha o que desenhar.
+  const semSeries = !a?.distancia_m?.length || !b?.distancia_m?.length;
+  const temCanal = (s: SerieAmostras, id: string) =>
+    (s.canais?.[id] ?? []).some((v) => v != null && Number.isFinite(v));
+  const semCanal = !semSeries && FAIXAS.every((f) => !temCanal(a, f.id) && !temCanal(b, f.id));
+  const avisoVazio = semSeries
+    ? "Sem telemetria pra comparar: as séries desta volta não chegaram."
+    : semCanal
+    ? "As séries chegaram, mas nenhum dos canais deste gráfico (velocidade, acelerador, freio, direção) veio no arquivo."
+    : null;
+
+  if (avisoVazio) {
+    return (
+      <article className="cartao">
+        <header>
+          <h4>Traço no tempo</h4>
+          <span className="no">bloco 10</span>
+          <span className="dir"><span className="eyebrow">{rotuloA} vs {rotuloB}</span></span>
+        </header>
+        <div className="deg">
+          <span className="ico">!</span>
+          <p>{avisoVazio}</p>
+        </div>
+      </article>
+    );
+  }
 
   // O escopo do traco e o trecho selecionado, se houver: e assim que a selecao
   // de um nivel vira o escopo do nivel seguinte.
@@ -46,7 +86,6 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
   })();
 
   const idx = a.distancia_m.map((_, i) => i).filter((i) => a.distancia_m[i] >= janela.d0 && a.distancia_m[i] <= janela.d1);
-  const W = useLargura(host, 900);
   const alturaFaixa = 84, vao = 10, PL = 62, PR = 14, PT = 8;
   const H = PT + FAIXAS.length * (alturaFaixa + vao) + 24; // folga para a régua de 100 m
   const base = PT + FAIXAS.length * (alturaFaixa + vao) - vao;
@@ -118,7 +157,12 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
         onPointerDown={(e) => {
           const d = dPara(e.clientX);
           if (d == null) return;
-          (e.target as Element).setPointerCapture?.(e.pointerId);
+          try {
+            (e.target as Element).setPointerCapture?.(e.pointerId);
+          } catch {
+            // pointer ja encerrado (ou sintetico): o gesto segue sem captura,
+            // que so existe pra nao perder o arraste fora do elemento
+          }
           gesto.current = { de: d, ate: d };
           setFaixa(gesto.current);
         }}
@@ -197,9 +241,16 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
         {/* Um card so, que troca de conteudo: com faixa marcada ele resume o
             intervalo e fica ancorado no centro dela; sem faixa, ele segue o
             cursor e mostra o ponto. Dois cards disputando a mesma area seria
-            o usuario tendo que descobrir qual deles esta respondendo. */}
+            o usuario tendo que descobrir qual deles esta respondendo.
+
+            O card ficava fixo no topo (top/y: 6-8) e cobria dado, porque as 4
+            faixas empilhadas tomam quase toda a altura do grafico e nao sobra
+            vao livre entre elas. Como o viewBox usa a mesma largura do host
+            medido, 1 unidade de svg = 1px de tela, entao H ja e a altura real
+            renderizada: abrir sempre abaixo de H tira o card de cima de
+            qualquer faixa, em vez de tentar achar um vao que nao existe. */}
         {marcado && resumo ? (
-          <div className="flutuante marcado" style={{ left: Math.max(4, Math.min(larguraHost - 214, emPx((xDe(marcado.de) + xDe(marcado.ate)) / 2) - 105)), top: 6, width: 210 }}>
+          <div className="flutuante marcado" style={{ left: Math.max(4, Math.min(larguraHost - 214, emPx((xDe(marcado.de) + xDe(marcado.ate)) / 2) - 105)), top: H + 8, width: 210 }}>
             <div className="tt">
               {Math.min(marcado.de, marcado.ate).toFixed(0)} a {Math.max(marcado.de, marcado.ate).toFixed(0)} m ·{" "}
               {Math.abs(marcado.ate - marcado.de).toFixed(0)} m
@@ -222,7 +273,7 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
         ) : cursor ? (
           <CardFlutuante
             x={emPx(x(cursor.k))}
-            y={8}
+            y={H + 8}
             largura={larguraHost}
             titulo={`${a.distancia_m[idx[cursor.k]].toFixed(0)} m`}
             linhas={[

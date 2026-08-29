@@ -48,7 +48,11 @@ export function MapaDaPista({ tracado, trechos, a, b, larga }: {
 
   const vel = a.canais.velocidade ?? [];
   const brk = a.canais.freio ?? [];
-  const marcha = a.canais.marcha ?? [];
+  // Marcha é sinal de DEGRAU: a reamostragem na grade de distância interpola
+  // e produz 2.37, 3.81... Arredondar aqui impede a legenda de virar um chip
+  // por valor distinto (centenas de chips derrubavam o layout inteiro,
+  // medido em produção em 29/08) e o cursor de mostrar marcha fracionária.
+  const marcha = (a.canais.marcha ?? []).map((g) => Math.round(g));
   const { local } = calcularDelta(a, b);
   const vmax = Math.max(...vel);
 
@@ -59,8 +63,41 @@ export function MapaDaPista({ tracado, trechos, a, b, larga }: {
     return divergente(local[i] * 4);
   };
 
+  // conversao de coordenada do viewBox pra pixel de tela: so serve pra
+  // REPOSICIONAR um ponto que a gente ja sabe (navegacao por teclado), nunca
+  // pra descobrir qual ponto esta sob o cursor (isso continua sendo o
+  // segmento, como o comentario logo acima explica). A direcao ponto->tela e
+  // direta, so aplicar a mesma escala do preserveAspectRatio "meet"; a
+  // direcao tela->ponto, que exigiria reconstruir essa escala na mao, e que o
+  // comentario original evitava, e continua evitando.
+  const paraTela = (vx: number, vy: number) => {
+    const r = host.current?.getBoundingClientRect();
+    if (!r) return { x: vx, y: vy };
+    const esc = Math.min(r.width / W, r.height / H);
+    const offX = (r.width - W * esc) / 2;
+    const offY = (r.height - H * esc) / 2;
+    return { x: offX + vx * esc, y: offY + vy * esc };
+  };
+
   const passo = 3;
   const indices = pts.map((_, i) => i).filter((i) => i % passo === 0);
+
+  // pontos vizinhos disputam o hover porque os segmentos sao curtos e ficam
+  // colados na tela, e o mouse troca de um pro outro so pelo jitter do
+  // sensor. Com um ponto ja selecionado, seta esquerda/direita anda pro
+  // vizinho sem depender de acertar o pixel certo.
+  const navegarTeclado = (e: React.KeyboardEvent) => {
+    if (!cursor.atual) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const pos = indices.indexOf(cursor.atual.i);
+    if (pos < 0) return;
+    const prox = e.key === "ArrowRight" ? Math.min(indices.length - 1, pos + 1) : Math.max(0, pos - 1);
+    const i = indices[prox];
+    const tela = paraTela(px(pts[i]), py(pts[i]));
+    cursor.definir({ i, xPx: tela.x, yPx: tela.y });
+  };
+
   const segmentos = indices.map((i) => {
     const j = (i + passo) % pts.length;
     return (
@@ -82,8 +119,19 @@ export function MapaDaPista({ tracado, trechos, a, b, larga }: {
       return [0, 0.25, 0.5, 0.75, 1].map((t) => ({ cor: rampa(t), rot: (t * vmax).toFixed(0) }));
     if (mapMode === "brake")
       return [0, 0.5, 1].map((t) => ({ cor: rampa(t), rot: `${(t * 100).toFixed(0)}%` }));
-    if (mapMode === "gear")
-      return [...new Set(marcha)].sort((p, q) => p - q).map((g) => ({ cor: rampaFina((g - 1) / 5), rot: `${g}ª` }));
+    if (mapMode === "gear") {
+      if (marcha.length === 0)
+        // degradação declarada: sem canal, o traçado fica neutro e a legenda
+        // diz o porquê, em vez de o modo quebrar a tela
+        return [{ cor: "var(--faint)", rot: "sem canal de marcha neste arquivo" }];
+      // Marchas já inteiras (arredondadas acima); o filtro de faixa é cinto
+      // de segurança contra canal podre (0 ou 99 não são marcha e não podem
+      // multiplicar chips de legenda).
+      return [...new Set(marcha)]
+        .filter((g) => Number.isFinite(g) && g >= 1 && g <= 8)
+        .sort((p, q) => p - q)
+        .map((g) => ({ cor: rampaFina((g - 1) / 5), rot: `${g}ª` }));
+    }
     return [
       { cor: "var(--d-gain)", rot: "ganhando" },
       { cor: "var(--d-mid)", rot: "igual" },
@@ -110,7 +158,13 @@ export function MapaDaPista({ tracado, trechos, a, b, larga }: {
         </span>
       </header>
 
-      <div className={`gr mapa${larga ? " larga" : ""}`} ref={host} onPointerLeave={() => cursor.definir(null)}>
+      <div
+        className={`gr mapa${larga ? " larga" : ""}`}
+        ref={host}
+        tabIndex={0}
+        onKeyDown={navegarTeclado}
+        onPointerLeave={() => cursor.definir(null)}
+      >
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img">
           {segmentos}
           <line
@@ -137,10 +191,31 @@ export function MapaDaPista({ tracado, trechos, a, b, larga }: {
 
         {cursor.atual && (() => {
           const i = cursor.atual.i;
+          // o card antigo seguia o cursor a 130px de distancia, e numa curva
+          // fechada isso ainda cai em cima do proprio tracado (a pista dobra
+          // sobre ela mesma na tela). Aqui ele vai sempre pro canto do host
+          // mais longe do ponto apontado: a pista tem folga (padding P) perto
+          // das bordas, entao o canto mais distante e o que tem menos chance
+          // de ter desenho por baixo.
+          const rect = host.current?.getBoundingClientRect();
+          const hostH = rect?.height ?? H;
+          const L = 210, alturaCard = 150; // estimativa: titulo + 4 linhas + rodape
+          const cantos = [
+            { x: 4, y: 4 },
+            { x: Math.max(4, largura - L - 4), y: 4 },
+            { x: 4, y: Math.max(4, hostH - alturaCard) },
+            { x: Math.max(4, largura - L - 4), y: Math.max(4, hostH - alturaCard) },
+          ];
+          let canto = cantos[0];
+          let melhorDist = -1;
+          for (const c of cantos) {
+            const d = Math.hypot(c.x - cursor.atual.xPx, c.y - cursor.atual.yPx);
+            if (d > melhorDist) { melhorDist = d; canto = c; }
+          }
           return (
             <CardFlutuante
-              x={cursor.atual.xPx}
-              y={Math.max(4, cursor.atual.yPx - 130)}
+              x={canto.x + L / 2}
+              y={canto.y}
               largura={largura}
               titulo={`${pts[i].s_m.toFixed(0)} m`}
               linhas={[

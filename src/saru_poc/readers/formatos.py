@@ -250,6 +250,32 @@ def detectar(caminho: Path) -> Deteccao:
     if not magic:
         return Deteccao(None, "nenhuma", "arquivo vazio")
 
+    # `.xrz` e um `.xrk` inteiro passado no zlib (confirmado em 29/08
+    # descomprimindo arquivo real do acervo: o stream interno comeca em
+    # `<hCNF`, a mesma assinatura do aim_xrk). A deteccao espia o comeco do
+    # conteudo DESCOMPRIMIDO e so aceita se a assinatura interna casar: zlib
+    # embrulha qualquer coisa, e aceitar pelo envelope seria adivinhar formato,
+    # que e a regra que este modulo existe pra nao quebrar.
+    if magic[:1] == b"\x78" and magic[1:2] in (b"\x01", b"\x5e", b"\x9c", b"\xda"):
+        import zlib
+
+        try:
+            interno = zlib.decompressobj().decompress(magic, 64)
+        except zlib.error:
+            interno = b""
+        if interno.startswith(b"<hCNF\x00"):
+            fmt_xrk = FORMATOS_POR_ID["aim_xrk"]
+            return Deteccao(
+                fmt_xrk,
+                "alta",
+                "zlib com stream aim_xrk dentro (.xrz); o leitor descomprime ao ler",
+            )
+        return Deteccao(
+            None,
+            "nenhuma",
+            "zlib valido, mas o conteudo interno nao e um formato conhecido",
+        )
+
     ext = caminho.suffix.lower()
     for fmt in FORMATOS:
         if not fmt.assinatura:

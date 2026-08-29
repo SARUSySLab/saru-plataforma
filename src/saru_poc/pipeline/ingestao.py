@@ -156,6 +156,7 @@ def _resolver_perfil(conn, formato_id, cabecalho, mapa_versao):
             "canal: nao da pra resolver por vocabulario"
         )
 
+    cols_por_perfil: dict[str, set[str]] = {}
     placar = []
     for p in candidatos:
         cols = {
@@ -166,22 +167,70 @@ def _resolver_perfil(conn, formato_id, cabecalho, mapa_versao):
                 (p, mapa_versao),
             )
         }
+        cols_por_perfil[p] = cols
         placar.append((len(lidos & cols), p))
     placar.sort(reverse=True)
     (n_top, top), (n_seg, _) = placar[0], placar[1]
     cobertura = n_top / len(lidos)
     margem = n_top - n_seg
 
-    if cobertura < COBERTURA_MINIMA or margem < MARGEM_MINIMA:
-        return None, (
-            f"nao resolvido entre {len(candidatos)} perfis: melhor foi {top} com "
-            f"{n_top} de {len(lidos)} canais ({cobertura:.0%}, minimo "
-            f"{COBERTURA_MINIMA:.0%}), margem {margem} (minimo {MARGEM_MINIMA})"
+    if cobertura >= COBERTURA_MINIMA and margem >= MARGEM_MINIMA:
+        return top, (
+            f"{top} por sobreposicao de vocabulario: {n_top} de {len(lidos)} canais "
+            f"({cobertura:.0%}), margem {margem} sobre o segundo"
         )
-    return top, (
-        f"{top} por sobreposicao de vocabulario: {n_top} de {len(lidos)} canais "
-        f"({cobertura:.0%}), margem {margem} sobre o segundo"
+
+    motivo_cobertura = (
+        f"nao resolvido entre {len(candidatos)} perfis por cobertura: melhor foi "
+        f"{top} com {n_top} de {len(lidos)} canais ({cobertura:.0%}, minimo "
+        f"{COBERTURA_MINIMA:.0%}), margem {margem} (minimo {MARGEM_MINIMA})"
     )
+
+    # Degrau de desempate: quando a cobertura nao decide (nenhum perfil chega
+    # no piso, ou dois empatam), tenta por coluna discriminante em vez de
+    # desistir direto. A discriminante NAO e uma lista hardcoded (o jeito que
+    # o saru-app fez com `_SIM_HINTS`, e que o proprio arquivo deles avisa que
+    # ja quebrou quando a coluna escolhida a mao era compartilhada por dois
+    # dialetos): aqui ela e DERIVADA do proprio `mapeamento_canal` no banco.
+    # Coluna que so um perfil deste formato mapeia e discriminante por
+    # construcao, porque nenhum outro perfil do mesmo formato pode declarar
+    # que le ela. Isso mantem o catalogo (aliases.yaml) como unica fonte: se
+    # um perfil novo entrar ou um mapeamento mudar, a discriminante
+    # acompanha sem precisar tocar codigo.
+    exclusivas: dict[str, set[str]] = {}
+    for p in candidatos:
+        outras = set()
+        for q in candidatos:
+            if q != p:
+                outras |= cols_por_perfil[q]
+        exclusivas[p] = cols_por_perfil[p] - outras
+
+    achados = []
+    for p in candidatos:
+        presentes = sorted(lidos & exclusivas[p])
+        if presentes:
+            achados.append((p, presentes))
+
+    if len(achados) == 1:
+        perfil, presentes = achados[0]
+        listadas = ", ".join(presentes[:5])
+        sobra = len(presentes) - 5
+        if sobra > 0:
+            listadas += f" e mais {sobra}"
+        return perfil, (
+            f"{perfil} por coluna discriminante: {listadas} "
+            f"so {perfil} mapeia entre os perfis de {formato_id} "
+            f"(cobertura nao decidiu: {motivo_cobertura})"
+        )
+
+    if len(achados) > 1:
+        empatados = ", ".join(p for p, _ in achados)
+        return None, (
+            f"discriminante nao desempatou: {empatados} tem coluna exclusiva "
+            f"presente no arquivo ao mesmo tempo ({motivo_cobertura})"
+        )
+
+    return None, f"{motivo_cobertura}; nenhuma coluna discriminante presente no arquivo"
 
 
 def _mapa_do_perfil(conn, perfil_id: str | None, mapa_versao: str) -> dict[str, tuple]:
@@ -240,7 +289,16 @@ def _escrever_canais(
                  n_amostras        = excluded.n_amostras,
                  valor_min         = excluded.valor_min,
                  valor_max         = excluded.valor_max,
-                 canal_canonico_id = excluded.canal_canonico_id,
+                 -- Reprocessar NAO pode DESAPRENDER. Sem o coalesce, reingerir
+                 -- uma gravacao cujo perfil ficou ambiguo (o acervo tem 3
+                 -- perfis concorrentes pro `.ld`, e nenhum alcanca a cobertura
+                 -- minima em alguns arquivos) sobrescrevia um
+                 -- `canal_canonico_id` CORRETO por NULL, e a temperatura de
+                 -- pneu de 2 gravacoes sumiu exatamente assim. Mapeamento novo
+                 -- vence, ausencia de mapeamento nao.
+                 canal_canonico_id = coalesce(
+                   excluded.canal_canonico_id, canal_gravado.canal_canonico_id
+                 ),
                  unidade_divergente = excluded.unidade_divergente""",
             (
                 gravacao_id,
@@ -327,45 +385,90 @@ def ingerir(conn, arquivo_id: str, *, mapa_versao: str = "2026.08-1") -> Resulta
     amostras = sum(p.linhas for p in ponteiros)
 
     for p in ponteiros:
+        # Slot (gravacao, camada, taxa, serie) ja ocupado por um processamento
+        # anterior? Leitor novo pode produzir conteudo DIFERENTE pra mesma
+        # serie (caso real: o resync de 29/08 recuperou a cauda de arquivos
+        # que antes paravam no meio). O ponteiro anda pro objeto novo em vez
+        # de tentar inserir linha duplicada (violava a unicidade do slot e
+        # derrubava o reprocessamento inteiro); o Parquet antigo continua no
+        # disco, imutavel, enderecado por conteudo.
         linha_serie = conn.execute(
-            """insert into serie_amostral
-                 (gravacao_id, camada, frequencia_hz, mapa_versao, uri,
-                  formato_armazenamento, linhas, bytes, sha256, t_inicio_s, t_fim_s,
-                  escrito_em)
-               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, now())
-               on conflict (sha256) do nothing
-               returning id""",
-            (
-                gravacao_id,
-                p.camada,
-                p.frequencia_hz,
-                p.mapa_versao,
-                p.uri,
-                p.formato_armazenamento,
-                p.linhas,
-                p.bytes_,
-                p.sha256,
-                p.t_inicio_s,
-                p.t_fim_s,
-            ),
+            """select id, sha256 from serie_amostral
+                where gravacao_id = %s and camada = %s and frequencia_hz = %s
+                  and serie = %s and mapa_versao is not distinct from %s""",
+            (gravacao_id, p.camada, p.frequencia_hz, p.serie, p.mapa_versao),
         ).fetchone()
-        if linha_serie is None:
-            # Objeto ja existia: o Parquet e enderecado por conteudo, entao
-            # reprocessar com o mesmo resultado cai aqui e a serie e a mesma.
+        if linha_serie is not None and linha_serie[1].strip() != p.sha256:
+            conn.execute(
+                """update serie_amostral
+                      set uri = %s, formato_armazenamento = %s, linhas = %s,
+                          bytes = %s, sha256 = %s, t_inicio_s = %s,
+                          t_fim_s = %s, escrito_em = now()
+                    where id = %s""",
+                (
+                    p.uri,
+                    p.formato_armazenamento,
+                    p.linhas,
+                    p.bytes_,
+                    p.sha256,
+                    p.t_inicio_s,
+                    p.t_fim_s,
+                    linha_serie[0],
+                ),
+            )
+        elif linha_serie is None:
             linha_serie = conn.execute(
-                "select id from serie_amostral where sha256 = %s", (p.sha256,)
+                """insert into serie_amostral
+                     (gravacao_id, camada, frequencia_hz, mapa_versao, uri,
+                      formato_armazenamento, linhas, bytes, sha256, t_inicio_s, t_fim_s,
+                      serie, escrito_em)
+                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, now())
+                   on conflict (sha256) do nothing
+                   returning id""",
+                (
+                    gravacao_id,
+                    p.camada,
+                    p.frequencia_hz,
+                    p.mapa_versao,
+                    p.uri,
+                    p.formato_armazenamento,
+                    p.linhas,
+                    p.bytes_,
+                    p.sha256,
+                    p.t_inicio_s,
+                    p.t_fim_s,
+                    p.serie,
+                ),
             ).fetchone()
+            if linha_serie is None:
+                # Objeto ja existia: o Parquet e enderecado por conteudo, entao
+                # reprocessar com o mesmo resultado cai aqui e a serie e a mesma.
+                linha_serie = conn.execute(
+                    "select id from serie_amostral where sha256 = %s", (p.sha256,)
+                ).fetchone()
         if linha_serie is None:
             continue
         # Liga o canal ao objeto onde os valores dele moram. Ate a serie
         # existir, `serie_id` fica nulo e o canal esta so catalogado
-        # (migration 008). A ligacao e por taxa nativa porque e assim que o
-        # Parquet foi particionado: um objeto por taxa.
-        conn.execute(
-            """update canal_gravado set serie_id = %s
-               where gravacao_id = %s and frequencia_hz = %s and serie_id is null""",
-            (linha_serie[0], gravacao_id, p.frequencia_hz),
-        )
+        # (migration 008). A ligacao e por taxa E POR NOME: desde a serie
+        # "gps" do .xrk, uma mesma taxa pode ter dois objetos Parquet com
+        # colunas diferentes, e ligar so por taxa penduraria canal na serie
+        # errada (o ponteiro diz quais colunas o objeto dele carrega).
+        if p.colunas:
+            conn.execute(
+                """update canal_gravado set serie_id = %s
+                   where gravacao_id = %s and frequencia_hz = %s
+                     and nome_bruto = any(%s) and serie_id is null""",
+                (linha_serie[0], gravacao_id, p.frequencia_hz, list(p.colunas)),
+            )
+        else:
+            # Ponteiro sem inventario de colunas (produtor antigo): a regra
+            # velha, so por taxa.
+            conn.execute(
+                """update canal_gravado set serie_id = %s
+                   where gravacao_id = %s and frequencia_hz = %s and serie_id is null""",
+                (linha_serie[0], gravacao_id, p.frequencia_hz),
+            )
 
     # `ok` exige as duas coisas: amostra materializada e vocabulario inteiro
     # traduzido. Inventario sem amostra e sucesso parcial, e dizer isso e o

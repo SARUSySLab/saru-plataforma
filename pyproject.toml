@@ -11,6 +11,16 @@ dependencies = [
     "pandas>=2.2",
     "pyyaml>=6.0",
     "python-dotenv>=1.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.9",
+    # Auth (decisao do Lucas, 29/08: pyjwt + argon2, sem framework de auth).
+    # fastavor de nao trazer fastapi-users: ele traz modelo de usuario proprio,
+    # e a tabela `usuario` ja existe em 001_identidade com o schema do catalogo.
+    "pyjwt>=2.9",
+    "argon2-cffi>=23.1",
+    # Cliente HTTP do servidor pra fora: OpenRouter (Sarue) e API de clima.
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
@@ -31,3 +41,8 @@ packages = ["src/saru_poc"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27",
+]

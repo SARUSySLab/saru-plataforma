@@ -1,4 +1,4 @@
-.PHONY: up down setup migrate reset doctor test fmt psql
+.PHONY: up down setup migrate reset doctor test fmt psql pipeline api
 
 up:            ## sobe o Postgres da PoC
 	docker compose --env-file .env up -d
@@ -21,6 +21,15 @@ migrate:       ## aplica as migrations pendentes
 
 doctor:        ## inventaria o acervo e confere o ambiente
 	uv run saru-poc doctor
+
+pipeline:      ## etapas 4 a 6 sobre tudo que ja foi ingerido
+	uv run saru-poc resolver-pista
+	uv run saru-poc cortar-voltas
+	uv run saru-poc decompor
+	uv run saru-poc tracar
+
+api:           ## sobe a API na 8010 (a porta que o vite proxia em /api)
+	uv run uvicorn saru_poc.api:app --port 8010 --reload
 
 psql:
 	psql "postgresql://$${SARU_PG_USER:-saru}:$${SARU_PG_PASSWORD:-saru}@127.0.0.1:$${SARU_PG_PORT:-5442}/$${SARU_PG_DB:-saru_poc}"

@@ -20,7 +20,7 @@ from pathlib import Path
 
 import yaml
 
-from .config import CONFIG
+from .config import CONFIG, REPO_ROOT
 
 # `pista.timezone` e NOT NULL e o tracks.yaml nao traz o campo. Estes sao os
 # fusos dos paises onde cada autodromo fica, escritos um a um em vez de
@@ -95,7 +95,64 @@ class ResumoPistas:
     sem_timezone: list[str] = field(default_factory=list)
 
 
+def caminho_aliases_curados() -> Path:
+    """De-para de venue versionado em `seeds/`.
+
+    O `tracks.yaml` traz so o alias canonico de cada layout. Os outros nascem de
+    duas formas que nao sobrevivem a um banco novo: curados a mao, e APRENDIDOS
+    pela etapa 4 durante a ingestao (`gravar_alias=True`), quando um exportador
+    escreve o nome da pista de um jeito que ainda nao estava no catalogo.
+
+    Sem exportar isso, um ambiente novo perde a memoria de "Zolder" e
+    "Curitiba", e arquivo que resolvia aqui sai como pista nao resolvida la. Foi
+    o que aconteceu no primeiro lote migrado pra producao em 29/08.
+    """
+    return REPO_ROOT / "seeds" / "alias_layout.csv"
+
+
+def semear_aliases_curados(conn) -> int:
+    """Carrega `seeds/alias_layout.csv`. Idempotente.
+
+    Alias ja existente nao e sobrescrito: a chave e (alias, fonte), e o que o
+    ambiente aprendeu sozinho vale tanto quanto o que veio do arquivo.
+    """
+    import csv
+
+    origem = caminho_aliases_curados()
+    if not origem.exists():
+        return 0
+    with origem.open(encoding="utf-8") as fh:
+        linhas = list(csv.DictReader(fh))
+    n = 0
+    for linha in linhas:
+        # layout que nao existe neste catalogo e ignorado em silencio: o CSV
+        # pode ter vindo de um ambiente com mais pistas, e falhar o seed inteiro
+        # por causa de uma linha orfa deixaria o resto de fora
+        existe = conn.execute(
+            "select 1 from layout where id = %s", (linha["layout_id"],)
+        ).fetchone()
+        if not existe:
+            continue
+        n += conn.execute(
+            "insert into alias_layout (alias, layout_id, fonte) values (%s,%s,%s)"
+            " on conflict do nothing",
+            (linha["alias"], linha["layout_id"], linha["fonte"]),
+        ).rowcount
+    return n
+
+
 def caminho_tracks() -> Path:
+    """A copia versionada em `seeds/` vence o snapshot do saru-app.
+
+    O snapshot mora no disco do Lucas (`SARU_APP_REF`), e producao nao pode
+    depender de um caminho que so existe numa maquina: sem isso o container
+    sobe com catalogo vazio e a tela nao tem pista nenhuma pra escolher. O
+    `seeds/` e a fonte de producao; o snapshot fica como fallback pra quem
+    quiser reimportar do saru-app.
+    """
+    versionado = REPO_ROOT / "seeds" / "tracks.yaml"
+    if versionado.exists():
+        return versionado
     return CONFIG.app_ref / "services/telemetry-api/config/tracks.yaml"
 
 
@@ -223,6 +280,32 @@ def semear_pistas(conn, caminho: Path | None = None) -> ResumoPistas:
                     ),
                 )
                 r.curvas += 1
+
+            # O upsert por (layout_id, tipo, ordem) atualiza quem existe e cria
+            # quem falta, mas nunca APAGA quem sobrou: quando uma rodada reduz a
+            # contagem (Curitiba foi de 7 curvas pra 6 na re-derivacao de
+            # 29/08), a ordem excedente ficava no banco com a geometria antiga,
+            # orfa do YAML, e continuava rendendo tempo por trecho de uma curva
+            # que nao existe mais. A ordem de delecao respeita as FKs: filhos
+            # (tempo_trecho, fase, curva/setor) antes do segmento.
+            n_setores = len(v["sector_distances"])
+            n_curvas = len(v.get("corners") or [])
+            for tipo, limite in (("setor", n_setores), ("curva", n_curvas)):
+                orfaos = [
+                    r_[0]
+                    for r_ in conn.execute(
+                        "select id from segmento where layout_id = %s and tipo = %s and ordem > %s",
+                        (tid, tipo, limite),
+                    ).fetchall()
+                ]
+                for seg_orfao in orfaos:
+                    conn.execute(
+                        "delete from tempo_trecho where segmento_id = %s", (seg_orfao,)
+                    )
+                    conn.execute("delete from fase where curva_id = %s", (seg_orfao,))
+                    conn.execute("delete from curva where segmento_id = %s", (seg_orfao,))
+                    conn.execute("delete from setor where segmento_id = %s", (seg_orfao,))
+                    conn.execute("delete from segmento where id = %s", (seg_orfao,))
 
         ids = {v["track_id"] for v in layouts}
         for alias, layout_id in ALIASES_CURADOS.items():

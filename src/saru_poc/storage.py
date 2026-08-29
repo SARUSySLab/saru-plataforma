@@ -13,6 +13,8 @@ decide qual vale e a constraint do banco, nao o filesystem.
 
 from __future__ import annotations
 
+import shutil
+
 import hashlib
 import os
 import tempfile
@@ -45,6 +47,12 @@ class PonteiroSerie:
     t_inicio_s: float
     t_fim_s: float
     formato_armazenamento: str = "parquet"
+    # Rotulo do `Lote.serie` de origem ("" = serie principal da taxa) e as
+    # colunas de canal do Parquet (sem `t_s`). As colunas existem pra ligar
+    # `canal_gravado.serie_id` por NOME: com duas series na MESMA taxa (caso
+    # GPS do .xrk), ligar so por taxa penduraria canal na serie errada.
+    serie: str = ""
+    colunas: tuple[str, ...] = ()
 
 
 def _sha256(caminho: Path) -> str:
@@ -56,16 +64,26 @@ def _sha256(caminho: Path) -> str:
 
 
 def _diretorio(
-    raiz: Path, gravacao_id: str, camada: str, hz: float, mapa: str | None
+    raiz: Path,
+    gravacao_id: str,
+    camada: str,
+    hz: float,
+    mapa: str | None,
+    serie: str = "",
 ) -> Path:
     # Particionado por gravacao e taxa nativa, como o plano fecha. A taxa entra
     # no caminho com 3 casas pra 12.5 Hz e 0.5 Hz nao colidirem em "12" e "0".
+    # `serie` nao-vazia (fluxo paralelo na mesma taxa, ex. GPS do .xrk) vira
+    # particao propria pra nao misturar objetos de fluxos diferentes no mesmo
+    # diretorio.
     partes = [
         raiz,
         f"gravacao={gravacao_id}",
         f"camada={camada}",
         f"taxa={hz:.3f}",
     ]
+    if serie:
+        partes.append(f"serie={serie}")
     if mapa is not None:
         partes.append(f"mapa={mapa}")
     return Path(*partes)
@@ -93,67 +111,83 @@ def escrever_serie(
     if camada == CAMADA_BRUTA and mapa_versao is not None:
         raise ValueError("serie bruta nao tem mapa: os nomes ainda sao do fabricante")
 
-    escritores: dict[float, pq.ParquetWriter] = {}
-    temporarios: dict[float, Path] = {}
-    linhas: dict[float, int] = {}
-    t_min: dict[float, float] = {}
-    t_max: dict[float, float] = {}
-    esquemas: dict[float, pa.Schema] = {}
+    # Chave de escritor: (taxa, rotulo de serie). O rotulo separa fluxos
+    # paralelos que dividem a mesma taxa (GPS do .xrk); DENTRO de uma chave o
+    # esquema continua imutavel e a falha continua alta.
+    Chave = tuple[float, str]
+    escritores: dict[Chave, pq.ParquetWriter] = {}
+    temporarios: dict[Chave, Path] = {}
+    linhas: dict[Chave, int] = {}
+    t_min: dict[Chave, float] = {}
+    t_max: dict[Chave, float] = {}
+    esquemas: dict[Chave, pa.Schema] = {}
 
     try:
         for lote in lotes:
-            hz = lote.frequencia_hz
+            chave = (lote.frequencia_hz, lote.serie)
             tabela = lote.tabela
-            if hz not in escritores:
+            if chave not in escritores:
                 fd, bruto = tempfile.mkstemp(suffix=".parquet")
                 os.close(fd)
-                temporarios[hz] = Path(bruto)
-                esquemas[hz] = tabela.schema
-                escritores[hz] = pq.ParquetWriter(
-                    temporarios[hz], tabela.schema, compression="zstd"
+                temporarios[chave] = Path(bruto)
+                esquemas[chave] = tabela.schema
+                escritores[chave] = pq.ParquetWriter(
+                    temporarios[chave], tabela.schema, compression="zstd"
                 )
-            elif tabela.schema != esquemas[hz]:
+            elif tabela.schema != esquemas[chave]:
                 raise ValueError(
-                    f"lote de {hz} Hz mudou de esquema no meio da serie. "
+                    f"lote de {chave[0]} Hz mudou de esquema no meio da serie. "
                     "Canal que aparece e some no mesmo arquivo precisa de "
                     "decisao explicita, nao de coluna nula silenciosa."
                 )
-            escritores[hz].write_batch(tabela)
-            linhas[hz] = linhas.get(hz, 0) + tabela.num_rows
+            escritores[chave].write_batch(tabela)
+            linhas[chave] = linhas.get(chave, 0) + tabela.num_rows
             if tabela.num_rows:
                 col = tabela.column("t_s")
                 a, b = col[0].as_py(), col[-1].as_py()
-                t_min[hz] = min(t_min.get(hz, a), a)
-                t_max[hz] = max(t_max.get(hz, b), b)
+                t_min[chave] = min(t_min.get(chave, a), a)
+                t_max[chave] = max(t_max.get(chave, b), b)
     finally:
         for w in escritores.values():
             w.close()
 
     ponteiros: list[PonteiroSerie] = []
-    for hz, temporario in temporarios.items():
-        if not linhas.get(hz):
+    for chave, temporario in temporarios.items():
+        hz, serie = chave
+        if not linhas.get(chave):
             temporario.unlink(missing_ok=True)
             continue
         sha = _sha256(temporario)
-        destino_dir = _diretorio(raiz, gravacao_id, camada, hz, mapa_versao)
+        destino_dir = _diretorio(raiz, gravacao_id, camada, hz, mapa_versao, serie)
         destino_dir.mkdir(parents=True, exist_ok=True)
         destino = destino_dir / f"{sha[:12]}.parquet"
         if destino.exists():
             # Mesmo conteudo, mesmo caminho: reprocessamento idempotente.
             temporario.unlink(missing_ok=True)
         else:
-            temporario.replace(destino)
+            # `shutil.move` e nao `Path.replace`: o rename do POSIX so funciona
+            # DENTRO do mesmo dispositivo, e em producao o temporario nasce no
+            # overlay do container enquanto o destino mora num volume montado.
+            # Dispositivos diferentes, e o rename falha com EXDEV (errno 18,
+            # "Invalid cross-device link"). Local nunca aparece porque la e tudo
+            # o mesmo disco. `shutil.move` cai pra copiar e apagar quando
+            # precisa; e mais lento, e so acontece quando o rename nao serve.
+            shutil.move(str(temporario), str(destino))
         ponteiros.append(
             PonteiroSerie(
                 uri=destino.as_uri(),
                 camada=camada,
                 frequencia_hz=hz,
                 mapa_versao=mapa_versao,
-                linhas=linhas[hz],
+                linhas=linhas[chave],
                 bytes_=destino.stat().st_size,
                 sha256=sha,
-                t_inicio_s=t_min[hz],
-                t_fim_s=t_max[hz],
+                t_inicio_s=t_min[chave],
+                t_fim_s=t_max[chave],
+                serie=serie,
+                colunas=tuple(
+                    n for n in esquemas[chave].names if n != "t_s"
+                ),
             )
         )
     return ponteiros

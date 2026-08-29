@@ -129,16 +129,29 @@ def receber(conn, caminhos: list[Path], *, label: str | None = None) -> Recepcao
     primario = next((f for f in PRIORIDADE_PRIMARIO if f in presentes), None)
     if primario is None:
         primario = lidos[0].formato_id
-    # Exatamente um primario por gravacao: se o bundle tem dois arquivos do
-    # mesmo formato campeao, o primeiro em ordem leva, o resto vira backup.
+    # Exatamente um primario por gravacao. Segundo candidato a primario com o
+    # MESMO radical de nome e copia da mesma captura (ex.: .xrk + .xrz do AiM)
+    # e vira backup, como sempre. Com radical DIFERENTE sao capturas
+    # diferentes, e fundir engoliria as voltas de uma delas em silencio (o bug
+    # das "2 voltas" de 29/08): a regra e falhar alto. Quem separa capturas e
+    # `agrupar_bundles`, que todo chamador (CLI e endpoint) usa antes daqui.
     ja_tem_primario = False
+    radical_primario: str | None = None
     for a in lidos:
         papel = _papel(a.formato_id, a.caminho, primario)
         if papel == "primario":
             if ja_tem_primario:
+                if a.caminho.stem != radical_primario:
+                    raise ValueError(
+                        f"dois arquivos primarios do mesmo formato ({a.formato_id}) "
+                        "com nomes diferentes no mesmo bundle: isso fundiria "
+                        "capturas diferentes numa gravacao so e parte das voltas "
+                        "sumiria. Envie cada captura separada."
+                    )
                 papel = "backup"
             else:
                 ja_tem_primario = True
+                radical_primario = a.caminho.stem
         a.papel = papel
 
     if not ja_tem_primario:

@@ -1,0 +1,43 @@
+alias,layout_id,fonte
+Imola,imola,aim_drk
+Interlagos,interlagos_gp,aim_drk
+A.Senna Kart,senna_kart,aim_xrk
+Goiania,goiania,aim_xrk
+Interlagos,interlagos_gp,aim_xrk
+A.Senna Kart,senna_kart,curado
+Autodromo de Interlagos,interlagos_gp,curado
+Autódromo de Interlagos,interlagos_gp,curado
+Ayrton Senna Kart,senna_kart,curado
+Interlagos,interlagos_gp,curado
+Interlagos GP Circuit,interlagos_gp,curado
+Autodromo de Interlagos,interlagos_gp,motec_ld
+Barcelona,barcelona,motec_ld
+Interlagos GP Circuit,interlagos_gp,motec_ld
+Zandvoort,zandvoort,motec_ld
+Zolder,zolder,motec_ld
+Curitiba,curitiba,pi_listhead_dat
+Curitiba,curitiba,pi_pid
+barcelona,barcelona,tracks.yaml
+brasilia_gp,brasilia_gp,tracks.yaml
+cascavel,cascavel,tracks.yaml
+curitiba,curitiba,tracks.yaml
+goiania,goiania,tracks.yaml
+granja_viana,granja_viana,tracks.yaml
+imola,imola,tracks.yaml
+interlagos_gp,interlagos_gp,tracks.yaml
+lago_maggiore,lago_maggiore,tracks.yaml
+lemans,lemans,tracks.yaml
+monza_gp,monza_gp,tracks.yaml
+monza_no_chicane,monza_no_chicane,tracks.yaml
+nordschleife_tourist,nordschleife_tourist,tracks.yaml
+nurburgring,nurburgring,tracks.yaml
+nurburgring_24h,nurburgring_24h,tracks.yaml
+red_bull_ring,red_bull_ring,tracks.yaml
+road_atlanta,road_atlanta,tracks.yaml
+senna_kart,senna_kart,tracks.yaml
+spa_gp,spa_gp,tracks.yaml
+suzuka,suzuka,tracks.yaml
+taruma,taruma,tracks.yaml
+velocita,velocita,tracks.yaml
+zandvoort,zandvoort,tracks.yaml
+zolder,zolder,tracks.yaml

@@ -2,10 +2,13 @@ import type { Relatorio } from "../types/contract";
 import { useSelecao, type PaginaId } from "../state/selection";
 import { caminho, escala } from "../graficos/svg";
 
-// A faixa de quadros da visao geral. Cada quadro e a CAPA de uma pagina: uma
-// pergunta, um numero dominante, uma miniatura da forma do dado. O detalhe
-// abre no clique em vez de empilhar aqui, que e a regra que segura a tela
-// depois do "muita informacao nao e legal" do engenheiro.
+// Capas de pagina do box, no MESMO padrao visual dos cards de dado (cartao
+// chave: header, numero heroi, miniatura, "ver detalhe"). Desde 29/08 as
+// capas se misturam com os cards de dado nas duas linhas 1x4, entao este
+// componente renderiza SO as capas pedidas em `ids`, na ordem pedida, sem
+// grid proprio: a composicao da linha e do App. O detalhe abre no clique em
+// vez de empilhar aqui, que e a regra que segura a tela depois do "muita
+// informacao nao e legal" do engenheiro.
 function Faisca({ vals, destaque, selecionado }: { vals: number[]; destaque: number; selecionado: number }) {
   const W = 200, H = 62;
   const lo = Math.min(...vals), hi = Math.max(...vals);
@@ -23,31 +26,35 @@ function Faisca({ vals, destaque, selecionado }: { vals: number[]; destaque: num
   );
 }
 
-function Barras({ vals, selecionado, foraDaConta }: { vals: number[]; selecionado: number; foraDaConta: Set<number> }) {
-  const W = 200, H = 62;
-  const lo = Math.min(...vals), hi = Math.max(...vals);
-  const larg = W / vals.length - 3;
+/**
+ * Miniatura do tracado pro quadro do mapa (pedido de 29/08: o card estava so
+ * com numero, e o mapa e justamente o quadro cuja forma o piloto reconhece).
+ * So a linha da pista, ajustada na caixa SEM esticar: pista distorcida deixa
+ * de ser reconhecivel, que era o unico trabalho da miniatura.
+ */
+function MiniPista({ pontos }: { pontos: { x: number; y: number }[] }) {
+  const W = 200, H = 62, M = 6;
+  const passo = Math.max(1, Math.floor(pontos.length / 240));
+  const usados = pontos.filter((_, i) => i % passo === 0);
+  const xs = usados.map((p) => p.x), ys = usados.map((p) => p.y);
+  const lox = Math.min(...xs), hix = Math.max(...xs);
+  const loy = Math.min(...ys), hiy = Math.max(...ys);
+  const k = Math.min((W - 2 * M) / (hix - lox || 1), (H - 2 * M) / (hiy - loy || 1));
+  const dx = (W - (hix - lox) * k) / 2, dy = (H - (hiy - loy) * k) / 2;
+  const pts = usados.map((p) => [dx + (p.x - lox) * k, H - dy - (p.y - loy) * k] as [number, number]);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img">
-      {vals.map((v, i) => {
-        const t = (v - lo) / (hi - lo || 1);
-        const h = Math.max(3, (H - 8) * (1 - t * 0.8));
-        return (
-          <rect
-            key={i} x={i * (W / vals.length)} y={H - h} width={larg} height={h} rx={2}
-            fill={foraDaConta.has(i) ? "var(--faint)" : "var(--ch-thr)"}
-            opacity={i === selecionado ? 1 : 0.55}
-          />
-        );
-      })}
+    <svg viewBox={`0 0 ${W} ${H}`} role="img">
+      <path d={caminho(pts) + " Z"} fill="none" stroke="var(--ch-spd)" strokeWidth={2} strokeLinejoin="round" />
     </svg>
   );
 }
 
-export function Quadros({ relatorio, emEscopo, melhorN }: {
+export function Quadros({ relatorio, emEscopo, melhorN, ids }: {
   relatorio: Relatorio;
   emEscopo: number;
   melhorN: number;
+  /** Quais capas renderizar, na ordem em que devem aparecer na linha. */
+  ids: PaginaId[];
 }) {
   const { irPara } = useSelecao();
   const voltas = relatorio.n1.voltas;
@@ -55,12 +62,6 @@ export function Quadros({ relatorio, emEscopo, melhorN }: {
   const perdas = relatorio.n2.por_curva.disponivel ? relatorio.n2.por_curva.itens : [];
   const recuperavel = perdas.filter((p) => p.perda_s > 0).reduce((a, p) => a + p.perda_s, 0);
   const pior = [...perdas].sort((a, b) => b.perda_s - a.perda_s)[0];
-  const consumo = relatorio.n1.consumo.media_etapa;
-  const litros = voltas.map((v) => v.litros ?? 0);
-  const ordenadas = [...validas].sort((a, b) => (a.litros ?? 0) - (b.litros ?? 0));
-  const fora = new Set(
-    voltas.map((v, i) => (!v.valida || v.n === ordenadas[0]?.n || v.n === ordenadas.at(-1)?.n ? i : -1)).filter((i) => i >= 0),
-  );
   const primeiraValida = validas[0];
   const melhor = voltas.find((v) => v.n === melhorN);
 
@@ -76,6 +77,7 @@ export function Quadros({ relatorio, emEscopo, melhorN }: {
       sub: relatorio.tracado.disponivel
         ? <>pico da volta · {relatorio.trechos.disponivel ? `${relatorio.trechos.itens.length} curvas` : "curvas não catalogadas"}</>
         : <span style={{ color: "var(--warn)" }}>sem coordenada no arquivo</span>,
+      viz: relatorio.tracado.disponivel ? <MiniPista pontos={relatorio.tracado.pontos} /> : undefined,
     },
     {
       id: "evolucao", pergunta: "Estou melhorando?", nome: "Evolução por volta",
@@ -84,39 +86,34 @@ export function Quadros({ relatorio, emEscopo, melhorN }: {
       viz: <Faisca vals={voltas.map((v) => v.tempo_s)} destaque={voltas.findIndex((v) => v.n === melhorN)} selecionado={voltas.findIndex((v) => v.n === emEscopo)} />,
     },
     {
-      id: "consumo", pergunta: "Quanto por volta?", nome: "Consumo",
-      valor: consumo.disponivel ? `${consumo.litros_por_volta.toFixed(2)} L` : "sem dado",
-      sub: consumo.disponivel ? <>por volta na etapa</> : consumo.texto,
-      viz: <Barras vals={litros} selecionado={voltas.findIndex((v) => v.n === emEscopo)} foraDaConta={fora} />,
-    },
-    {
       id: "voltas", pergunta: "Qual volta olhar?", nome: "Resumo das voltas",
       valor: String(voltas.length),
       sub: <>voltas · <b>{validas.length}</b> válidas · em escopo: <b>volta {emEscopo}</b></>,
       viz: <Faisca vals={voltas.map((v) => v.v_max_kmh ?? 0)} destaque={voltas.findIndex((v) => v.n === melhorN)} selecionado={voltas.findIndex((v) => v.n === emEscopo)} />,
     },
-    {
-      id: "traco", pergunta: "O que fiz nos controles?", nome: "Traço no tempo",
-      valor: `${voltas.find((v) => v.n === emEscopo)?.acelerador_pleno_pct?.toFixed(0) ?? "-"}%`,
-      sub: <>de acelerador pleno · 4 canais sobrepostos</>,
-    },
   ];
+
+  const pedidos = ids
+    .map((id) => defs.find((d) => d.id === id))
+    .filter((d): d is (typeof defs)[number] => d != null);
 
   return (
     <>
-      <div className="quadros">
-        {defs.map((d) => (
-          <button key={d.id} type="button" className="quadro" onClick={() => irPara({ tipo: "pagina", id: d.id })}>
-            <span className="pergunta-q">{d.pergunta}</span>
-            <span className="nome-q">{d.nome}</span>
-            <span className={`valor-q${/[a-z]/.test(d.valor) && !/km|s$|L$|%$/.test(d.valor) ? " degradado-q" : ""}`}>{d.valor}</span>
-            <span className="sub-q">{d.sub}</span>
+      {pedidos.map((d) => {
+        const degradado = /[a-z]/.test(d.valor) && !/km|s$|L$|%$/.test(d.valor);
+        return (
+          <button key={d.id} type="button" className="cartao chave" onClick={() => irPara({ tipo: "pagina", id: d.id })}>
+            <header>
+              <h4>{d.nome}</h4>
+              <span className="no">{d.pergunta}</span>
+            </header>
+            <p className="heroi" style={degradado ? { fontSize: 17, color: "var(--warn)" } : undefined}>{d.valor}</p>
+            <p className="heroi-sub">{d.sub}</p>
             <span className="viz-q">{d.viz}</span>
             <span className="ir"><span>ver detalhe</span><span>&rsaquo;</span></span>
           </button>
-        ))}
-      </div>
-      <p className="nota">Seis quadros, uma pergunta cada. Clique para abrir o detalhe.</p>
+        );
+      })}
     </>
   );
 }

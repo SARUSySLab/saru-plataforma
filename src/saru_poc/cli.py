@@ -344,11 +344,12 @@ def resolver_pista() -> int:
     from .db import connect
     from .pipeline.resolucao_pista import resolver
 
-    print("\n== resolucao de pista (degrau alias) ==")
+    print("\n== resolucao de pista (degraus alias e GPS) ==")
     with connect() as conn:
         r = resolver(conn)
         conn.commit()
     _linha(OK, f"resolvidas          {r.resolvidas}")
+    _linha(OK, f"  das quais por GPS {r.por_gps}")
     _linha(OK, f"aliases aprendidos  {r.aliases_novos}")
     _linha(AVISO, f"sem venue declarado {r.sem_venue}")
     _linha(AVISO, f"nao resolvidas      {r.nao_resolvidas}")
@@ -360,7 +361,7 @@ def resolver_pista() -> int:
 def seed_pistas() -> int:
     """Transcreve o catalogo de pista do saru-app pro nosso modelo."""
     from .db import connect
-    from .pista import caminho_tracks, semear_pistas
+    from .pista import caminho_tracks, semear_aliases_curados, semear_pistas
 
     origem = caminho_tracks()
     if not origem.exists():
@@ -379,6 +380,10 @@ def seed_pistas() -> int:
     _linha(OK, f"aliases de layout {r.aliases}")
     _linha(OK, f"setores           {r.setores}")
     _linha(OK, f"curvas            {r.curvas}")
+    with connect() as conn:
+        extras = semear_aliases_curados(conn)
+        conn.commit()
+    _linha(OK, f"aliases curados   {extras} (de-para aprendido, seeds/alias_layout.csv)")
     _linha(
         AVISO,
         "fase nao populada: o tracks.yaml da 3 pontos por curva (inicio, apex, "
@@ -472,6 +477,391 @@ def sniff(caminho: Path, *, resumo: bool = False) -> int:
     return 0
 
 
+def cortar_voltas(*, recortar: bool, detalhe: bool) -> int:
+    """Etapa 5: cascata de corte de volta (canal > ldx > gps)."""
+    from .db import connect
+    from .pipeline.corte_voltas import cortar_todas
+
+    print("\n== corte de voltas ==")
+    with connect() as conn:
+        resumo, cortes = cortar_todas(conn, recortar=recortar)
+        conn.commit()
+    _linha(OK, f"gravacoes cortadas  {resumo.cortadas}")
+    _linha(OK, f"voltas gravadas     {resumo.voltas}")
+    if resumo.ja_cortadas:
+        _linha(AVISO, f"ja cortadas         {resumo.ja_cortadas} (use --recortar)")
+    _linha(AVISO, f"nao cortadas        {resumo.nao_cortadas}")
+    if resumo.por_metodo:
+        print("\n  por metodo:")
+        for metodo, n in sorted(resumo.por_metodo.items(), key=lambda x: -x[1]):
+            print(f"    {n:>4}x {metodo}")
+    if resumo.por_taxa:
+        print("\n  taxa da serie que cortou (teto da precisao do tempo):")
+        for taxa, n in sorted(resumo.por_taxa.items(), key=lambda x: -x[1]):
+            print(f"    {n:>4}x {taxa}")
+    if resumo.suspeitas:
+        print(
+            f"\n  {len(resumo.suspeitas)} gravacao(oes) com dispersao de tempo "
+            "suspeita (a mais longa vale mais que 3x a mais curta):"
+        )
+        for gid, razao in sorted(resumo.suspeitas, key=lambda x: -x[1])[:10]:
+            print(f"    {gid}  {razao:.1f}x")
+    if resumo.por_motivo:
+        print("\n  por que nao cortou:")
+        for motivo, n in sorted(resumo.por_motivo.items(), key=lambda x: -x[1]):
+            print(f"    {n:>4}x {motivo}")
+    if detalhe:
+        print("\n  detalhe por gravacao cortada:")
+        for c in cortes:
+            if not c.cortou:
+                continue
+            tempos = ", ".join(f"{v.tempo_s:.3f}" for v in c.voltas[:6])
+            taxa = f"{c.frequencia_hz:g} Hz" if c.frequencia_hz else "-"
+            print(
+                f"    {c.gravacao_id}  {len(c.voltas):>2} volta(s)  "
+                f"{c.metodo_versao:<20} {taxa:>7}  [{tempos}]"
+            )
+    return 0
+
+
+def decompor(*, redecompor: bool, detalhe: bool) -> int:
+    """Etapa 6: tempo por trecho, contra os setores e curvas do layout."""
+    from .db import connect
+    from .pipeline.decomposicao import decompor_todas
+
+    print("\n== decomposicao (tempo por trecho) ==")
+    with connect() as conn:
+        resumo, saidas = decompor_todas(conn, redecompor=redecompor)
+        conn.commit()
+    _linha(OK, f"voltas decompostas  {resumo.decompostas}")
+    _linha(OK, f"trechos gravados    {resumo.trechos}")
+    if resumo.ja_decompostas:
+        _linha(AVISO, f"ja decompostas      {resumo.ja_decompostas} (use --redecompor)")
+    _linha(AVISO, f"nao decompostas     {resumo.nao_decompostas}")
+    if resumo.por_origem:
+        print("\n  eixo de distancia veio de:")
+        for origem, n in sorted(resumo.por_origem.items(), key=lambda x: -x[1]):
+            print(f"    {n:>4}x {origem}")
+    if resumo.fatores:
+        f = resumo.fatores
+        print(
+            f"\n  fator de fechamento: min {min(f):.3f}  "
+            f"mediana {sorted(f)[len(f) // 2]:.3f}  max {max(f):.3f}"
+        )
+    if resumo.por_motivo:
+        print("\n  por que nao decompos:")
+        for motivo, n in sorted(resumo.por_motivo.items(), key=lambda x: -x[1]):
+            print(f"    {n:>4}x {motivo}")
+    if detalhe:
+        print("\n  detalhe das voltas decompostas:")
+        for d in saidas:
+            if not d.decompos:
+                continue
+            print(
+                f"    volta {d.numero:>2}  {d.setores} setor(es) + {d.curvas} curva(s)"
+                f"  eixo {d.dist_origem:<10} fator {d.dist_fator:.3f}"
+            )
+    return 0
+
+
+def tracar(*, rederivar: bool, detalhe: bool) -> int:
+    """Etapa 6, segunda parte: tracado medido de cada volta, do GPS."""
+    from .db import connect
+    from .pipeline.tracado import derivar_todos
+
+    print("\n== tracado medido ==")
+    with connect() as conn:
+        resumo, saidas = derivar_todos(conn, rederivar=rederivar)
+        conn.commit()
+    _linha(OK, f"tracados gravados   {resumo.gravados}")
+    _linha(OK, f"subtracados         {resumo.subtracados}")
+    if resumo.ja_gravados:
+        _linha(AVISO, f"ja derivados        {resumo.ja_gravados} (use --rederivar)")
+    _linha(AVISO, f"nao gravados        {resumo.nao_gravados}")
+    if resumo.por_motivo:
+        print("\n  por que nao gravou:")
+        for motivo, n in sorted(resumo.por_motivo.items(), key=lambda x: -x[1]):
+            print(f"    {n:>4}x {motivo}")
+    if detalhe:
+        for r in saidas:
+            if r.gravou:
+                print(
+                    f"    volta {r.numero:>2}  {r.n_pontos} pontos, "
+                    f"{r.subtracados} subtracado(s), fator {r.fator:.3f}"
+                )
+    return 0
+
+
+def reingerir(*, gravacao: str | None, tudo: bool, desatualizadas: bool = False) -> int:
+    """Reprocessa ingestao que ficou pra tras, etapas 2 a 6, igual upload novo.
+
+    Contexto do bug: em producao, `Path.replace` (storage.py e
+    pipeline/tracado.py) caia com `OSError: Invalid cross-device link` quando
+    origem e destino ficavam em filesystems diferentes. A causa ja foi
+    corrigida (virou `shutil.move`), mas a linha de `ingestao` que registrou o
+    fracasso continua status='falhou' pra sempre: `ingestao` e append-only por
+    desenho (nunca reescreve o passado). E a recepcao dedupe por sha256 do
+    arquivo primario, entao reenviar o mesmo arquivo devolve `ja_existia` e
+    NAO chama `ingerir` de novo. Sem este comando, o arquivo fica preso.
+
+    Por que precisa limpar volta/tempo_trecho/tracado antes de reingerir, e so
+    esses: `ingerir()` (pipeline/ingestao.py) e idempotente por conta propria,
+    escreve linha nova em `ingestao` (append-only, correto) e faz
+    `on conflict do update` em `canal_gravado`/`on conflict do nothing` em
+    `serie_amostral`, entao chamar de novo nao duplica nada ali. O problema e
+    downstream: `cortar()` (pipeline/corte_voltas.py) SO recorta se
+    `recortar=True` quando ja existe volta pra aquela gravacao, e o arquivo que
+    acabou de reingerir pode trazer um canal que a corte anterior nao tinha
+    (ex.: o `.xrk` falhou mas o `.drk` irmao ja tinha cortado por GPS; agora
+    o contador de volta do `.xrk` manda na cascata e produz corte diferente).
+    Manter a volta antiga seria empatar com o resultado de um pipeline
+    incompleto, nao com o de um upload novo, que e o que a tarefa pede. E
+    `tempo_trecho`/`tracado` (+`subtracado`) referenciam `volta` por FK SEM
+    cascade (decisao do catalogo, 28/08: tabela de auditoria/derivado nao pode
+    perder historico em cascade silencioso), entao apagar `volta` sem apagar
+    os dois antes quebra com violacao de FK. A ordem abaixo (subtracado ->
+    tracado -> tempo_trecho -> volta) e a unica que passa pelas FKs.
+
+    O escopo do apagamento e so a(s) gravacao(oes) atingidas pelo arquivo que
+    falhou, nunca o catalogo inteiro: `where session_id = %s` em cada delete.
+    Gravacao e arquivo_bruto em si nunca sao apagados, so o que os proximos
+    passos regravam.
+    """
+    from .db import connect
+    from .pipeline.corte_voltas import cortar
+    from .pipeline.decomposicao import decompor_volta
+    from .pipeline.ingestao import ingerir
+    from .pipeline.resolucao_pista import resolver
+    from .pipeline.tracado import derivar_volta
+
+    status_alvo = {"falhou", "parcial"} if tudo else {"falhou"}
+    if desatualizadas:
+        # Reprocessa TAMBEM o que esta `ok` mas foi lido por versao mais velha
+        # do leitor registrado hoje. E o unico criterio honesto pra reprocessar
+        # `ok`: "ok" continua sendo ok, o que mudou foi o leitor (ex.: decode
+        # tipado fp16 de 29/08, que corrige o VALOR de canais que a versao
+        # anterior lia como int16). O filtro por versao acontece abaixo, na
+        # selecao, porque depende do formato de cada arquivo.
+        status_alvo = status_alvo | {"ok"}
+
+    print("\n== reingestao ==")
+    with connect() as conn:
+        if gravacao:
+            linhas = conn.execute(
+                """select distinct on (i.arquivo_id) i.arquivo_id, i.gravacao_id, i.status
+                     from ingestao i
+                    where i.gravacao_id = %s
+                    order by i.arquivo_id, i.iniciada_em desc, i.id desc""",
+                (gravacao,),
+            ).fetchall()
+        else:
+            linhas = conn.execute(
+                """select distinct on (i.arquivo_id) i.arquivo_id, i.gravacao_id, i.status
+                     from ingestao i
+                    order by i.arquivo_id, i.iniciada_em desc, i.id desc"""
+            ).fetchall()
+
+        if desatualizadas:
+            from .readers import LEITORES
+
+            versao_atual = {fmt: le.versao for fmt, le in LEITORES.items()}
+            versoes = dict(
+                conn.execute(
+                    """select distinct on (i.arquivo_id) i.arquivo_id,
+                              (i.leitor_versao, a.formato_id)
+                         from ingestao i join arquivo_bruto a on a.id = i.arquivo_id
+                        order by i.arquivo_id, i.iniciada_em desc, i.id desc"""
+                ).fetchall()
+            )
+
+            def _desatualizada(arquivo_id, status) -> bool:
+                if status != "ok":
+                    return True  # falhou/parcial ja entram pelo status_alvo
+                par = versoes.get(arquivo_id)
+                if par is None:
+                    return False
+                leitor_versao, formato_id = par
+                atual = versao_atual.get(formato_id)
+                return atual is not None and leitor_versao != atual
+
+            alvos = [
+                (str(arquivo_id), str(gravacao_id))
+                for arquivo_id, gravacao_id, status in linhas
+                if status in status_alvo and _desatualizada(arquivo_id, status)
+            ]
+        else:
+            alvos = [
+                (str(arquivo_id), str(gravacao_id))
+                for arquivo_id, gravacao_id, status in linhas
+                if status in status_alvo
+            ]
+
+        if not alvos:
+            _linha(AVISO, "nenhuma ingestao falhou/parcial pra reprocessar")
+            return 0
+
+        _linha(OK, f"{len(alvos)} arquivo(s) marcado(s) pra reingerir")
+
+        gravacoes = sorted({g for _, g in alvos})
+        for gid in gravacoes:
+            conn.execute(
+                """delete from subtracado where tracado_id in
+                     (select id from tracado where volta_id in
+                        (select id from volta where session_id = %s))""",
+                (gid,),
+            )
+            conn.execute(
+                """delete from tracado where volta_id in
+                     (select id from volta where session_id = %s)""",
+                (gid,),
+            )
+            conn.execute(
+                """delete from tempo_trecho where volta_id in
+                     (select id from volta where session_id = %s)""",
+                (gid,),
+            )
+            conn.execute("delete from volta where session_id = %s", (gid,))
+        conn.commit()
+
+        falharam_de_novo = 0
+        for arquivo_id, _ in alvos:
+            r = ingerir(conn, arquivo_id)
+            conn.commit()
+            if r.status == "falhou":
+                falharam_de_novo += 1
+
+        # Etapas 4 a 6, mesma sequencia e ordem de `_rodar_pipeline` (api.py),
+        # pro resultado sair identico ao de um upload novo.
+        resolver(conn)
+        conn.commit()
+
+        n_voltas = n_trechos = 0
+        for gid in gravacoes:
+            cortar(conn, gid)
+            conn.commit()
+            voltas = [
+                str(r[0])
+                for r in conn.execute(
+                    "select id from volta where session_id = %s order by lap_number",
+                    (gid,),
+                ).fetchall()
+            ]
+            for volta_id in voltas:
+                decompor_volta(conn, volta_id)
+                derivar_volta(conn, volta_id)
+            conn.commit()
+            n_voltas += len(voltas)
+            n_trechos += conn.execute(
+                """select count(*) from tempo_trecho t join volta v on v.id = t.volta_id
+                    where v.session_id = %s""",
+                (gid,),
+            ).fetchone()[0]
+
+    _linha(OK, f"reprocessados         {len(alvos)}")
+    if falharam_de_novo:
+        _linha(FALHA, f"voltaram a falhar     {falharam_de_novo}")
+    else:
+        _linha(OK, "voltaram a falhar     0")
+    _linha(OK, f"gravacoes atingidas   {len(gravacoes)}")
+    _linha(OK, f"voltas no fim         {n_voltas}")
+    _linha(OK, f"trechos no fim        {n_trechos}")
+    return 1 if falharam_de_novo else 0
+
+
+def emitir_relatorio(
+    gravacao_id: str,
+    *,
+    volta: int | None,
+    referencia: int | None,
+    fixture: bool,
+    saida: str | None,
+) -> int:
+    """Etapa 7: monta o relatorio, valida contra o contrato do front e emite."""
+    import json
+
+    from .contrato import carregar, validar
+    from .db import connect
+    from .relatorio import amostras, montar
+
+    print("\n== relatorio (etapa 7) ==")
+    tipos = carregar()
+    with connect() as conn:
+        try:
+            rel = montar(conn, gravacao_id, volta=volta, referencia=referencia)
+        except ValueError as e:
+            _linha(FALHA, str(e))
+            return 1
+        series = {}
+        alvos: list[int | str] = [v["n"] for v in rel["n1"]["voltas"]]
+        alvos.append("media")
+        for alvo in alvos:
+            try:
+                series[alvo] = amostras(conn, gravacao_id, alvo)
+            except ValueError as e:
+                _linha(AVISO, f"amostra da volta {alvo}: {e}")
+        conn.rollback()
+
+    erros = validar(rel, "Relatorio", tipos)
+    for alvo, serie in series.items():
+        erros += [f"volta {alvo}: {x}" for x in validar(serie, "SerieAmostras", tipos)]
+
+    if erros:
+        _linha(FALHA, f"{len(erros)} divergencia(s) contra o contrato do front")
+        for e in erros[:15]:
+            print(f"         {e}")
+        return 1
+    _linha(OK, "bate com o contrato do front (Relatorio + SerieAmostras)")
+
+    mv = rel["n0"]["melhor_volta"]
+    _linha(OK, f"voltas              {len(rel['n1']['voltas'])}")
+    _linha(
+        OK,
+        f"melhor volta        {mv['melhor_volta_s']:.3f} s (volta {mv['melhor_volta_n']})",
+    )
+    if mv["ideal_suprimida"]:
+        _linha(AVISO, "volta ideal         suprimida (guarda do B1)")
+    else:
+        _linha(OK, f"volta ideal         {mv['volta_ideal_s']:.3f} s")
+    for rotulo, bloco in (
+        ("perdas top 3", rel["n0"]["perdas_top3"]),
+        ("n2 por curva", rel["n2"]["por_curva"]),
+        ("n2 micro-setor", rel["n2"]["por_micro_setor"]),
+        ("trechos", rel["trechos"]),
+        ("tracado", rel["tracado"]),
+        ("consumo etapa", rel["n1"]["consumo"]["media_etapa"]),
+        ("contexto sessao", rel["contexto"]["sessao"]),
+    ):
+        if bloco.get("disponivel"):
+            n = len(bloco.get("itens") or bloco.get("pontos") or [])
+            _linha(OK, f"{rotulo:<19} {n} item(ns)")
+        else:
+            _linha(AVISO, f"{rotulo:<19} degradado: {bloco['motivo']}")
+    _linha(OK, f"amostras            {len(series)} serie(s) de {900} pontos")
+
+    if saida:
+        Path(saida).write_text(json.dumps(rel, ensure_ascii=False, indent=2))
+        _linha(OK, f"gravado em          {saida}")
+    if fixture:
+        raiz = CONFIG.data_root.parent / "web" / "src" / "fixtures"
+        (raiz / "relatorio.json").write_text(
+            json.dumps(rel, ensure_ascii=False, indent=2)
+        )
+        pasta = raiz / "amostras"
+        for antigo in pasta.glob("volta-*.json"):
+            antigo.unlink()
+        for alvo, serie in series.items():
+            (pasta / f"volta-{alvo}.json").write_text(
+                json.dumps(serie, ensure_ascii=False)
+            )
+        _linha(OK, f"fixture do front    {raiz} (relatorio + {len(series)} amostras)")
+        _linha(
+            AVISO,
+            "atencao: `npm run dev` roda `npm run fixture` antes de subir e "
+            "sobrescreve isto com o sintetico. Use `npx vite` pra ver o dado real.",
+        )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         prog="saru-poc", description="PoC core SARU - track day"
@@ -496,6 +886,65 @@ def main(argv: list[str] | None = None) -> int:
     am.add_argument("raiz", nargs="?", default=None, help="pasta (default: acervo)")
     sub.add_parser(
         "resolver-pista", help="etapa 4: resolve layout pelo venue declarado"
+    )
+    cv = sub.add_parser(
+        "cortar-voltas", help="etapa 5: corta voltas por canal, ldx ou GPS"
+    )
+    cv.add_argument(
+        "--recortar",
+        action="store_true",
+        help="apaga as voltas ja gravadas e corta de novo",
+    )
+    cv.add_argument(
+        "--detalhe", action="store_true", help="lista os tempos de cada gravacao"
+    )
+    dc = sub.add_parser(
+        "decompor", help="etapa 6: tempo por trecho contra os setores do layout"
+    )
+    dc.add_argument(
+        "--redecompor",
+        action="store_true",
+        help="apaga os tempos de trecho ja gravados e refaz",
+    )
+    dc.add_argument("--detalhe", action="store_true", help="lista volta por volta")
+    tr = sub.add_parser(
+        "tracar", help="etapa 6: deriva o tracado medido de cada volta, do GPS"
+    )
+    tr.add_argument(
+        "--rederivar", action="store_true", help="apaga o tracado gravado e refaz"
+    )
+    tr.add_argument("--detalhe", action="store_true", help="lista volta por volta")
+    rg = sub.add_parser(
+        "reingerir",
+        help="reprocessa ingestao que falhou (arquivo preso por causa ja corrigida)",
+    )
+    rg.add_argument(
+        "--gravacao", default=None, help="limita o reprocessamento a uma gravacao (uuid)"
+    )
+    rg.add_argument(
+        "--tudo",
+        action="store_true",
+        help="reprocessa tambem ingestao parcial, nao so falhou",
+    )
+    rg.add_argument(
+        "--desatualizadas",
+        action="store_true",
+        help=(
+            "reprocessa tambem ingestao ok cujo leitor mudou de versao desde "
+            "entao (combine com --tudo pra cobrir falhou+parcial+ok)"
+        ),
+    )
+    rl = sub.add_parser(
+        "relatorio", help="etapa 7: monta o relatorio e valida contra o contrato"
+    )
+    rl.add_argument("gravacao_id")
+    rl.add_argument("--volta", type=int, default=None, help="volta em escopo")
+    rl.add_argument("--referencia", type=int, default=None, help="volta de referencia")
+    rl.add_argument("--saida", default=None, help="grava o JSON neste caminho")
+    rl.add_argument(
+        "--fixture",
+        action="store_true",
+        help="grava como fixture do front (web/src/fixtures)",
     )
     sp = sub.add_parser(
         "seed-pistas", help="popula pista, layout, setor e curva do tracks.yaml"
@@ -528,6 +977,24 @@ def main(argv: list[str] | None = None) -> int:
         return amostrar(Path(args.raiz) if args.raiz else CONFIG.acervo_root)
     if args.cmd == "resolver-pista":
         return resolver_pista()
+    if args.cmd == "cortar-voltas":
+        return cortar_voltas(recortar=args.recortar, detalhe=args.detalhe)
+    if args.cmd == "decompor":
+        return decompor(redecompor=args.redecompor, detalhe=args.detalhe)
+    if args.cmd == "tracar":
+        return tracar(rederivar=args.rederivar, detalhe=args.detalhe)
+    if args.cmd == "reingerir":
+        return reingerir(
+            gravacao=args.gravacao, tudo=args.tudo, desatualizadas=args.desatualizadas
+        )
+    if args.cmd == "relatorio":
+        return emitir_relatorio(
+            args.gravacao_id,
+            volta=args.volta,
+            referencia=args.referencia,
+            fixture=args.fixture,
+            saida=args.saida,
+        )
     if args.cmd == "seed-pistas":
         return seed_pistas()
     if args.cmd == "seed":

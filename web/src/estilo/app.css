@@ -14,14 +14,21 @@ input, select { font: inherit; }
 .app.recolhido .rail { opacity: 0; pointer-events: none; overflow: hidden; width: 0; padding: 0; border-right: none; }
 
 /* ---------- rail ---------- */
-.rail { border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; transition: opacity .15s; }
-.rail-head { padding: var(--s4); border-bottom: 1px solid var(--border); position: relative; }
+/* `overscroll-behavior: contain` para o scroll do painel NAO vazar pra pagina
+   quando ele chega no fim: sem isso a roda do mouse continuava rolando o
+   dashboard por tras, e o usuario perdia o lugar onde estava lendo.
+   `dvh` e nao `vh` porque a barra do browser no mobile some e volta. */
+.rail { border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; position: sticky; top: 0; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; transition: opacity .15s; }
+/* sticky DENTRO do rail rolavel: em tela baixa o painel rola, mas a marca
+   e o botao de ocultar ficam sempre a vista (pedido de 29/08). Flex no
+   fluxo, nao absoluto: o botao dividia pixel com a logo. */
+.rail-head { padding: var(--s3) var(--s4); border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
 .marca { display: flex; align-items: baseline; gap: var(--s2); padding-right: 92px; }
 .marca .g { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--brand); }
 .marca .v { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-left: auto; }
-.rail-head h1 { font-size: 17px; font-weight: 600; letter-spacing: -.01em; margin-top: 4px; }
+.rail-head h1 { font-size: 17px; font-weight: 600; letter-spacing: -.01em; margin-top: 6px; }
 .rail-head .sub { font-family: var(--mono); font-size: 11px; color: var(--faint); margin: 3px 0 0; }
-.rail-toggle { position: absolute; top: var(--s4); right: var(--s3); font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--muted); line-height: 1; padding: 4px 7px; border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--bg); }
+.rail-toggle { flex: none; font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--muted); line-height: 1; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--bg); cursor: pointer; }
 .rail-toggle:hover { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
 
 .rail-sec { padding: var(--s3) var(--s4); border-bottom: 1px solid var(--border); }
@@ -29,10 +36,14 @@ input, select { font: inherit; }
 .eyebrow { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin: 0; }
 
 .niveis { padding: var(--s2) 0 var(--s3); }
-.nivel { display: flex; gap: var(--s3); width: 100%; text-align: left; padding: 7px var(--s4); border-left: 2px solid transparent; align-items: baseline; }
+.nivel { display: flex; gap: var(--s3); width: 100%; text-align: left; padding: 5px var(--s4); border-left: 2px solid transparent; align-items: baseline; }
 .nivel:hover { background: var(--raised); }
 .nivel[aria-current="true"] { background: var(--brand-soft); border-left-color: var(--brand); }
-.nivel .n { font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: var(--faint); flex: none; width: 18px; }
+/* Icone de traço (Icone.tsx): MESMO tamanho em todos os itens da sidebar,
+   funil e entradas, decisao de 29/08. O alinhamento e pelo topo do texto
+   (translateY) porque o item tem duas linhas e centralizar no bloco
+   deixava o icone flutuando entre elas. */
+.nivel .n { color: var(--faint); flex: none; width: 22px; display: inline-flex; transform: translateY(2px); }
 .nivel[aria-current="true"] .n { color: var(--brand); }
 .nivel .t { font-size: 13px; }
 .nivel[aria-current="true"] .t { font-weight: 600; }
@@ -43,6 +54,9 @@ input, select { font: inherit; }
 
 /* ---------- navbar ---------- */
 .principal { min-width: 0; padding: 0 var(--s6) 120px; }
+/* box: o 120px e folga pro FAB nas paginas que scrollam; aqui ele so
+   fabricava um scroll de 40px em tela baixa (medido em 29/08) */
+.principal.justa { padding-bottom: var(--s4); }
 .navbar { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); margin: 0 calc(var(--s6) * -1); padding: var(--s3) var(--s6); display: flex; align-items: center; column-gap: var(--s4); row-gap: var(--s3); flex-wrap: wrap; }
 .navbar h2 { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
 .navbar .meta { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin: 0; }
@@ -57,15 +71,38 @@ input, select { font: inherit; }
 /* Barra de escopo. Regra de leitura: a cor de destaque marca o que o usuario
    muda; o que vem do arquivo e cinza e nao tem afordancia nenhuma, senao o
    piloto fica tentando clicar no nome do evento. */
-.escopo { flex-basis: 100%; display: flex; align-items: stretch; flex-wrap: wrap; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
+.escopo { flex-basis: 100%; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
+/* Cada linha e um escopo inteiro (evento, bateria, volta, trecho): grid, nao
+   flex solto. As duas linhas tem os MESMOS 4 campos na mesma ordem, entao a
+   mesma grade de colunas (rotulo fixo + 4 colunas iguais) cai exatamente uma
+   embaixo da outra, e o rotulo de cada campo alinha verticalmente entre as
+   duas linhas sem precisar coordenar largura na mao. Em tela estreita a
+   grade vira flex com wrap (media query abaixo): simetria de coluna so
+   importa quando ha coluna de verdade pra alinhar. */
+.escopo-linha { display: grid; grid-template-columns: 148px repeat(5, minmax(0, 1fr)); align-items: stretch; }
+.escopo-linha + .escopo-linha { border-top: 1px solid var(--border); }
+@media (max-width: 760px) {
+  .escopo-linha { display: flex; flex-wrap: wrap; }
+}
+/* Rotulo da linha (nao do campo): distingue de relance "Volta analisada" de
+   "Comparar com" sem precisar ler cada select. Cor de marca na linha de cima
+   (e o escopo principal), tom neutro na de baixo (e o contraste). */
+.escopo-rotulo { display: flex; align-items: center; flex: none; padding: 5px var(--s3); font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; border-right: 1px solid var(--border); white-space: nowrap; }
+.escopo-rotulo-a { color: var(--muted); background: var(--raised); }
+.escopo-rotulo-b { color: var(--muted); background: var(--bg); }
 .escopo-campo { display: flex; flex-direction: column; gap: 1px; padding: 5px var(--s3); border-right: 1px solid var(--border); min-width: 0; }
 .escopo-campo:last-child { border-right: none; }
 .escopo-campo > .k { font-family: var(--mono); font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
-.escopo-campo.editavel > .k { color: var(--brand); }
+.escopo-campo.editavel > .k { color: var(--muted); }
 .escopo-campo > .v { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
-.escopo-campo select { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--brand); background: var(--bg); border: 1px solid var(--brand); border-radius: var(--r-sm); padding: 0 4px; cursor: pointer; max-width: 210px; }
+.escopo-campo select { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text); background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 0 4px; cursor: pointer; max-width: 210px; }
 .escopo-campo select:hover { background: var(--brand-soft); }
-.limpar { font-family: var(--mono); font-size: 9.5px; color: var(--brand); border: 1px solid var(--brand); border-radius: var(--r-sm); padding: 0 5px; line-height: 1.5; margin-left: var(--s2); }
+.limpar { font-family: var(--mono); font-size: 9.5px; color: var(--muted); border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 0 5px; line-height: 1.5; margin-left: var(--s2); }
+/* Guarda de pista: aviso duro, nao um detalhe discreto. Usa a paleta de alerta
+   que ja existe no tema, nunca cor literal, pra funcionar em claro e escuro. */
+.escopo-aviso { display: flex; align-items: center; gap: var(--s2); padding: 6px var(--s3); font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--warn); background: var(--warn-soft); border-top: 1px solid var(--border); }
+/* Nota fixa sobre N0/N2: uma linha, tom apagado, nao compete com o aviso de pista. */
+.escopo-nota { padding: 4px var(--s3); font-family: var(--mono); font-size: 10px; color: var(--faint); border-top: 1px solid var(--border); }
 
 /* ---------- cartoes ---------- */
 .cartao { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--s4); min-width: 0; display: flex; flex-direction: column; }
@@ -116,8 +153,8 @@ button.cartao:hover .ir { color: var(--brand); }
 
 /* Insight usa a cor de destaque, nao a semantica de alerta: a ressalva nao e
    um erro do sistema, e a leitura. */
-.insight { display: flex; gap: var(--s3); align-items: flex-start; margin-top: var(--s3); padding: var(--s3); border-radius: var(--r-md); background: var(--brand-soft); border: 1px solid var(--brand); border-left-width: 3px; }
-.insight .ci { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--brand); flex: none; padding-top: 2px; }
+.insight { display: flex; gap: var(--s3); align-items: flex-start; margin-top: var(--s3); padding: var(--s3); border-radius: var(--r-md); background: var(--warn-soft); border: 1px solid var(--warn); border-left-width: 3px; }
+.insight .ci { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--warn); flex: none; padding-top: 2px; }
 .insight p { margin: 0; font-size: 12.5px; color: var(--muted); }
 
 /* pergunta ativa da ingestao: primeira coisa da tela, porque e a condicao de
@@ -155,7 +192,7 @@ button.cartao:hover .ir { color: var(--brand); }
 .segmentado.igual { display: grid; }
 .segmentado button { font-family: var(--mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; padding: 3px 9px; color: var(--faint); border-right: 1px solid var(--border); text-align: center; }
 .segmentado button:last-child { border-right: none; }
-.segmentado button[aria-pressed="true"] { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
+.segmentado button[aria-pressed="true"] { background: var(--raised); color: var(--text); font-weight: 700; box-shadow: inset 0 0 0 1px var(--border-strong); }
 .segmentado button:disabled { opacity: .35; cursor: not-allowed; }
 
 /* ---------- faixa de perdas ---------- */
@@ -188,13 +225,7 @@ tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 2px 0 0 var(--
 .intervalo .lin { display: flex; justify-content: space-between; gap: var(--s3); }
 
 /* ---------- gavetas ---------- */
-.veu { position: fixed; inset: 0; background: hsl(0 0% 0% / .35); opacity: 0; pointer-events: none; transition: opacity .22s; z-index: 30; }
-.veu.on { opacity: 1; pointer-events: auto; }
-.gaveta { position: fixed; top: 0; right: 0; width: min(440px, 94vw); height: 100vh; background: var(--surface); border-left: 1px solid var(--border-strong); box-shadow: -12px 0 40px hsl(0 0% 0% / .22); transform: translateX(100%); transition: transform .22s cubic-bezier(.4,0,.2,1); z-index: 40; overflow-y: auto; padding: var(--s5); }
-.gaveta.aberta { transform: translateX(0); }
-.gaveta header { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s4); }
-.gaveta h3 { font-size: 16px; font-weight: 600; }
-.gaveta .fechar { margin-left: auto; font-family: var(--mono); font-size: 16px; color: var(--faint); line-height: 1; }
+/* .veu/.gaveta sairam em 29/08: as ex-gavetas usam .modal-veu/.modal-cartao */
 .grupo { margin-top: var(--s5); }
 .grupo h5 { font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--border); padding-bottom: 4px; margin: 0 0 var(--s2); }
 
@@ -208,10 +239,12 @@ tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 2px 0 0 var(--
 .campo.auto > label::after { content: " auto"; font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--ok); }
 
 /* ---------- box ---------- */
-.box-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: var(--s4); margin-top: var(--s4); }
-@media (max-width: 1000px) { .box-grid { grid-template-columns: minmax(0, 1fr); } }
+/* Uma linha, tres colunas (pedido de 29/08): os tres cards do box sao pares
+   e nenhum merece dobro de largura. Em tela estreita empilha. */
+.box-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s4); margin-top: var(--s4); align-items: start; }
+@media (max-width: 1100px) { .box-grid { grid-template-columns: minmax(0, 1fr); } }
 .saida { display: flex; align-items: baseline; gap: var(--s3); margin-top: var(--s4); padding-top: var(--s3); border-top: 1px solid var(--border-strong); }
-.numero { font-family: var(--mono); font-size: 38px; font-weight: 700; letter-spacing: -.03em; line-height: 1; color: var(--brand); }
+.numero { font-family: var(--mono); font-size: 38px; font-weight: 700; letter-spacing: -.03em; line-height: 1; color: var(--text); }
 .un { font-family: var(--mono); font-size: 12px; color: var(--faint); }
 .modelo { margin-top: var(--s3); padding: var(--s3); border-radius: var(--r-md); background: var(--raised); font-size: 11.5px; color: var(--muted); }
 .modelo code { font-size: 11px; color: var(--text); }
@@ -229,19 +262,8 @@ tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 2px 0 0 var(--
 .dupla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); align-items: start; }
 @media (max-width: 1100px) { .dupla { grid-template-columns: minmax(0, 1fr); } }
 
-/* ---------- faixa de quadros ---------- */
-.quadros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); margin-top: var(--s5); }
-@media (max-width: 1100px) { .quadros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 720px) { .quadros { grid-template-columns: minmax(0, 1fr); } }
-.quadro { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--s3) var(--s3) var(--s2); text-align: left; display: flex; flex-direction: column; gap: var(--s2); min-width: 0; transition: border-color .14s, transform .14s; }
-.quadro:hover { border-color: var(--brand); transform: translateY(-2px); }
-.quadro:hover .ir { color: var(--brand); }
-.pergunta-q { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--brand); }
-.nome-q { font-size: 12px; font-weight: 600; color: var(--muted); }
-.valor-q { font-family: var(--mono); font-size: 25px; white-space: nowrap; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
-.valor-q.degradado-q { font-size: 17px; color: var(--warn); }
-.sub-q { font-size: 11px; color: var(--muted); line-height: 1.3; min-height: 28px; }
-.viz-q { height: 62px; display: flex; align-items: flex-end; }
+/* ---------- miniatura dos quadros-capa (segunda linha do box) ---------- */
+.viz-q { height: 62px; display: flex; align-items: flex-end; width: 100%; }
 .viz-q svg { width: 100%; height: 62px; display: block; }
 
 /* Coluna estreita do N0: o cabecalho quebra em vez de espremer, e o numero do
@@ -264,3 +286,139 @@ tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 2px 0 0 var(--
    sair sem empurrar a previsao de dois dias que vem logo abaixo. */
 .faixa-card { position: relative; min-height: 104px; margin-top: var(--s2); }
 .faixa-card .flutuante { box-shadow: 0 4px 14px hsl(0 0% 0% / .14); }
+
+/* --- rodape de marca da sidebar (fase 14) ------------------------------- */
+/* margin-top auto empurra pro fim da coluna flex do .rail sem depender da
+   altura do conteudo acima: com o funil curto ou longo, o rodape fica embaixo. */
+/* `sticky` no fim, e nao so `margin-top: auto`: com o funil inteiro mais os
+   itens fora do funil, o painel rola, e o rodape (tema, conta, sair) saia da
+   tela justo quando alguem precisava dele. Agora ele fica colado embaixo e o
+   conteudo rola por tras. */
+.rail-rodape { margin-top: auto; position: sticky; bottom: 0; background: var(--surface); z-index: 2; padding: var(--s2) var(--s3); border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; }
+.rail-rodape .powered { font-family: var(--mono); font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+/* A marca da LA e vetor inline (ver componentes/MarcaLA.tsx). O monograma
+   mantem o teal da identidade nos dois temas, e o nome herda a cor do texto,
+   entao nao ha variante de arquivo pra manter em sincronia. */
+.marca-la-svg { display: inline-flex; align-items: center; gap: 6px; opacity: .85; }
+.marca-la-svg:hover { opacity: 1; }
+.marca-la-svg svg { width: 15px; height: 14px; flex: none; }
+.marca-la-svg .nome { font-family: var(--display); font-size: 12px; font-weight: 600; color: var(--text); letter-spacing: -.01em; white-space: nowrap; }
+/* "de Software" some no painel estreito: o que identifica e "LA Soluções". */
+.marca-la-svg .cauda { font-weight: 400; color: var(--muted); }
+@media (max-width: 1100px) { .marca-la-svg .cauda { display: none; } }
+.rail-rodape .versao { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 2px; }
+
+/* --- estados de rede (fase 0.2) ----------------------------------------- */
+/* A tela precisa saber dizer POR QUE nao ha dado. Tela vazia calada e a mesma
+   doenca do default silencioso do B2, so que na camada de transporte. */
+/* Centrado nos DOIS eixos, na altura toda da area de conteudo. Antes era
+   `margin: 18vh auto 0`, que so empurra de cima e deixa o bloco alto na tela e
+   fora do centro em monitor grande. `dvh` porque a barra do browser no mobile
+   some e volta. */
+/* Ocupa a viewport inteira e centra nos dois eixos. E o enquadramento de
+   carregando, erro e vazio, que nao tem painel lateral pra dividir espaco. */
+.tela-cheia { min-height: 100dvh; display: grid; place-items: center; padding: var(--s5); background: var(--bg); }
+.tela-cheia .estado-vazio { min-height: 0; }
+
+.estado-vazio { max-width: 46ch; min-height: 78dvh; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s3); }
+.estado-vazio h2 { font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
+.estado-vazio p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.aviso-falha { font-size: 12px; color: var(--warn); background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--r-md); padding: var(--s2) var(--s3); margin-bottom: var(--s3); line-height: 1.4; }
+
+/* Dia de pista: item de ACAO no topo da sidebar, com a cor da marca (pedido
+   de 29/08). O funil abaixo continua neutro: leitura nao compete com acao. */
+.nivel.destaque { background: var(--brand-soft); border-left-color: var(--brand); margin: var(--s2) 0; }
+.nivel.destaque .n, .nivel.destaque .t { color: var(--brand); }
+.nivel.destaque .t { font-weight: 700; }
+
+/* ---------- ajustes de 29/08: cores semanticas + layout novo ---------- */
+
+/* perdas em vermelho e ganhos em verde tambem fora dos graficos: o numero de
+   tempo perdido do N0 e a soma recuperavel seguem a mesma semantica do delta */
+.perda-topo .dt { color: var(--danger); }
+.recuperavel .v, .ok-num { color: var(--ok); }
+
+/* Box (ex visao geral): linha 1x4 com os quatro numeros do dia */
+/* SEMPRE 1x4 (pedido de 29/08): os cards sao compactos e encolhem juntos;
+   so em tela de celular vira coluna unica */
+.n0.quatro { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* squeeze vertical do 2x4 (pedido de 29/08: o box inteiro cabe numa tela sem
+   scroll). So dentro das linhas 1x4: as paginas de detalhe seguem folgadas. */
+.n0.quatro > .cartao { padding: var(--s3); }
+.n0.quatro > .cartao > header { margin-bottom: var(--s2); }
+.n0.quatro .heroi { font-size: clamp(22px, 2vw, 28px); }
+.n0.quatro .heroi-sub { font-size: 11px; margin-top: 4px; }
+.n0.quatro .viz-q, .n0.quatro .viz-q svg { height: 44px; }
+.n0.quatro .gr svg { height: 110px; }
+.n0.quatro .cartao .nota { font-size: 10px; margin-top: var(--s2); }
+.n0.quatro .ir, .n0.quatro .ir-link { padding-top: var(--s2); }
+.n0.quatro .legenda { margin-top: var(--s2); font-size: 10px; }
+@media (max-width: 760px)  { .n0.quatro { grid-template-columns: minmax(0, 1fr); } }
+/* onde perdi tempo: largura inteira, altura do conteudo */
+
+/* escopo retratil: a aba e uma FAIXA inteira centrada no extremo inferior do
+   componente (pedido de 29/08: o botaozinho no canto era invisivel e dificil
+   de acertar). Area de clique generosa, rotulo dizendo o que acontece. */
+.escopo { position: relative; }
+.escopo-aba { display: block; width: 100%; text-align: center; font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); background: none; border: none; border-top: 1px dashed var(--border); padding: 4px 0 5px; cursor: pointer; }
+.escopo-aba:hover { color: var(--brand); background: var(--raised); }
+.escopo.recolhido { padding: 0; }
+.escopo-resumo { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; padding: 6px var(--s4); font-family: var(--mono); font-size: 11.5px; color: var(--text); }
+.escopo-resumo .par em { font-style: normal; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-right: 4px; }
+.escopo-resumo .vs { color: var(--faint); font-weight: 700; }
+/* 1.9: recolhido esconde SO a referencia; o resumo dela vira uma linha com o
+   botao de reabrir ao lado */
+.escopo-resumo .escopo-aba { width: auto; border: none; margin-left: auto; padding: 0 var(--s2); }
+/* 1.11: aviso informativo (escopo mudou), sem tom de erro */
+.escopo-aviso.info { color: var(--muted); background: var(--raised); }
+.escopo-aviso.info .ghost { font-size: 11px; padding: 1px 8px; }
+
+/* modal flutuante (cadastro de evento/sessao/bateria) */
+.modal-veu { position: fixed; inset: 0; background: hsl(0 0% 0% / .45); z-index: 60; display: flex; align-items: center; justify-content: center; padding: var(--s5); }
+.modal-cartao { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-lg); padding: var(--s4) var(--s5); width: min(440px, 100%); max-height: 86vh; overflow: auto; box-shadow: 0 18px 50px hsl(0 0% 0% / .35); }
+.modal-cabeca { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s3); }
+/* ex-gavetas (contexto, ficha de setup) viraram modal (pedido de 29/08):
+   mais largas que o modal de cadastro, com rolagem propria */
+.modal-cartao.modal-gaveta { width: min(720px, 96vw); max-height: 90dvh; }
+.modal-cartao.modal-gaveta .modal-cabeca { align-items: baseline; }
+.modal-cabeca h3 { font-family: var(--display); font-size: 16px; }
+
+/* sidebar compacta: rodape numa linha, respiros menores */
+.rail-rodape { gap: var(--s1); }
+.rail-rodape .powered { display: inline; margin-right: var(--s1); }
+
+.marca-home { min-width: 0; }
+/* NUNCA height:auto aqui: com svg de aspecto largo o auto vencia o height
+   fixo do sessao.css e o header estourava (medido em 29/08) */
+.marca-home .marca-logo { max-width: 100%; display: block; }
+
+/* tema compacto: uma linha discreta no rodape em vez do trio de botoes */
+.tema-ciclo { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); background: none; border: 1px solid var(--border); border-radius: var(--r-sm); padding: 3px 8px; cursor: pointer; }
+.tema-ciclo:hover { color: var(--text); border-color: var(--border-strong); }
+
+/* assinatura em UMA linha miuda no rodape (29/08) */
+.rail-rodape .assinatura { display: inline-flex; align-items: center; gap: 6px; }
+.rail-rodape .assinatura .versao { font-family: var(--mono); font-size: 9px; color: var(--faint); }
+.rail-rodape .assinatura .marca-la-svg svg { width: 11px; height: 10px; }
+.rail-rodape .assinatura .marca-la-svg .nome { font-size: 10.5px; }
+.rail-rodape .assinatura .marca-la-svg .cauda { display: none; }
+
+/* rodape em duas linhas: tema + conta + sair lado a lado, assinatura embaixo */
+.rail-rodape .rail-linha { display: flex; align-items: center; justify-content: center; gap: var(--s2); flex-wrap: wrap; max-width: 100%; }
+
+/* exclusao: vermelho e o unico lugar do vermelho de acao (29/08) */
+.limpar.perigo { color: var(--danger); border-color: var(--danger); }
+.limpar.perigo:hover { background: var(--danger); color: var(--bg); }
+button.perigoso { font-family: var(--data); font-size: 13px; font-weight: 600; color: var(--bg); background: var(--danger); border: 1px solid var(--danger); border-radius: var(--r-sm); padding: 7px 14px; cursor: pointer; }
+button.perigoso:hover { filter: brightness(1.1); }
+
+/* responsividade dos cartoes estreitos (grid 1x4): header e legenda QUEBRAM
+   linha em vez de cortar o segmentado e empilhar texto por cima (29/08) */
+.cartao > header { flex-wrap: wrap; row-gap: 4px; }
+.cartao > header .dir { flex-wrap: wrap; row-gap: 4px; justify-content: flex-end; }
+.legenda { flex-wrap: wrap; row-gap: 3px; }
+.segmentado button { white-space: nowrap; }
+
+/* botao com o MESMO layout do rodape-link dos cards ("ver pneu por canto...") */
+button.ir-link { margin-top: auto; width: 100%; font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); display: flex; justify-content: space-between; padding: var(--s3) 0 0; border: none; border-top: 1px dashed var(--border); background: none; cursor: pointer; }
+button.ir-link:hover { color: var(--brand); }

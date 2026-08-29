@@ -1,0 +1,16 @@
+# O que NAO precisa (nem deve) entrar no contexto de build.
+.venv/
+web/node_modules/
+web/dist/
+data/
+.git/
+__pycache__/
+**/__pycache__/
+*.pyc
+.env
+*.parquet
+.pytest_cache/
+.ruff_cache/
+docs/
+README.md
+tests/

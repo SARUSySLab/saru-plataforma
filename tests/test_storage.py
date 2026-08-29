@@ -70,6 +70,33 @@ def test_canal_que_some_no_meio_da_serie_falha_alto(escrever) -> None:
         )
 
 
+def test_serie_rotulada_convive_com_a_principal_na_mesma_taxa(escrever) -> None:
+    """Caso GPS do .xrk: fluxo paralelo com relogio e colunas proprios na
+    MESMA taxa do grupo principal. O rotulo `serie` separa os escritores (sem
+    ele, o segundo lote quebrava por esquema); cada ponteiro declara as
+    colunas do seu objeto, que e o que a ingestao usa pra ligar canal a serie
+    por NOME e nao so por taxa."""
+    lote_gps = Lote(
+        10.0,
+        pa.RecordBatch.from_pydict(
+            {
+                "t_s": pa.array([0.0, 0.1], pa.float64()),
+                "GPS Latitude": pa.array([-15.8, -15.8], pa.float64()),
+            }
+        ),
+        serie="gps",
+    )
+    ponteiros = escrever("grav-8", [_lote(10.0, 0, 10, ("SPEED",)), lote_gps])
+    assert len(ponteiros) == 2
+    por_serie = {p.serie: p for p in ponteiros}
+    assert por_serie[""].colunas == ("SPEED",)
+    assert por_serie["gps"].colunas == ("GPS Latitude",)
+    assert por_serie[""].uri != por_serie["gps"].uri
+    # A falha alta continua valendo DENTRO de cada rotulo.
+    with pytest.raises(ValueError, match="mudou de esquema"):
+        escrever("grav-9", [lote_gps, Lote(10.0, _lote(10.0, 0, 2).tabela, serie="gps")])
+
+
 def test_serie_canonica_exige_versao_do_mapa(escrever) -> None:
     with pytest.raises(ValueError, match="exige mapa_versao"):
         escrever("grav-5", [_lote(10.0, 0, 10)], camada="canonica")

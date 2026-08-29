@@ -1,12 +1,12 @@
 {
   "name": "web",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "fixture": "node scripts/gerar-fixture.mjs",
-    "dev": "npm run fixture && vite",
-    "build": "npm run fixture && tsc -b && vite build",
+    "dev": "vite",
+    "build": "oxlint --deny react-hooks/rules-of-hooks && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },

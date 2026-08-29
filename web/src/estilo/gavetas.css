@@ -1,0 +1,171 @@
+/* Estilo especifico das gavetas de Ficha de Setup e Contexto da Bateria
+   (fase 4/5: leitura+escrita reais). Reusa os tokens de tokens.css e as
+   classes .campo/.grupo/.nota/.kv/.deg ja definidas em app.css; aqui so o
+   que essas duas gavetas precisam e nao existia ainda: editor de pares
+   chave/valor, botoes de acao, e o carimbo de "versao anterior"/"historico".
+
+   Convencao do projeto: cor de destaque (--brand) marca o que o usuario
+   muda; cinza (--muted/--faint) marca o que vem do arquivo. Os campos de
+   captura usam .destaque pra reforcar isso alem do falta/ok/auto que
+   app.css ja resolve. */
+
+.erro-txt { color: var(--danger); }
+
+/* ---------- ficha de setup: editor de pares ---------- */
+
+.pares-setup { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s2); }
+
+.par-setup {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--s2);
+  align-items: center;
+}
+
+.par-setup input {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+.par-chave { color: var(--brand); border-color: var(--brand) !important; }
+
+.par-remover {
+  color: var(--faint);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+}
+.par-remover:hover { color: var(--danger); border-color: var(--danger); }
+
+.notas-setup {
+  width: 100%;
+  min-height: 56px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 6px 8px;
+  font-size: 12.5px;
+  font-family: var(--data);
+  margin-top: var(--s2);
+}
+
+/* ---------- botoes de acao ---------- */
+
+.btn-secundario {
+  margin-top: var(--s3);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: var(--r-sm);
+  padding: 5px 10px;
+}
+.btn-secundario:hover { background: var(--brand-soft); }
+
+.btn-primario {
+  margin-top: var(--s4);
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: hsl(0 0% 100%);
+  background: var(--brand);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  text-align: center;
+}
+.btn-primario:hover { filter: brightness(1.08); }
+.btn-primario:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---------- versoes anteriores / historico ---------- */
+
+.versao-anterior {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s3);
+  margin-top: var(--s2);
+  background: var(--surface);
+}
+
+.versao-anterior-cab {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s2);
+}
+
+.versao-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-radius: var(--r-sm);
+  padding: 1px 7px;
+}
+
+.versao-data {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+.historico-item {
+  border-left: 2px solid var(--border);
+  padding: var(--s2) 0 var(--s2) var(--s3);
+  margin-top: var(--s2);
+}
+
+/* campo de captura: reforca "isso e o que o usuario esta digitando agora",
+   por cima do falta/ok que app.css ja da a borda */
+.campo.destaque > label { color: var(--brand); }
+
+/* ---------- fase 11: box de leitura (pneu/gasolina) ---------- */
+
+/* app.css so tem falta/ok/auto pra .campo (que tem input). Os boxes de
+   leitura nao tem input, mostram par chave/valor com .kv; esta classe da o
+   mesmo aviso visual (cor de warn, nunca esconder atras de um zero) pro
+   texto puro em vez do input. */
+.kv.falta .v { color: var(--warn); font-style: italic; }
+
+/* aviso inline com icone, versao mais compacta do .deg de app.css (que e
+   pensado pra ocupar o card inteiro). Usado no card de consumo quando falta
+   um dos dois litros pra derivar o consumo. */
+.deg-inline { display: flex; gap: var(--s2); align-items: flex-start; }
+.deg-inline .ico {
+  font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--warn);
+  border: 1px solid var(--warn); border-radius: 50%; width: 16px; height: 16px;
+  display: grid; place-items: center; flex: none; margin-top: 1px;
+}
+
+/* Sugestões de campo da ficha de setup. Chip desabilitado é campo que já está
+   na ficha: some a afordância, não o item, senão a lista muda de tamanho e a
+   pessoa procura o que jurava ter visto. */
+.sugestoes-setup { margin-top: var(--s3); display: flex; flex-direction: column; gap: var(--s2); }
+.sugestao-grupo { display: flex; flex-direction: column; gap: 4px; }
+.sugestao-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 3px 7px; }
+.chip:not(:disabled):hover { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
+.chip:disabled { opacity: .4; }
+
+/* acoes miudas de historico/versao (corrigir, excluir em dois cliques) */
+.hist-acoes { display: inline-flex; gap: var(--s2); margin-left: auto; }
+.mini-acao { font-family: var(--mono); font-size: 10px; color: var(--muted); background: transparent; border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 1px 6px; cursor: pointer; }
+.mini-acao:hover { color: var(--brand); border-color: var(--brand); }
+.mini-acao.perigo { color: var(--danger); border-color: var(--danger); }
+.mini-acao.perigo:hover { background: var(--danger); color: var(--bg); }
+.historico-item.em-correcao { border-color: var(--brand); }

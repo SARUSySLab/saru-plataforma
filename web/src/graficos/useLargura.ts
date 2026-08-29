@@ -20,7 +20,12 @@ export function useLargura(ref: RefObject<HTMLElement | null>, reserva: number) 
     if (!el) return;
     const medir = () => {
       const w = el.clientWidth;
-      if (w > 240) setLargura(Math.round(w));
+      // Guarda so contra caixa AINDA sem layout (0/negativo) ou escondida.
+      // O corte antigo em 240px engolia medida legitima de coluna estreita
+      // (o box virou grid de 3 colunas em 29/08) e a largura ficava presa na
+      // reserva: o SVG esticava e o card flutuante clampava contra uma
+      // largura que nao existia, vazando pra fora da tela.
+      if (w >= 100) setLargura(Math.round(w));
     };
     medir();
     const obs = new ResizeObserver(medir);

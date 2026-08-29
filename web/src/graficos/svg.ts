@@ -31,6 +31,10 @@ export function rampa(t: number) {
  */
 export function rampaFina(t: number) {
   const c = [token("--seq-1"), token("--seq-2"), token("--seq-3"), token("--seq-4"), token("--seq-5")];
+  // NaN (canal ausente no modo escolhido) nao pode virar indice: c[NaN] e
+  // undefined e o .slice de baixo DERRUBAVA o app inteiro (tela branca,
+  // medido em producao em 29/08 no mapa por marcha sem canal de marcha).
+  if (!Number.isFinite(t)) return "var(--faint)";
   const p = Math.max(0, Math.min(1, t)) * (c.length - 1);
   const i = Math.floor(p);
   if (i >= c.length - 1) return c[c.length - 1];
@@ -52,4 +56,18 @@ export const divergente = (t: number) =>
 export function larguraDe(el: HTMLElement | null, padrao: number) {
   const w = el?.clientWidth ?? 0;
   return w > 240 ? Math.round(w) : padrao;
+}
+
+/**
+ * De quantos em quantos itens rotular um eixo categorico (um item por volta,
+ * por ponto etc), calculado pela largura disponivel, e nao um numero fixo
+ * (tipo "so par, de dois em dois"): com poucos itens um passo fixo pula
+ * rotulo a toa, e com muitos itens ele nao pula o bastante e os numeros se
+ * sobrepoem e viram uma tarja ilegivel. `larguraMinima` e o espaco que um
+ * rotulo tipico precisa pra nao encostar no vizinho.
+ */
+export function passoRotulo(nItens: number, larguraDisponivel: number, larguraMinima = 28) {
+  if (nItens <= 1) return 1;
+  const porItem = larguraDisponivel / (nItens - 1);
+  return Math.max(1, Math.ceil(larguraMinima / Math.max(1, porItem)));
 }

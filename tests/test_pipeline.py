@@ -139,3 +139,26 @@ def test_agrupar_bundles_usa_pasta_e_radical() -> None:
     ]
     grupos = agrupar_bundles(caminhos)
     assert sorted(len(g) for g in grupos) == [1, 1, 2]
+
+
+def test_duas_capturas_do_mesmo_formato_nao_fundem(conn) -> None:
+    """O bug das "2 voltas" de 29/08: dois primarios do mesmo formato com
+    radicais DIFERENTES sao capturas diferentes, e fundir engoliria as voltas
+    de uma delas. A recepcao tem que falhar alto, nunca engolir."""
+    distintos: list = []
+    for f in sorted(CONFIG.acervo_root.rglob("*.xrk")):
+        if all(f.stem != d.stem for d in distintos):
+            distintos.append(f)
+        if len(distintos) == 2:
+            break
+    if len(distintos) < 2:
+        pytest.skip("acervo sem duas capturas .xrk distintas")
+    with pytest.raises(ValueError, match="capturas diferentes"):
+        receber(conn, distintos)
+
+
+def test_copia_comprimida_da_mesma_captura_vira_backup(conn) -> None:
+    """.xrk + .xrz do MESMO radical sao a mesma captura duas vezes: o segundo
+    candidato a primario vira backup, sem drama (e o caso sidecar legitimo)."""
+    rec = receber(conn, _bundle_aim())
+    assert [a.papel for a in rec.arquivos].count("primario") == 1

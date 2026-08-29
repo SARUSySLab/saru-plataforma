@@ -31,9 +31,67 @@ make web        # dev server em :5177
 
 ## Estado
 
-Ambiente pronto. Pipeline ainda nao existe: `src/saru_poc/{readers,pipeline}`
-estao vazios de proposito, e `migrations/` so tem o bookkeeping. O schema das
-26 entidades e o proximo passo.
+Pipeline completo (7 etapas) mais a camada HTTP. Medido no catalogo em 29/08:
+198 gravacoes, 686 series em Parquet, 141 voltas, 369 tempos de trecho.
+
+| Etapa | Estado | Onde |
+|---|---|---|
+| 1. Recepcao | pronta | `pipeline/recepcao.py` |
+| 2. Parse | pronta | `pipeline/ingestao.py` + `readers/` |
+| 3. Normalizacao | pronta (camada bruta) | `storage.py`, `pipeline/leitura.py` |
+| 4. Resolucao de pista | degrau alias | `pipeline/resolucao_pista.py` |
+| 5. Corte de voltas | pronta | `pipeline/corte_voltas.py` |
+| 6. Decomposicao | pronta | `pipeline/decomposicao.py` + `pipeline/tracado.py` |
+| 7. Relatorio e insight | pronta | `relatorio.py` |
+| API | pronta (leitura + upload) | `api.py` |
+
+```bash
+make pipeline   # etapas 4 a 6 sobre o que ja foi ingerido
+make api        # API na 8010, que o vite ja proxia em /api
+uv run saru-poc relatorio <gravacao_id> --fixture   # etapa 7 -> fixture do front
+```
+
+### Rotas
+
+| Rota | O que devolve |
+|---|---|
+| `GET /api/saude` | ping do Postgres |
+| `GET /api/gravacoes?com_volta=` | catalogo, com quantas voltas e trechos cada uma tem |
+| `GET /api/relatorio/{id}?volta=&referencia=` | `Relatorio` do contrato, pro par em escopo |
+| `GET /api/gravacoes/{id}/amostras?volta=` | `SerieAmostras` na grade comum (900 pontos) |
+| `POST /api/gravacoes` | recebe bundle, devolve 202 e roda as etapas 2 a 6 em background |
+| `POST /api/gravacoes/{id}/contexto` | captura de contexto de sessao (bloco 15) |
+
+Toda resposta de leitura e validada contra `web/src/types/contract.ts` antes de
+sair (`SARU_VALIDA_CONTRATO=1`, default). Divergencia de shape vira 500 no
+servidor em vez de tela quebrada no cliente. O validador esta em `contrato.py`,
+le o proprio `.ts` como fonte e nao precisou de dependencia nova no front.
+
+### Dividas medidas, nao supostas
+
+- **100 gravacoes PI** (`pi_pid`, `listhead_dat`) tem corte de volta dentro do
+  arquivo (`EVNT_B0`) que o leitor ainda nao decodifica: nao cortam, com motivo.
+- **17 gravacoes cortam por canal a 1 Hz**, o que da tempo de volta inteiro em
+  segundos. Refinar o instante do corte contra serie de taxa alta segue aberto.
+- **Curitiba: 67 voltas recusadas na decomposicao.** O catalogo diz 3.220 m e o
+  carro anda 3.749 m (razao 1,164, medida em 67 voltas, com canal de distancia e
+  integral da velocidade concordando entre si). O comprimento cadastrado
+  provavelmente esta errado, ou e outro layout. Decisao de dominio, nao de
+  codigo.
+- **As 3 gravacoes GT7 tem GPS de Donington Park declarando Interlagos.** A
+  pista esta certa (distancia por volta da 4.217 m contra 4.309 m de
+  Interlagos); o exportador emite coordenada de outro lugar. Corte por GPS e
+  tracado recusam as duas com o tamanho do erro na mensagem.
+- **Zero tracado gravado**, por consequencia do item acima: `tracado` e
+  `subtracado` estao implementados e vazios, esperando GPS coerente.
+- **Consumo de combustivel**: existe `Fuel Level` como canal bruto no acervo,
+  mas nao ha canal canonico de combustivel no vocabulario. O bloco 14 degrada
+  com `sem_canal_combustivel` ate o canal entrar no mapa.
+- **`fase` vazia no catalogo**, entao `tempo_por_fase` sai sempre declarado como
+  indisponivel.
+- O canal de volta e casado por NOME BRUTO, nao pelo vocabulario canonico. O
+  acervo prova que nome igual nao garante semantica igual (um `Lap Number` que
+  vai de 28 a 2572, rejeitado pela guarda de densidade).
 
 ## Regras que este repo carrega do plano
 

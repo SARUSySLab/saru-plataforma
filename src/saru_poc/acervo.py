@@ -26,7 +26,7 @@ from typing import Any
 
 import yaml
 
-from .config import CONFIG
+from .config import CONFIG, REPO_ROOT
 from .readers import FORMATOS_POR_ID, LEITORES
 
 # Uma grandeza por unidade canonica distinta encontrada no aliases.yaml. Nao ha
@@ -121,10 +121,18 @@ class Resumo:
 
 
 def caminho_aliases() -> Path:
-    return (
-        CONFIG.app_ref
-        / "services/telemetry-api/saru_lapanalyzer/infra/mapping/aliases.yaml"
-    )
+    """A copia versionada em `seeds/` vence o snapshot do saru-app.
+
+    O snapshot mora no disco do Lucas (`SARU_APP_REF`), e producao nao pode
+    depender de um caminho que so existe numa maquina: sem isso o container
+    sobe com catalogo vazio e a tela nao tem pista nenhuma pra escolher. O
+    `seeds/` e a fonte de producao; o snapshot fica como fallback pra quem
+    quiser reimportar do saru-app.
+    """
+    versionado = REPO_ROOT / "seeds" / "aliases.yaml"
+    if versionado.exists():
+        return versionado
+    return CONFIG.app_ref / "services/telemetry-api/saru_lapanalyzer/infra/mapping/aliases.yaml"
 
 
 def _decompor(canal: str) -> tuple[str | None, str | None]:

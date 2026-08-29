@@ -1,0 +1,510 @@
+# config/tracks.yaml
+# ---------------------------------------------------------------------------
+# Catálogo de pistas do SARU LapAnalyzer.
+#
+# Campos obrigatórios por entrada:
+#   track_id            Identificador único snake_case (ex: interlagos_gp).
+#                       Deve corresponder ao hint extraído do nome do arquivo
+#                       de telemetria para detecção automática.
+#   track_name          Nome legível exibido na UI.
+#   length_m            Comprimento total da pista [m].
+#   sector_distances    Lista com a distância acumulada ao FIM de cada setor [m].
+#                       Ex: [1200.0, 2600.0, 4309.0] → 3 setores, último = length_m.
+#   corners             Lista de curvas. Cada curva:
+#     corner_id         Identificador curto (T1, S1, etc.)
+#     label             Nome legível para UI e relatório.
+#     s_start           Início da freada [m].
+#     s_apex            Distância do apex [m].
+#     s_end             Fim da zona de saída [m].
+#
+# Campos opcionais:
+#   ref_lat / ref_lon   Coordenada de referência do traçado [graus, WGS84]. Serve
+#                       para identificar a pista pelo GPS do arquivo: o centróide
+#                       dos fixes da sessão é comparado com esta referência, e a
+#                       pista mais próxima dentro do raio de tolerância vence.
+#                       NÃO é a linha de chegada — é um ponto qualquer dentro do
+#                       traçado, então erro de algumas centenas de metros é
+#                       irrelevante.
+#
+#                       REGRA DURA: só entra aqui coordenada MEDIDA de arquivo
+#                       real do acervo, ou trazida pelo operador com fonte. Nunca
+#                       de memória. Coordenada errada faz a detecção casar a pista
+#                       errada EM SILÊNCIO — pior que o 422 que pergunta.
+#
+#                       As presentes hoje foram medidas em 2026-08-13 como mediana
+#                       de gps_lat/gps_lon sobre os fixes válidos dos arquivos do
+#                       acervo (83 arquivos lidos de 240 candidatos). Espalhamento
+#                       entre arquivos do mesmo grupo: 20 a 501 m.
+#
+#                       AUSENTE = ainda não medida. Não é esquecimento; é falta de
+#                       fonte. Faltam 18 das 22, por dois motivos:
+#                       · o acervo tem arquivo mas o formato não carrega GPS
+#                         (ACC `.ld` só tem G_LAT/G_LON, que é ACELERAÇÃO, não
+#                         coordenada): monza_gp, barcelona, nurburgring,
+#                         zandvoort, zolder;
+#                       · não há arquivo nenhum no acervo: spa_gp, imola,
+#                         nurburgring_24h, lemans, lago_maggiore, road_atlanta,
+#                         nordschleife_tourist, monza_no_chicane, red_bull_ring,
+#                         suzuka, velocita, taruma, brasilia_gp.
+#                       TODO(operador): pesquisa preparada em
+#                       docs/research/prompt-coordenadas-pistas-2026-08-13.md
+#
+#                       ATENÇÃO — perfil `gt7_ld` NÃO serve como fonte. Medido:
+#                       os três arquivos GT7 do acervo declaram "Interlagos" e
+#                       caem todos em 52.83 / -1.38 (Reino Unido), a 9.600 km do
+#                       Interlagos real, com espalhamento de 14 m entre si. A
+#                       FORMA é verdadeira (bbox 650×1035 m e volta de 4221 m,
+#                       iguais às dos arquivos AiM reais) — o que é falso é a
+#                       ORIGEM, um placeholder fixo do export. Manter `gt7_ld`
+#                       fora da cascata de detecção por coordenada.
+#
+# Campo gerado automaticamente:
+#   track_map           Coordenadas 2D normalizadas [-1, 1]. Null até ser gerado.
+#                       GERAÇÃO: após carregar um arquivo de telemetria desta pista,
+#                       execute o CLI abaixo para preencher o campo track_map:
+#
+#                         python -m saru_lapanalyzer.tools.trackmap_cli \
+#                           --input data/samples/<sim>/<track>/<arquivo>.ld \
+#                           --track-id <track_id> \
+#                           --sim <acc|iracing|gt7|ams2>
+#
+#                       O CLI grava as coordenadas diretamente neste arquivo.
+#                       Recomenda-se usar a volta de melhor traçado (sem erros de pista).
+# ---------------------------------------------------------------------------
+
+# Raio de aceite do casamento por GPS ("estar no autódromo"), em km. Decisão
+# Vitor 2026-08-20, com dado do acervo na mesa: espalhamento interno medido de
+# 501 m (interlagos_gp, 29 arquivos) e 475–491 m nos três .vbo do Giaffone;
+# pista errada mais próxima do catálogo a 318,8 km (curitiba↔interlagos_gp).
+# 5 km = 10× o espalhamento medido, 60× abaixo da separação mínima. O casamento
+# só vale quando é ÚNICO dentro do raio — dois candidatos = ninguém ganha.
+gps_match_radius_km: 5.0
+
+tracks:
+  - track_id: senna_kart
+    track_name: "Kartódromo Ayrton Senna"
+    length_m: 1150.0
+    sector_distances: [380.0, 760.0, 1150.0]
+    corners:
+      - {corner_id: T1, label: "Curva 1", s_start: 50.0, s_apex: 120.0, s_end: 180.0}
+      - {corner_id: T2, label: "Curva do S", s_start: 300.0, s_apex: 370.0, s_end: 450.0}
+      - {corner_id: T3, label: "Curva da Mata", s_start: 600.0, s_apex: 680.0, s_end: 750.0}
+
+  - track_id: granja_viana
+    track_name: "Kartódromo Granja Viana"
+    length_m: 1020.0
+    sector_distances: [340.0, 680.0, 1020.0]
+    corners:
+      - {corner_id: T1, label: "Curva 1", s_start: 40.0, s_apex: 100.0, s_end: 160.0}
+      - {corner_id: T2, label: "Miolo", s_start: 400.0, s_apex: 480.0, s_end: 560.0}
+
+  - track_id: interlagos_gp
+    track_name: "Autódromo José Carlos Pace — GP"
+    length_m: 4309.0
+    # Medido 2026-08-13 · 29 arquivos (25 nomes distintos), espalhamento 501 m.
+    # Ex.: data/telemetry/pendrive_amg_a45/25ET06 - Interlagos/Corrida 2 - Todos
+    # os carros/A45 Pro 2026 6et C2 P0 #22.DLF
+    ref_lat: -23.700710
+    ref_lon: -46.698711
+    sector_distances: [1200.0, 2600.0, 4309.0]
+    corners:
+      - {corner_id: T1,  label: "Curva 1 (Senna)",      s_start: 80.0,   s_apex: 200.0,  s_end: 320.0}
+      - {corner_id: T2,  label: "Curva S (Ferradura)",  s_start: 420.0,  s_apex: 550.0,  s_end: 680.0}
+      - {corner_id: T3,  label: "Curva 3",              s_start: 730.0,  s_apex: 820.0,  s_end: 900.0}
+      - {corner_id: T4,  label: "Descida do Lago",      s_start: 980.0,  s_apex: 1050.0, s_end: 1150.0}
+      - {corner_id: T5,  label: "Mergulho",             s_start: 1380.0, s_apex: 1460.0, s_end: 1560.0}
+      - {corner_id: T6,  label: "Laranjinha",           s_start: 1700.0, s_apex: 1800.0, s_end: 1900.0}
+      - {corner_id: T7,  label: "Pinheirinho",          s_start: 2050.0, s_apex: 2160.0, s_end: 2280.0}
+      - {corner_id: T8,  label: "Bico de Pato",         s_start: 2380.0, s_apex: 2460.0, s_end: 2550.0}
+      - {corner_id: T9,  label: "Junção",              s_start: 2700.0, s_apex: 2780.0, s_end: 2850.0}
+      - {corner_id: T10, label: "Subida dos Boxes",     s_start: 3900.0, s_apex: 4000.0, s_end: 4100.0}
+    track_map: null
+
+  # Autódromo Internacional de Cascavel (Zilmar Beux) — Copa Truck.
+  # Corners PROVISÓRIOS (distâncias aproximadas; refinar com traçado GPS real).
+  - track_id: cascavel
+    track_name: "Autódromo Internacional de Cascavel"
+    length_m: 3052.0
+    # Medido 2026-08-13 · 1 arquivo. Comprimento medido 3002 m (0,984 do catálogo).
+    # data/telemetry/aim_xrk_copatruck/Rafa Lopes _8_Cascavel PR_Qualifying_a_1565.xrk
+    ref_lat: -24.982076
+    ref_lon: -53.388518
+    sector_distances: [1050.0, 2050.0, 3052.0]
+    corners:
+      - {corner_id: T1, label: "Curva 1", s_start: 60.0,   s_apex: 150.0,  s_end: 260.0}
+      - {corner_id: T2, label: "Curva 2", s_start: 400.0,  s_apex: 500.0,  s_end: 620.0}
+      - {corner_id: T3, label: "Curva 3", s_start: 1150.0, s_apex: 1260.0, s_end: 1380.0}
+      - {corner_id: T4, label: "Curva 4", s_start: 1600.0, s_apex: 1720.0, s_end: 1850.0}
+      - {corner_id: T5, label: "Curva 5", s_start: 2150.0, s_apex: 2260.0, s_end: 2380.0}
+      - {corner_id: T6, label: "Curva 6", s_start: 2600.0, s_apex: 2720.0, s_end: 2850.0}
+    track_map: null
+
+  - track_id: monza_gp
+    track_name: "Autodromo Nazionale Monza — GP"
+    length_m: 5793.0
+    sector_distances: [1750.0, 3500.0, 5793.0]
+    corners:
+      - {corner_id: T1, label: "Prima Variante",    s_start: 280.0,  s_apex: 380.0,  s_end: 500.0}
+      - {corner_id: T2, label: "Seconda Variante",  s_start: 1100.0, s_apex: 1180.0, s_end: 1280.0}
+      - {corner_id: T3, label: "Variante Ascari",   s_start: 3200.0, s_apex: 3350.0, s_end: 3500.0}
+      - {corner_id: T4, label: "Parabolica",        s_start: 5150.0, s_apex: 5350.0, s_end: 5550.0}
+    track_map: null
+
+  - track_id: spa_gp
+    track_name: "Circuit de Spa-Francorchamps — GP"
+    length_m: 7004.0
+    sector_distances: [2100.0, 4600.0, 7004.0]
+    corners:
+      - {corner_id: T1, label: "La Source",          s_start: 50.0,   s_apex: 120.0,  s_end: 200.0}
+      - {corner_id: T2, label: "Raidillon/Eau Rouge", s_start: 500.0,  s_apex: 620.0,  s_end: 750.0}
+      - {corner_id: T3, label: "Les Combes",         s_start: 1900.0, s_apex: 2000.0, s_end: 2100.0}
+      - {corner_id: T4, label: "Pouhon",             s_start: 3200.0, s_apex: 3350.0, s_end: 3500.0}
+      - {corner_id: T5, label: "Blanchimont",        s_start: 5600.0, s_apex: 5750.0, s_end: 5900.0}
+      - {corner_id: T6, label: "Bus Stop",           s_start: 6600.0, s_apex: 6750.0, s_end: 6900.0}
+    track_map: null
+
+  # Alias para compatibilidade com nomes de arquivo ACC (ex: "Barcelona-...")
+  - track_id: barcelona
+    track_name: "Circuit de Barcelona-Catalunya — GP"
+    length_m: 4675.0
+    sector_distances: [1300.0, 3100.0, 4675.0]
+    corners:
+      - {corner_id: T1,  label: "Elf",               s_start: 50.0,   s_apex: 130.0,  s_end: 230.0}
+      - {corner_id: T2,  label: "Renault",           s_start: 300.0,  s_apex: 420.0,  s_end: 530.0}
+      - {corner_id: T3,  label: "Repsol",            s_start: 700.0,  s_apex: 800.0,  s_end: 880.0}
+      - {corner_id: T4,  label: "Seat",              s_start: 950.0,  s_apex: 1050.0, s_end: 1150.0}
+      - {corner_id: T5,  label: "Chicane S/F",       s_start: 1200.0, s_apex: 1300.0, s_end: 1420.0}
+      - {corner_id: T6,  label: "Wurth",             s_start: 1900.0, s_apex: 2000.0, s_end: 2100.0}
+      - {corner_id: T7,  label: "Campsa",            s_start: 2300.0, s_apex: 2450.0, s_end: 2600.0}
+      - {corner_id: T8,  label: "La Caixa",          s_start: 2750.0, s_apex: 2880.0, s_end: 3000.0}
+      - {corner_id: T9,  label: "Banc Sabadell",     s_start: 3100.0, s_apex: 3220.0, s_end: 3350.0}
+      - {corner_id: T10, label: "New Holland",       s_start: 3500.0, s_apex: 3620.0, s_end: 3750.0}
+      - {corner_id: T11, label: "Europcar",          s_start: 3900.0, s_apex: 4020.0, s_end: 4150.0}
+      - {corner_id: T12, label: "Final chicane",     s_start: 4300.0, s_apex: 4450.0, s_end: 4600.0}
+    track_map: null
+
+  - track_id: imola
+    track_name: "Autodromo Enzo e Dino Ferrari — Imola"
+    length_m: 4909.0
+    sector_distances: [1450.0, 3000.0, 4909.0]
+    corners:
+      - {corner_id: T1,  label: "Tamburello",        s_start: 100.0,  s_apex: 230.0,  s_end: 380.0}
+      - {corner_id: T2,  label: "Villeneuve",        s_start: 550.0,  s_apex: 650.0,  s_end: 750.0}
+      - {corner_id: T3,  label: "Tosa",              s_start: 900.0,  s_apex: 1020.0, s_end: 1150.0}
+      - {corner_id: T4,  label: "Piratella",         s_start: 1600.0, s_apex: 1750.0, s_end: 1900.0}
+      - {corner_id: T5,  label: "Acque Minerali",    s_start: 2100.0, s_apex: 2250.0, s_end: 2400.0}
+      - {corner_id: T6,  label: "Variante Alta",     s_start: 2700.0, s_apex: 2850.0, s_end: 3000.0}
+      - {corner_id: T7,  label: "Rivazza 1",         s_start: 3600.0, s_apex: 3750.0, s_end: 3900.0}
+      - {corner_id: T8,  label: "Rivazza 2",         s_start: 3950.0, s_apex: 4050.0, s_end: 4150.0}
+      - {corner_id: T9,  label: "Variante Bassa",    s_start: 4400.0, s_apex: 4550.0, s_end: 4700.0}
+    track_map: null
+
+  - track_id: nurburgring
+    track_name: "Nurburgring — GP"
+    length_m: 5148.0
+    sector_distances: [1500.0, 3100.0, 5148.0]
+    corners:
+      - {corner_id: T1,  label: "Einfahrt Motodrom",  s_start: 50.0,   s_apex: 150.0,  s_end: 270.0}
+      - {corner_id: T2,  label: "Mercedes Arena",    s_start: 500.0,  s_apex: 650.0,  s_end: 820.0}
+      - {corner_id: T3,  label: "Dunlop-Kehre",      s_start: 1100.0, s_apex: 1250.0, s_end: 1400.0}
+      - {corner_id: T4,  label: "NGK Schikane",      s_start: 1800.0, s_apex: 1950.0, s_end: 2100.0}
+      - {corner_id: T5,  label: "Bit-Kurve",         s_start: 2600.0, s_apex: 2750.0, s_end: 2900.0}
+      - {corner_id: T6,  label: "Ford Kurve",        s_start: 3400.0, s_apex: 3550.0, s_end: 3700.0}
+      - {corner_id: T7,  label: "Coca-Cola Kurve",   s_start: 4200.0, s_apex: 4380.0, s_end: 4550.0}
+      - {corner_id: T8,  label: "Einfahrt Motodrom", s_start: 4800.0, s_apex: 4950.0, s_end: 5050.0}
+    track_map: null
+
+  - track_id: nurburgring_24h
+    track_name: "Nurburgring — 24h (Nordschleife+GP)"
+    length_m: 25378.0
+    sector_distances: [6000.0, 13000.0, 25378.0]
+    corners: []  # corners a definir
+    track_map: null
+
+  # ---------------------------------------------------------------------------
+  # GT7-specific tracks (validated with Luis data)
+  # ---------------------------------------------------------------------------
+
+  - track_id: lemans
+    track_name: "Circuit de la Sarthe — 24 Heures du Mans"
+    length_m: 13626.0
+    sector_distances: [3500.0, 7500.0, 13626.0]
+    corners:
+      - {corner_id: T1,  label: "Dunlop Chicane",        s_start: 50.0,    s_apex: 150.0,   s_end: 280.0}
+      - {corner_id: T2,  label: "Tertre Rouge",          s_start: 1700.0,  s_apex: 1850.0,  s_end: 1950.0}
+      - {corner_id: T3,  label: "Mulsanne Chicane 1",    s_start: 4700.0,  s_apex: 4900.0,  s_end: 5100.0}
+      - {corner_id: T4,  label: "Mulsanne Chicane 2",    s_start: 6500.0,  s_apex: 6700.0,  s_end: 6900.0}
+      - {corner_id: T5,  label: "Mulsanne Corner",       s_start: 8400.0,  s_apex: 8600.0,  s_end: 8800.0}
+      - {corner_id: T6,  label: "Indianapolis",          s_start: 9600.0,  s_apex: 9800.0,  s_end: 10000.0}
+      - {corner_id: T7,  label: "Arnage",               s_start: 10300.0, s_apex: 10500.0, s_end: 10700.0}
+      - {corner_id: T8,  label: "Porsche Curves Entry",  s_start: 11000.0, s_apex: 11200.0, s_end: 11400.0}
+      - {corner_id: T9,  label: "Porsche Curves Exit",   s_start: 11800.0, s_apex: 12000.0, s_end: 12200.0}
+      - {corner_id: T10, label: "Ford Chicane",          s_start: 13000.0, s_apex: 13200.0, s_end: 13400.0}
+    track_map: null
+
+  - track_id: lago_maggiore
+    track_name: "Autodrome Lago Maggiore — Full Course"
+    length_m: 5809.0
+    sector_distances: [1500.0, 3500.0, 5809.0]
+    corners:
+      - {corner_id: T1,  label: "Turn 1",               s_start: 80.0,    s_apex: 180.0,   s_end: 300.0}
+      - {corner_id: T2,  label: "Turn 2",               s_start: 450.0,   s_apex: 580.0,   s_end: 700.0}
+      - {corner_id: T3,  label: "Turn 3",               s_start: 850.0,   s_apex: 950.0,   s_end: 1080.0}
+      - {corner_id: T4,  label: "Turn 4",               s_start: 1400.0,  s_apex: 1550.0,  s_end: 1700.0}
+      - {corner_id: T5,  label: "Turn 5-6 Complex",     s_start: 2100.0,  s_apex: 2300.0,  s_end: 2500.0}
+      - {corner_id: T6,  label: "Turn 7-8 Esses",       s_start: 2800.0,  s_apex: 3000.0,  s_end: 3200.0}
+      - {corner_id: T7,  label: "Turn 9 Hairpin",       s_start: 3500.0,  s_apex: 3650.0,  s_end: 3800.0}
+      - {corner_id: T8,  label: "Turn 10-11 Complex",   s_start: 4000.0,  s_apex: 4200.0,  s_end: 4400.0}
+      - {corner_id: T9,  label: "Turn 13-14 Chicane",   s_start: 4800.0,  s_apex: 4950.0,  s_end: 5100.0}
+      - {corner_id: T10, label: "Final Turn",            s_start: 5400.0,  s_apex: 5550.0,  s_end: 5700.0}
+    track_map: null
+
+  - track_id: road_atlanta
+    track_name: "Michelin Raceway Road Atlanta — GP"
+    length_m: 4088.0
+    sector_distances: [1100.0, 2500.0, 4088.0]
+    corners:
+      - {corner_id: T1,  label: "Turn 1",               s_start: 80.0,    s_apex: 200.0,   s_end: 330.0}
+      - {corner_id: T2,  label: "Turn 2 (Esses Entry)", s_start: 450.0,   s_apex: 550.0,   s_end: 680.0}
+      - {corner_id: T3,  label: "Turn 3 (Esses)",       s_start: 700.0,   s_apex: 820.0,   s_end: 950.0}
+      - {corner_id: T4,  label: "Turn 5",               s_start: 1100.0,  s_apex: 1220.0,  s_end: 1350.0}
+      - {corner_id: T5,  label: "Turn 6",               s_start: 1400.0,  s_apex: 1520.0,  s_end: 1650.0}
+      - {corner_id: T6,  label: "Turn 7",               s_start: 1700.0,  s_apex: 1820.0,  s_end: 1950.0}
+      - {corner_id: T7,  label: "Turn 8",               s_start: 2000.0,  s_apex: 2120.0,  s_end: 2250.0}
+      - {corner_id: T8,  label: "Turn 9",               s_start: 2300.0,  s_apex: 2420.0,  s_end: 2550.0}
+      - {corner_id: T9,  label: "Turn 10a/b",           s_start: 2600.0,  s_apex: 2750.0,  s_end: 2900.0}
+      - {corner_id: T10, label: "Turn 11",              s_start: 2950.0,  s_apex: 3080.0,  s_end: 3220.0}
+      - {corner_id: T11, label: "Turn 12",              s_start: 3300.0,  s_apex: 3450.0,  s_end: 3600.0}
+    track_map: null
+
+  - track_id: nordschleife_tourist
+    track_name: "Nürburgring Nordschleife — Tourist Layout"
+    length_m: 20832.0
+    sector_distances: [5500.0, 12000.0, 20832.0]
+    corners: []  # 73 corners — a definir se necessário
+    track_map: null
+
+  - track_id: monza_no_chicane
+    track_name: "Autodromo Nazionale Monza — No Chicane"
+    length_m: 5593.0  # Monza GP (5793m) minus Ascari chicane (~200m)
+    sector_distances: [1700.0, 3400.0, 5593.0]
+    corners:
+      - {corner_id: T1, label: "Prima Variante",    s_start: 280.0,  s_apex: 380.0,  s_end: 500.0}
+      - {corner_id: T2, label: "Seconda Variante",  s_start: 1100.0, s_apex: 1180.0, s_end: 1280.0}
+      - {corner_id: T3, label: "Parabolica",        s_start: 4900.0, s_apex: 5100.0, s_end: 5300.0}
+    track_map: null
+
+  - track_id: red_bull_ring
+    track_name: "Red Bull Ring — GP"
+    length_m: 4318.0
+    sector_distances: [850.0, 2400.0, 4318.0]
+    corners:
+      - {corner_id: T1, label: "Castrol",      s_start: 50.0,   s_apex: 150.0,  s_end: 270.0}
+      - {corner_id: T2, label: "Remus",        s_start: 650.0,  s_apex: 780.0,  s_end: 900.0}
+      - {corner_id: T3, label: "Schlossgold",  s_start: 1900.0, s_apex: 2050.0, s_end: 2200.0}
+      - {corner_id: T4, label: "Rindt",        s_start: 2600.0, s_apex: 2750.0, s_end: 2900.0}
+      - {corner_id: T5, label: "Jochen Rindt", s_start: 3500.0, s_apex: 3650.0, s_end: 3800.0}
+    track_map: null
+
+  - track_id: zandvoort
+    track_name: "Circuit Zandvoort — GP"
+    length_m: 4259.0
+    sector_distances: [1100.0, 2700.0, 4259.0]
+    corners:
+      - {corner_id: T1,  label: "Tarzanbocht",    s_start: 50.0,   s_apex: 150.0,  s_end: 280.0}
+      - {corner_id: T2,  label: "Hugenholtzbocht",s_start: 700.0,  s_apex: 850.0,  s_end: 1000.0}
+      - {corner_id: T3,  label: "Scheivlak",      s_start: 1400.0, s_apex: 1550.0, s_end: 1700.0}
+      - {corner_id: T4,  label: "Hugenholtz II",  s_start: 2200.0, s_apex: 2350.0, s_end: 2500.0}
+      - {corner_id: T5,  label: "Arie Luyendyk",  s_start: 3100.0, s_apex: 3280.0, s_end: 3450.0}
+      - {corner_id: T6,  label: "Audi S",         s_start: 3700.0, s_apex: 3880.0, s_end: 4050.0}
+    track_map: null
+
+  - track_id: zolder
+    track_name: "Circuit Zolder"
+    length_m: 4011.0
+    sector_distances: [1100.0, 2500.0, 4011.0]
+    corners:
+      - {corner_id: T1, label: "Merelbeke",  s_start: 80.0,   s_apex: 200.0,  s_end: 320.0}
+      - {corner_id: T2, label: "Terlamenbocht", s_start: 700.0, s_apex: 850.0, s_end: 1000.0}
+      - {corner_id: T3, label: "Bianchi",    s_start: 1500.0, s_apex: 1650.0, s_end: 1800.0}
+      - {corner_id: T4, label: "Chicane",    s_start: 2400.0, s_apex: 2550.0, s_end: 2700.0}
+      - {corner_id: T5, label: "Kleine Chicane", s_start: 3100.0, s_apex: 3250.0, s_end: 3400.0}
+      - {corner_id: T6, label: "Bus Stop",   s_start: 3700.0, s_apex: 3850.0, s_end: 3980.0}
+    track_map: null
+
+  - track_id: suzuka
+    track_name: "Suzuka International Racing Course"
+    length_m: 5807.0
+    sector_distances: [1500.0, 3500.0, 5807.0]
+    corners:
+      - {corner_id: T1,  label: "Turn 1",          s_start: 50.0,   s_apex: 180.0,  s_end: 320.0}
+      - {corner_id: T2,  label: "S Curves",        s_start: 600.0,  s_apex: 900.0,  s_end: 1200.0}
+      - {corner_id: T3,  label: "Dunlop",          s_start: 1500.0, s_apex: 1620.0, s_end: 1750.0}
+      - {corner_id: T4,  label: "Hairpin",         s_start: 1900.0, s_apex: 2050.0, s_end: 2200.0}
+      - {corner_id: T5,  label: "Spoon",           s_start: 3200.0, s_apex: 3450.0, s_end: 3700.0}
+      - {corner_id: T6,  label: "130R",            s_start: 4300.0, s_apex: 4450.0, s_end: 4600.0}
+      - {corner_id: T7,  label: "Chicane",         s_start: 4700.0, s_apex: 4850.0, s_end: 5000.0}
+      - {corner_id: T8,  label: "Degner",          s_start: 5200.0, s_apex: 5380.0, s_end: 5550.0}
+    track_map: null
+
+  # ---------------------------------------------------------------------------
+  # Pistas brasileiras — Copa Truck / Stock Car Pro Series
+  # ---------------------------------------------------------------------------
+
+  - track_id: goiania
+    track_name: "Autódromo Internacional de Goiânia"
+    length_m: 3806.0
+    # Medido 2026-08-13 · 11 arquivos, espalhamento 311 m. Comprimento medido
+    # 3764 m (0,989 do catálogo).
+    # Ex.: data/telemetry/SuperBike Logs/Goiânia/Mauro Passarino-Yamaha R6-
+    # Qualifying 2 (2022_12_18 20_23_00 UTC).xrk
+    ref_lat: -16.717358
+    ref_lon: -49.192740
+    sector_distances: [1100.0, 2400.0, 3806.0]
+    corners:
+      - {corner_id: T1,  label: "Curva 1",          s_start: 80.0,   s_apex: 180.0,  s_end: 290.0}
+      - {corner_id: T2,  label: "Curva 2",          s_start: 400.0,  s_apex: 520.0,  s_end: 650.0}
+      - {corner_id: T3,  label: "Esesse",           s_start: 850.0,  s_apex: 1000.0, s_end: 1150.0}
+      - {corner_id: T4,  label: "Curva 4",          s_start: 1300.0, s_apex: 1420.0, s_end: 1550.0}
+      - {corner_id: T5,  label: "Curva 5",          s_start: 1700.0, s_apex: 1830.0, s_end: 1960.0}
+      - {corner_id: T6,  label: "Curva 6",          s_start: 2150.0, s_apex: 2280.0, s_end: 2420.0}
+      - {corner_id: T7,  label: "Curva 7",          s_start: 2600.0, s_apex: 2750.0, s_end: 2900.0}
+      - {corner_id: T8,  label: "Última",           s_start: 3400.0, s_apex: 3560.0, s_end: 3720.0}
+    track_map: null
+
+  - track_id: curitiba
+    track_name: "Autódromo de Curitiba"
+    length_m: 3695.0
+    # Medido 2026-08-13 · 3 arquivos, espalhamento 20 m (o mais apertado do lote).
+    # Ex.: data/telemetry/F3/Rubens Barrichello/F309-016/2020-12-02/
+    # Rubens Barrichello_F309-016_20201202_165034_Curitiba_4300133_c_1124.xrk
+    ref_lat: -25.450509
+    ref_lon: -49.195718
+    #
+    # RESOLVIDO em 2026-08-29, era 3220.0. O TODO anterior pedia confirmar o
+    # tracado antes de mexer, e a confirmacao veio de duas direcoes que
+    # concordam:
+    #   1. telemetria: duas medicoes independentes (integracao de velocidade e
+    #      tracado GPS projetado) deram 3645 m, batendo em 8 m entre si;
+    #   2. fonte externa: o circuito principal do Autodromo Internacional de
+    #      Curitiba (Raul Boesel) tem 3.695 m, 3.707 km no tracado de 1988.
+    # Os 3220.0 anteriores nao correspondem a nenhum dos dois, e reprovavam
+    # 100% das voltas de Curitiba no gate de fechamento da etapa 6 (fator 0.86,
+    # fora da faixa 0.9 a 1.1), o que zerava `trechos` de toda a pista.
+    track_map: null
+    #
+    # GEOMETRIA RE-DERIVADA em 2026-08-29 (script scripts/derivar_curvas.py).
+    #
+    # Historico: `sector_distances` e as 7 curvas abaixo somavam exatamente os
+    # 3220 m ERRADOS (ver acima). Com o comprimento corrigido pra 3695 m essa
+    # geometria continuava no ar, deslocada contra uma pista que nao e esta.
+    # A fonte upstream (saru-app/services/telemetry-api/config/tracks.yaml,
+    # bloco curitiba) tem O MESMO erro de 3220 m, entao nao havia de onde
+    # copiar: a unica saida era derivar do proprio dado medido.
+    #
+    # NAO TEM GPS: as 16 gravacoes de Curitiba no acervo (F309 .xrk, AiM) nao
+    # gravam latitude/longitude -- confirmado em `canal_gravado`, nenhuma tem
+    # `gps_lat`/`gps_lon` mapeado. O que existe e "Acc Lat" -> canal canonico
+    # `lat_acc` (aceleracao lateral, m/s^2). Curvatura de tracado GPS nao da
+    # pra calcular; aceleracao lateral e o canal fisico equivalente (curva =
+    # forca lateral sustentada), e e a alternativa que a propria tarefa previu.
+    #
+    # METODO (integral em scripts/derivar_curvas.py, reproduzivel):
+    #   1. as 8 melhores voltas validas (fator de fechamento da etapa 6 mais
+    #      perto de 1, entre 0.994 e 1.003) tiveram `lat_acc` e `speed`
+    #      reamostrados numa grade uniforme de distancia 0-3695 m (a mesma
+    #      cascata e o mesmo fechamento da etapa 6: `distance_m` do proprio
+    #      arquivo, fechado no comprimento do layout);
+    #   2. mediana ponto a ponto entre as 8 voltas (robusta a volta ruim
+    #      isolada, sem descartar a volta inteira);
+    #   3. curva = trecho onde |lat_acc mediana| sustenta acima de 4.0 m/s^2
+    #      (~0.41 g); zona de entrada/saida = extensao do nucleo enquanto
+    #      |lat_acc| > 1.3 m/s^2 (histerese); apex = pico de |lat_acc| dentro
+    #      do nucleo;
+    #   4. validado contra velocidade: todo apex caiu a <=2 m de um minimo
+    #      local de `speed` mediana (ver prova de sanidade no relatorio).
+    #
+    # RESULTADO: 6 curvas, nao 7. A curvatura NAO separa em 2 features
+    # limpas o que o levantamento antigo chamava de "Curva 1" e "Esesse":
+    # entre 470 m e 862 m o dado mostra 3 sub-picos colados
+    # (esquerda 524-620, direita 628-662, esquerda 668-844), com vaos de
+    # 6-8 m entre eles -- muito curtos pra serem 2 curvas com reta de
+    # verdade no meio (o proximo vao livre medido, pra Curva 2, e de 474 m).
+    # Entao os 3 sub-picos viraram UM registro so ("Curva 1 / Esesse"), com a
+    # ressalva de que pode ser 2 features historicas fisicamente coladas, nao
+    # uma so; o dado nao decide isso sozinho, precisa de inspecao visual do
+    # tracado (que esta pista nao tem, por falta de GPS). As outras 5 curvas
+    # (Curva 2 a Curva 5 e Última) saem cada uma com 1 sub-pico so, sem essa
+    # ambiguidade.
+    #
+    # `sector_distances` derivado dividindo em tercos por PONTO DE CURVA: as 2
+    # fronteiras internas ficam no meio do maior vao livre mais perto de
+    # 1231.7 m e 2463.3 m (1/3 e 2/3 de 3695 m), nunca dentro do span de uma
+    # curva. A segunda fronteira alvo (2463.3 m) caiu dentro da Curva 4
+    # (2366-2590 m) e foi empurrada pro vao livre mais proximo por fora dela
+    # (2365.3 m), o que deixa o setor 3 maior que os outros dois -- efeito
+    # colateral esperado de nao cortar curva ao meio, nao erro de conta.
+    sector_distances: [1231.7, 2365.3, 3695.0]
+    corners:
+      - {corner_id: T1, label: "Curva 1 / Esesse", s_start: 470.0,  s_apex: 580.0,  s_end: 862.0}
+      - {corner_id: T2, label: "Curva 2",          s_start: 1306.0, s_apex: 1436.0, s_end: 1820.0}
+      - {corner_id: T3, label: "Curva 3",          s_start: 1832.0, s_apex: 2022.0, s_end: 2272.0}
+      - {corner_id: T4, label: "Curva 4",          s_start: 2366.0, s_apex: 2498.0, s_end: 2590.0}
+      - {corner_id: T5, label: "Curva 5",          s_start: 2598.0, s_apex: 2730.0, s_end: 2858.0}
+      - {corner_id: T6, label: "Última",           s_start: 2970.0, s_apex: 3110.0, s_end: 3374.0}
+
+  - track_id: velocita
+    track_name: "Autódromo Velo Città — Mogi Guaçu/SP"
+    length_m: 3055.0
+    sector_distances: [900.0, 1950.0, 3055.0]
+    corners:
+      - {corner_id: T1,  label: "Curva 1",          s_start: 60.0,   s_apex: 160.0,  s_end: 270.0}
+      - {corner_id: T2,  label: "Esesse",           s_start: 420.0,  s_apex: 540.0,  s_end: 660.0}
+      - {corner_id: T3,  label: "Curva 3",          s_start: 850.0,  s_apex: 970.0,  s_end: 1090.0}
+      - {corner_id: T4,  label: "Curva 4",          s_start: 1250.0, s_apex: 1380.0, s_end: 1510.0}
+      - {corner_id: T5,  label: "Curva 5",          s_start: 1680.0, s_apex: 1810.0, s_end: 1950.0}
+      - {corner_id: T6,  label: "Curva 6",          s_start: 2150.0, s_apex: 2280.0, s_end: 2420.0}
+      - {corner_id: T7,  label: "Última",           s_start: 2700.0, s_apex: 2840.0, s_end: 2970.0}
+    track_map: null
+
+  - track_id: taruma
+    track_name: "Autódromo Internacional Tarumã — Viamão/RS"
+    length_m: 3020.0
+    sector_distances: [880.0, 1920.0, 3020.0]
+    corners:
+      - {corner_id: T1,  label: "Curva 1",          s_start: 60.0,   s_apex: 160.0,  s_end: 260.0}
+      - {corner_id: T2,  label: "Curva Ferradura",  s_start: 450.0,  s_apex: 580.0,  s_end: 700.0}
+      - {corner_id: T3,  label: "Curva 3",          s_start: 870.0,  s_apex: 990.0,  s_end: 1110.0}
+      - {corner_id: T4,  label: "Curva 4",          s_start: 1280.0, s_apex: 1400.0, s_end: 1530.0}
+      - {corner_id: T5,  label: "Curva 5",          s_start: 1700.0, s_apex: 1830.0, s_end: 1960.0}
+      - {corner_id: T6,  label: "Curva 6",          s_start: 2150.0, s_apex: 2280.0, s_end: 2420.0}
+      - {corner_id: T7,  label: "Última",           s_start: 2680.0, s_apex: 2820.0, s_end: 2950.0}
+    track_map: null
+
+  # Autódromo Internacional Nelson Piquet — reaberto 30/11/2025 após a DER-DF
+  # regeometrizar três curvas para padrão FIA (12 -> 16 curvas). Não é divergência
+  # de medição entre fontes: é geometria diferente.
+  #
+  # length_m PROVISÓRIO (2026-08-12). 5384 m é o layout completo segundo a pesquisa
+  # oficial (GDF/DER-DF, Stock Car 2025). O local tem SEIS configurações e ainda
+  # falta o organizador confirmar qual roda no evento. Se ele confirmar layout curto
+  # e não souber o número, SUBESTIMAR: `_compute_lap_time` tira o tempo do canal de
+  # tempo, não da distância — length_m subestimado mantém as voltas válidas, enquanto
+  # superestimado reprova todas no gate de cobertura de 0,70 e produz "nenhuma volta
+  # válida", que aparece só como log INFO.
+  #
+  # NÃO usar as outras três fontes, todas de layouts que não existem mais:
+  #   * saru-physics-py/data/tracks/brasilia.hdf5 — 5578 m, derivado de OSM, pré-reforma
+  #   * nelson_piquet.yaml — 3800 m, auto-marcado "a validar", contradiz tudo
+  #   * Wikipedia PT / mods de Assetto Corsa — 5476 m / 12 curvas, layout 1974-2014
+  #
+  # sector_distances: terços, convenção SARU. NÃO há setor oficial publicado — o
+  # relatório precisa dizer isso. corners vazio de propósito: nomear curva antes de
+  # ver traçado real produz janela deslocada, e `detect_braking_points` só procura em
+  # [s_start, s_apex] e OMITE em silêncio a curva onde não acha frenagem.
+  - track_id: brasilia_gp
+    track_name: "Autódromo Internacional Nelson Piquet — Brasília/DF"
+    length_m: 5384.0
+    sector_distances: [1795.0, 3590.0, 5384.0]
+    corners: []
+    track_map: null

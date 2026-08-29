@@ -74,10 +74,18 @@ class Lote:
     `tabela` tem uma coluna `t_s` (segundos desde o inicio da captura) mais uma
     coluna por canal daquela taxa, com o NOME BRUTO como nome de coluna. A
     traducao pro vocabulario canonico acontece depois, na etapa 3.
+
+    `serie` separa fluxos que dividem a MESMA taxa mas tem relogio e colunas
+    proprios (caso real: canais GPS sintetizados do .xrk a 25 Hz num arquivo
+    que ja tem grupo CHS de 25 Hz - 23 dos 113 arquivos com GPS do acervo,
+    medido em 29/08). O default vazio preserva o contrato antigo por inteiro,
+    inclusive a falha alta de "canal que some no meio da serie": dentro de um
+    mesmo `serie`, esquema continua nao podendo mudar.
     """
 
     frequencia_hz: float
     tabela: pa.RecordBatch
+    serie: str = ""
 
     def __post_init__(self) -> None:
         if "t_s" not in self.tabela.schema.names:

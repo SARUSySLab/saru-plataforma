@@ -476,12 +476,24 @@ def test_ler_os_66_arquivos_bate_com_inspecionar(leitor: LeitorXrk) -> None:
             f"amostra na cauda: {perdas_conhecidas[:6]}"
         )
     assert not divergencias, "\n".join(divergencias)
-    # DIVIDA CONHECIDA e NOMEADA: um arquivo do acervo bate numa variante de
-    # registro que o leitor nao mapeia e nao entrega amostra nenhuma. Ele
-    # ABRE normalmente (o teste de inventario acima cobre os 66), so nao
-    # decodifica valor. A lista e explicita de proposito: arquivo novo que
-    # falhar quebra o teste em vez de se esconder num contador.
-    ESPERADO_SEM_AMOSTRA = {"20210712_162500_Matt Romanowski_LimeRockP_a_0235.xrk"}
+    # DIVIDA CONHECIDA e NOMEADA (lista vazia hoje, mantida como mecanismo):
+    # um arquivo do acervo batia numa variante de registro que o leitor nao
+    # mapeava e nao entregava amostra nenhuma. Ele ABRIA normalmente (o
+    # teste de inventario acima cobre os 66), so nao decodificava valor. A
+    # lista e explicita de proposito: arquivo novo que falhar quebra o
+    # teste em vez de se esconder num contador.
+    #
+    # ELIMINADO em 29/08: o unico membro da lista era
+    # "20210712_162500_Matt Romanowski_LimeRockP_a_0235.xrk" (LimeRock, 36
+    # MB, o maior do acervo). A causa era um walker que parava (kind `c` +
+    # uma sequencia de ~17 bytes solta no meio do stream, sem relacao com
+    # kind nenhum, que nem o proprio libxrk reconhece) e devolvia 0% de
+    # cobertura, entao `ler()` levantava "nenhuma amostra decodificavel".
+    # Com o kind `c` mapeado e a resincronizacao em chunk (`xrk.py`,
+    # `_tamanho_registro_c` e `_resincroniza_em_chunk`), o arquivo le 100%
+    # de cobertura e `ler()` decodifica 1.342.199 linhas em 16 lotes:
+    # deixou de ser divida, tirado da lista em vez de so relaxar o teste.
+    ESPERADO_SEM_AMOSTRA: set[str] = set()
     nomes_que_falharam = {msg.split(":", 1)[0] for msg in falharam_ler}
     inesperados = nomes_que_falharam - ESPERADO_SEM_AMOSTRA
     assert not inesperados, f"arquivo novo sem amostra decodificavel: {inesperados}"

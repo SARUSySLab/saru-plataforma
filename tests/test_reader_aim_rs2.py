@@ -155,3 +155,67 @@ def test_acervo_nao_quebra_e_taxa_de_metadado_condiz_com_a_medicao() -> None:
     proporcao = com_metadado / len(arquivos)
     # medido: 125/129 = 0.97. Deixa folga pro acervo crescer sem quebrar CI.
     assert proporcao > 0.8
+
+
+# ---------------------------------------------------------------------------
+# Tabela de voltas do indice (29/08)
+# ---------------------------------------------------------------------------
+
+
+def _drk_com_tabela(tmp_path: Path, duracoes_ms: list[int], off_tabela: int = 4096) -> Path:
+    """Monta um `.drk` sintetico: cabecalho minimo + tabela de voltas no
+    layout medido (registros de 288 bytes: contador em +0, acumulado em
+    +272, duracao em +276)."""
+    import struct
+
+    corpo = bytearray(off_tabela + 288 * (len(duracoes_ms) + 1))
+    acumulado = 0
+    for k, dur in enumerate(duracoes_ms):
+        base = off_tabela + k * 288
+        struct.pack_into("<i", corpo, base, k)
+        struct.pack_into("<i", corpo, base + 272, acumulado)
+        struct.pack_into("<i", corpo, base + 276, dur)
+        acumulado += dur
+    caminho = tmp_path / "sintetico.drk"
+    caminho.write_bytes(bytes(corpo))
+    return caminho
+
+
+def test_tabela_de_voltas_vira_passagens_sem_a_ultima(
+    tmp_path: Path, leitor: LeitorAimDrk
+) -> None:
+    """3 registros = 3 inicios confirmados por beacon = 2 voltas fechadas.
+    O fim do ultimo registro fecha no desligamento do logger, nao num
+    beacon (medido contra o .xrk irmao em 45 pares do acervo, prefixo
+    exato em todos), entao ele NAO vira passagem."""
+    cab = leitor.inspecionar(_drk_com_tabela(tmp_path, [95_000, 96_500, 94_000]))
+    assert cab.bruto["lap_beacons_ms"] == "0,95000,191500"
+    assert cab.bruto["lap_registros"] == "3"
+    assert "desligamento" in cab.bruto["lap_ultimo_descartado"]
+
+
+def test_registro_unico_nao_declara_beacon(tmp_path: Path, leitor: LeitorAimDrk) -> None:
+    """Sessao de volta unica: 1 registro nao fecha volta nenhuma (o unico
+    fim conhecido e o desligamento). Nada de lap_beacons_ms."""
+    cab = leitor.inspecionar(_drk_com_tabela(tmp_path, [275_000]))
+    assert "lap_beacons_ms" not in cab.bruto
+
+
+def test_registro_de_duracao_implausivel_interrompe_a_tabela(
+    tmp_path: Path, leitor: LeitorAimDrk
+) -> None:
+    """Transponder que falha no meio da sessao agrega o resto num registro
+    gigante (caso real do kart 0276): a caminhada para nele e as voltas
+    anteriores continuam valendo."""
+    import struct
+
+    caminho = _drk_com_tabela(tmp_path, [68_000, 41_000])
+    dados = bytearray(caminho.read_bytes())
+    base = 4096 + 2 * 288
+    struct.pack_into("<i", dados, base, 2)
+    struct.pack_into("<i", dados, base + 272, 109_000)
+    struct.pack_into("<i", dados, base + 276, 4_000_000)  # 66 min: nao e volta
+    caminho.write_bytes(bytes(dados))
+    cab = leitor.inspecionar(caminho)
+    assert cab.bruto["lap_beacons_ms"] == "0,68000"
+    assert cab.bruto["lap_registros"] == "2"

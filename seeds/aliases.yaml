@@ -1,0 +1,1747 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# UNIDADE CANÔNICA DE ACELERAÇÃO: m/s². SEM EXCEÇÃO.
+#
+# Sete perfis — aim_xrk, vbox, pitoolbox, wintax, windarab, fueltech, protune —
+# emitiam `unit_out: g`, e são justamente TODOS os formatos de logger real; só
+# os simuladores estavam certos. O domínio compara contra limiar em m/s²
+# (`braking_lon_acc: -3.0` em sim_profiles.yaml, `_UNDERSTEER_MIN_LAT_ACC = 2.0`
+# em analysis_math_channels.py), então um canal em g nunca cruzava nenhum deles:
+# fase de frenagem jamais detectada, understeer sempre NaN, raio de curva capado
+# no teto.
+#
+# O erro era ESPELHADO do que o perfil `acc` tinha: lá a tela mentia e o engine
+# acertava; aqui a tela acertava (o fator de exibição virava 1,0) e o engine
+# errava. Nos dois casos a causa é a mesma — mais de uma unidade viva no mesmo
+# canal canônico. Converta AQUI, uma vez; o engine emite m/s² sempre e quem
+# exibe converte para g na ponta.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# saru_lapanalyzer/infra/mapping/aliases.yaml
+# Mapeamento de canais brutos por simulador para nomes canônicos do domínio.
+#
+# VALIDADO contra arquivo .ld bruto (McLaren 720S GT3 Evo, Barcelona 2023-10-19)
+# via ldparser inspect_ld_raw.py em 2026-04-10. Unidades confirmadas pelo
+# campo 'unit' do ldChan (não pelo nome do canal).
+#
+# GT7: colunas de ferramenta UDP gt7telemetry/gt7dashboard.
+# AMS2: colunas do SimHub plugin para Automobilista 2.
+#
+# Estrutura:
+#   <sim_id>:
+#     <canal_canonico>:
+#       col: <nome_coluna_no_arquivo>
+#       unit_in: <unidade_entrada>
+#       unit_out: <unidade_canônica>
+#       scale: <col × scale → canônico>
+
+acc:
+  speed:
+    col: SPEED
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  throttle:
+    col: THROTTLE
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    col: BRAKE
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  clutch:
+    col: CLUTCH
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  steering:
+    col: STEERANGLE
+    unit_in: deg
+    unit_out: rad
+    scale: 0.017453
+  # G_LAT/G_LON do .ld do ACC estão em **g**, apesar de o arquivo DECLARAR m/s2
+  # em `ch.unit`. Medido, não suposto: a razão |dv/dt| / |G_LON| — com dv/dt
+  # vindo só do canal SPEED, que está correto — dá mediana 9,521 com correlação
+  # 0,98 em demo_motec.ld (n=3562) e 9,495 no Ferrari 488 de Hungaroring.
+  # Razão ≈ g significa que o canal está em g.
+  #
+  # Com `scale: 1.0` o engine emitia g rotulado m/s2, o frontend dividia por
+  # 9,80665 achando que convertia, e a tela mostrava 0,21 g onde o McLaren 720S
+  # GT3 fez 2,02. E contaminava todo limiar do domínio: Trail-Braking Index 0%
+  # em 100% das sessões ACC (limiar 0,3 g nunca cruzado), nenhuma fase de
+  # frenagem detectada (limiar -3,0), raio de curva capado no teto em 93,6% das
+  # amostras, "Uso do grip 6,5%" onde o piloto usou ~66%.
+  #
+  # A correção é a MESMA que `gt7_ld` e `motec_ld` já fazem: converter aqui, uma
+  # vez, e o engine emitir m/s2 sempre. Não corrigir no frontend — os outros
+  # consumidores do engine assumem m/s2.
+  lat_acc:
+    col: G_LAT
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  lon_acc:
+    col: G_LON
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  yaw_rate:
+    col: ROTY
+    unit_in: rad/s
+    unit_out: rad/s
+    scale: 1.0
+  gear:
+    col: GEAR
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  rpm:
+    col: RPMS
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  eng_torque:
+    col: EN_ET
+    unit_in: Nm
+    unit_out: Nm
+    scale: 1.0
+  eng_gear_ratio:
+    col: EN_GR
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  lap_number:
+    col: LAP_BEACON
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  susp_pos_fl:
+    col: SUS_TRAVEL_LF
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_fr:
+    col: SUS_TRAVEL_RF
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_rl:
+    col: SUS_TRAVEL_LR
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_rr:
+    col: SUS_TRAVEL_RR
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  wheel_speed_fl:
+    col: WHEEL_SPEED_LF
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  wheel_speed_fr:
+    col: WHEEL_SPEED_RF
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  wheel_speed_rl:
+    col: WHEEL_SPEED_LR
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  wheel_speed_rr:
+    col: WHEEL_SPEED_RR
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  tyre_press_fl:
+    col: TYRE_PRESS_LF
+    unit_in: psi
+    unit_out: kPa
+    scale: 6.89476
+  tyre_press_fr:
+    col: TYRE_PRESS_RF
+    unit_in: psi
+    unit_out: kPa
+    scale: 6.89476
+  tyre_press_rl:
+    col: TYRE_PRESS_LR
+    unit_in: psi
+    unit_out: kPa
+    scale: 6.89476
+  tyre_press_rr:
+    col: TYRE_PRESS_RR
+    unit_in: psi
+    unit_out: kPa
+    scale: 6.89476
+  tyre_temp_mid_fl:
+    col: TYRE_TAIR_LF
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_fr:
+    col: TYRE_TAIR_RF
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_rl:
+    col: TYRE_TAIR_LR
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_rr:
+    col: TYRE_TAIR_RR
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  brake_temp_fl:
+    col: BRAKE_TEMP_LF
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  brake_temp_fr:
+    col: BRAKE_TEMP_RF
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  brake_temp_rl:
+    col: BRAKE_TEMP_LR
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  brake_temp_rr:
+    col: BRAKE_TEMP_RR
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  abs_active:
+    col: ABS
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  tc_active:
+    col: TC
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  bumpstop_force_fl:
+    col: BUMPSTOP_FORCE_LF
+    unit_in: N
+    unit_out: N
+    scale: 1.0
+  bumpstop_force_fr:
+    col: BUMPSTOP_FORCE_RF
+    unit_in: N
+    unit_out: N
+    scale: 1.0
+  bumpstop_force_rl:
+    col: BUMPSTOP_FORCE_LR
+    unit_in: N
+    unit_out: N
+    scale: 1.0
+  bumpstop_force_rr:
+    col: BUMPSTOP_FORCE_RR
+    unit_in: N
+    unit_out: N
+    scale: 1.0
+
+# ---------------------------------------------------------------------------
+iracing:
+  speed:
+    col: Speed
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  throttle:
+    col: Throttle
+    unit_in: "0-1"
+    unit_out: "0-1"
+    scale: 1.0
+  brake:
+    col: Brake
+    unit_in: "0-1"
+    unit_out: "0-1"
+    scale: 1.0
+  steering:
+    col: SteeringWheelAngle
+    unit_in: rad
+    unit_out: rad
+    scale: 1.0
+  clutch:
+    col: Clutch
+    unit_in: "0-1"
+    unit_out: "0-1"
+    scale: 1.0
+  lon_acc:
+    col: LongAccel
+    unit_in: m/s2
+    unit_out: m/s2
+    scale: 1.0
+  lat_acc:
+    col: LatAccel
+    unit_in: m/s2
+    unit_out: m/s2
+    scale: 1.0
+  gear:
+    col: Gear
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  rpm:
+    # `EDL8_RPM` é a mesma grandeza na ECU do F3 (medido 561..7131).
+    col: [RPM, EDL8_RPM]
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  lap_number:
+    col: Lap
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  distance:
+    col: LapDistPct
+    unit_in: pct
+    unit_out: m
+    scale: null
+  gps_x:
+    col: WorldPosX
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  gps_y:
+    col: WorldPosY
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  tyre_temp_inner_fl:
+    col: TireTempFLI
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_fl:
+    col: TireTempFLM
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_outer_fl:
+    col: TireTempFLO
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_press_fl:
+    col: TirePressFL
+    unit_in: kPa
+    unit_out: kPa
+    scale: 1.0
+  wheel_speed_fl:
+    col: WheelSpeedFL
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  susp_pos_fl:
+    col: FLRideHeight
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  tyre_temp_inner_fr:
+    col: TireTempFRI
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_fr:
+    col: TireTempFRM
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_outer_fr:
+    col: TireTempFRO
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_press_fr:
+    col: TirePressFR
+    unit_in: kPa
+    unit_out: kPa
+    scale: 1.0
+  wheel_speed_fr:
+    col: WheelSpeedFR
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  susp_pos_fr:
+    col: FRRideHeight
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  tyre_temp_inner_rl:
+    col: TireTempRLI
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_rl:
+    col: TireTempRLM
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_outer_rl:
+    col: TireTempRLO
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_press_rl:
+    col: TirePressRL
+    unit_in: kPa
+    unit_out: kPa
+    scale: 1.0
+  wheel_speed_rl:
+    col: WheelSpeedRL
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  susp_pos_rl:
+    col: RLRideHeight
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  tyre_temp_inner_rr:
+    col: TireTempRRI
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_rr:
+    col: TireTempRRM
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_outer_rr:
+    col: TireTempRRO
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_press_rr:
+    col: TirePressRR
+    unit_in: kPa
+    unit_out: kPa
+    scale: 1.0
+  wheel_speed_rr:
+    col: WheelSpeedRR
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  susp_pos_rr:
+    col: RRRideHeight
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+
+# ---------------------------------------------------------------------------
+gt7:
+  # Colunas do gt7telemetry / gt7dashboard (exporta\u00e7\u00e3o UDP para CSV)
+  speed:
+    col: body_velocity
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  throttle:
+    col: throttle
+    unit_in: "0-255"
+    unit_out: "0-1"
+    scale: 0.003922      # 1/255
+  brake:
+    col: brake
+    unit_in: "0-255"
+    unit_out: "0-1"
+    scale: 0.003922
+  steering:
+    col: steer
+    unit_in: "0-1"
+    unit_out: rad
+    scale: 0.5236        # \u00b130\u00b0 = 0.5236 rad — ajustar por ve\u00edculo
+  lon_acc:
+    col: accel_x          # eixo Z no pacote GT7 (longitudinal)
+    unit_in: m/s2
+    unit_out: m/s2
+    scale: 1.0
+  lat_acc:
+    col: accel_y          # eixo X no pacote GT7 (lateral)
+    unit_in: m/s2
+    unit_out: m/s2
+    scale: 1.0
+  yaw_rate:
+    col: rotation_y
+    unit_in: rad/s
+    unit_out: rad/s
+    scale: 1.0
+  gear:
+    col: gear
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  rpm:
+    col: engine_rpm
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  lap_number:
+    col: lap_count
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  gps_x:
+    col: position_x
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  gps_y:
+    col: position_z        # eixo Z = plano horizontal no GT7
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  wheel_speed_fl:
+    col: wheel_rps_fl
+    unit_in: rad/s
+    unit_out: m/s
+    scale: 0.318          # raio efetivo ~0.318 m (ajustar por categoria)
+  wheel_speed_fr:
+    col: wheel_rps_fr
+    unit_in: rad/s
+    unit_out: m/s
+    scale: 0.318
+  wheel_speed_rl:
+    col: wheel_rps_rl
+    unit_in: rad/s
+    unit_out: m/s
+    scale: 0.318
+  wheel_speed_rr:
+    col: wheel_rps_rr
+    unit_in: rad/s
+    unit_out: m/s
+    scale: 0.318
+  tyre_temp_mid_fl:
+    col: tyre_temp_fl
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_fr:
+    col: tyre_temp_fr
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_rl:
+    col: tyre_temp_rl
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_rr:
+    col: tyre_temp_rr
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  susp_pos_fl:
+    col: suspension_fl
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_fr:
+    col: suspension_fr
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_rl:
+    col: suspension_rl
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_rr:
+    col: suspension_rr
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+
+# ---------------------------------------------------------------------------
+ams2:
+  # Colunas do SimHub > Automobilista 2 (CSV Data Logger plugin)
+  speed:
+    col: SpeedMs
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  throttle:
+    col: Throttle
+    unit_in: "0-1"
+    unit_out: "0-1"
+    scale: 1.0
+  brake:
+    col: Brake
+    unit_in: "0-1"
+    unit_out: "0-1"
+    scale: 1.0
+  steering:
+    col: Steering
+    unit_in: "0-1"
+    unit_out: rad
+    scale: 1.5708        # normalizado [-1,1] \u2192 \u00b190\u00b0 (ajustável)
+  clutch:
+    col: Clutch
+    unit_in: "0-1"
+    unit_out: "0-1"
+    scale: 1.0
+  lon_acc:
+    col: AccG_Longitudinal
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  lat_acc:
+    col: AccG_Lateral
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  gear:
+    col: Gear
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  rpm:
+    col: Rpms
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  lap_number:
+    col: CurrentLap
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  gps_x:
+    col: PositionX
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  gps_y:
+    col: PositionZ
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  tyre_temp_mid_fl:
+    col: TyreTempFrontLeft
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_fr:
+    col: TyreTempFrontRight
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_rl:
+    col: TyreTempRearLeft
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_temp_mid_rr:
+    col: TyreTempRearRight
+    unit_in: "\u00b0C"
+    unit_out: "\u00b0C"
+    scale: 1.0
+  tyre_press_fl:
+    col: TyrePressureFrontLeft
+    unit_in: kPa
+    unit_out: kPa
+    scale: 1.0
+  tyre_press_fr:
+    col: TyrePressureFrontRight
+    unit_in: kPa
+    unit_out: kPa
+    scale: 1.0
+  tyre_press_rl:
+    col: TyrePressureRearLeft
+    unit_in: kPa
+    unit_out: kPa
+    scale: 1.0
+  tyre_press_rr:
+    col: TyrePressureRearRight
+    unit_in: kPa
+    unit_out: kPa
+    scale: 1.0
+  wheel_speed_fl:
+    col: WheelSpeedFrontLeft
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  wheel_speed_fr:
+    col: WheelSpeedFrontRight
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  wheel_speed_rl:
+    col: WheelSpeedRearLeft
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  wheel_speed_rr:
+    col: WheelSpeedRearRight
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  tyre_wear_fl:
+    col: TyreWear_FL
+    unit_in: "0-1"
+    unit_out: "0-1"
+    scale: 1.0
+  tyre_wear_fr:
+    col: TyreWear_FR
+    unit_in: "0-1"
+    unit_out: "0-1"
+    scale: 1.0
+  tyre_wear_rl:
+    col: TyreWear_RL
+    unit_in: "0-1"
+    unit_out: "0-1"
+    scale: 1.0
+  tyre_wear_rr:
+    col: TyreWear_RR
+    unit_in: "0-1"
+    unit_out: "0-1"
+    scale: 1.0
+  susp_pos_fl:
+    col: SuspensionFrontLeft
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_fr:
+    col: SuspensionFrontRight
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_rl:
+    col: SuspensionRearLeft
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_rr:
+    col: SuspensionRearRight
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+
+# ---------------------------------------------------------------------------
+# GT7 via sim-to-motec (.ld export)
+# Colunas do conversor sim-to-motec que exporta UDP GT7 para MoTeC .ld.
+# Nomes diferentes do gt7telemetry CSV — usar source_override="gt7_ld".
+# ---------------------------------------------------------------------------
+gt7_ld:
+  speed:
+    col: Ground Speed
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  throttle:
+    # `tp_1` é a borboleta da mesma ECU, em % (medido 1,19..100,92).
+    col: [Throttle Pos, tp_1]
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    col: Brake Pos
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  clutch:
+    col: Clutch Pos
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  steering:
+    col: Steered Angle
+    unit_in: deg
+    unit_out: rad
+    scale: 0.0174533
+  lon_acc:
+    col: G Force Long
+    unit_in: G
+    unit_out: m/s2
+    scale: 9.80665
+  lat_acc:
+    col: G Force Lat
+    unit_in: G
+    unit_out: m/s2
+    scale: 9.80665
+  gear:
+    col: Gear
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  rpm:
+    col: [Engine RPM, n_eng]
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  lap_number:
+    col: Lap Number
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  gps_lat:
+    col: GPS Latitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+  gps_lon:
+    col: GPS Longitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+  wheel_speed_fl:
+    col: Wheel Speed FL
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  wheel_speed_fr:
+    col: Wheel Speed FR
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  wheel_speed_rl:
+    col: Wheel Speed RL
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  wheel_speed_rr:
+    col: Wheel Speed RR
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  susp_pos_fl:
+    col: Susp Pos FL
+    unit_in: cm
+    unit_out: m
+    scale: 0.01
+  susp_pos_fr:
+    col: Susp Pos FR
+    unit_in: cm
+    unit_out: m
+    scale: 0.01
+  susp_pos_rl:
+    col: Susp Pos RL
+    unit_in: cm
+    unit_out: m
+    scale: 0.01
+  susp_pos_rr:
+    col: Susp Pos RR
+    unit_in: cm
+    unit_out: m
+    scale: 0.01
+  tyre_temp_inner_fl:
+    col: Tyre Temp FL
+    unit_in: C
+    unit_out: "°C"
+    scale: 1.0
+  tyre_temp_inner_fr:
+    col: Tyre Temp FR
+    unit_in: C
+    unit_out: "°C"
+    scale: 1.0
+  tyre_temp_inner_rl:
+    col: Tyre Temp RL
+    unit_in: C
+    unit_out: "°C"
+    scale: 1.0
+  tyre_temp_inner_rr:
+    col: Tyre Temp RR
+    unit_in: C
+    unit_out: "°C"
+    scale: 1.0
+
+# ---------------------------------------------------------------------------
+# MoTeC .ld real (MoTeC i2 Pro / ChassisSim export) — source auto = "motec_ld".
+# Canais Title-Case com espaços. Escalas VALIDADAS vs Porsche MPES 2023 reais
+# (Formula Renault Monza, LMP3 Barcelona) por range de valores em 2026-07-01.
+# lap_number NÃO é mapeado: "Beacon (Internal)" não é pulso 0/1 (range ±30k);
+# o IngestionService segmenta por reset do canal 'distance' (Lap Distance).
+#
+# Moto (ECU Marelli — SuperBike, validado 2026-07-30 vs arquivo real
+# `SuperBike Logs/Motec/20220514-1112402...ld`, 500 Hz): mesmo source_hint
+# "motec_ld" (é MoTeC .ld real também), canais em lower_snake em vez de
+# Title-Case. Candidatos alternativos abaixo cobrem os dois casos:
+#   speed:    v_ref (velocidade de referência do ECU, km/h — mesma grandeza
+#             de "Wheel Speed FL", sensor de roda em vez de GPS).
+#   throttle: tpd = "throttle position demand" (posição comandada no punho,
+#             pré-atuador) — equivalente ao "Throttle Pos" de carro. tp_1/
+#             tp_2 são sensores físicos redundantes pós-atuador (par de
+#             plausibilidade do ride-by-wire); mapeados à parte como
+#             throttle_tps1/throttle_tps2 (canais novos, não substituem
+#             `throttle`) — [FÍSICA] confirmar nomenclatura com Vitor.
+#   brake:    p_brake_fr (pressão do freio DIANTEIRO). Moto tem 2 circuitos
+#             hidráulicos independentes; freio traseiro (p_brake_rr) fica
+#             de fora — sem canal canônico "brake_rear" hoje (adicionar é
+#             decisão de schema, não deste fix).
+#   rpm:      n_eng.
+#   lat_acc/lon_acc: "G Force Lat"/"G Force Long" (mesmo math channel do
+#             dash, nome sem hífen e abreviado).
+#   gear/distance: já batem sem mudança ("Gear"/"Lap Distance" idênticos).
+#   steering: NÃO mapeado p/ moto — não existe canal de ângulo de direção
+#             (a contrapartida seria ângulo de cambagem/lean `phi_lean`,
+#             grandeza física DIFERENTE — não é substituto de steering).
+#   suspensão (susp_pos_*) / temp pneu: NÃO mapeados p/ moto — logger só tem
+#             1 amortecedor por eixo (s_susp_fr/s_susp_rr), schema atual
+#             assume 4 cantos de carro (FL/FR/RL/RR); duplicar o mesmo
+#             sensor em fl+fr seria fabricar dado. Gap de arquitetura
+#             (schema 2-rodas) à parte — ver docs/testing/
+#             telemetry-data-inventory.md §6.
+# ---------------------------------------------------------------------------
+motec_ld:
+  # Alternativas medidas em log real de ECU de moto (`SuperBike Logs/Motec`,
+  # 958 mil amostras): `Ground Speed`, `v_ref` e `v_front` estão em km/h como
+  # `Wheel Speed FL`, provado pela integral — 58,6 km em 1916 s dá 110 km/h de
+  # média, batendo com a mediana do canal; em m/s daria 396 km/h. Mesma unidade,
+  # então cabem no mesmo alias. `v_rear` fica de fora: é roda motriz e derrapa.
+  speed:
+    col: [Wheel Speed FL, Ground Speed, v_ref, v_front]
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  throttle:
+    col: [Throttle Pos, tpd]
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  throttle_tps1:
+    # Moto only: sensor físico redundante #1 (plausibilidade ride-by-wire).
+    col: tp_1
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  throttle_tps2:
+    # Moto only: sensor físico redundante #2 (plausibilidade ride-by-wire).
+    col: tp_2
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    # Freio real é pressão hidráulica (Bar); normaliza p/ 0-1 como proxy de
+    # pedal (loggers .ld não têm posição de pedal de freio). Opcional.
+    col: [Brk_Press_Fnt, p_brake_fr]
+    unit_in: bar
+    unit_out: "0-1"
+    normalize_by_max: true
+  rpm:
+    col: [Engine RPM, n_eng]
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  gear:
+    col: Gear
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  steering:
+    col: Steered Angle
+    unit_in: deg
+    unit_out: rad
+    scale: 0.0174533
+  lat_acc:
+    col: [G Force - Lateral, G Force Lat]
+    unit_in: G
+    unit_out: m/s2
+    scale: 9.80665
+  lon_acc:
+    col: [G Force - Longitudinal, G Force Long]
+    unit_in: G
+    unit_out: m/s2
+    scale: 9.80665
+  distance:
+    col: Lap Distance
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  susp_pos_fl:
+    col: Damper Position - Front L
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_fr:
+    col: Damper Position - Front R
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_rl:
+    col: Damper Position - Rear L
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  susp_pos_rr:
+    col: Damper Position - Rear R
+    unit_in: mm
+    unit_out: m
+    scale: 0.001
+  tyre_temp_mid_fl:
+    col: Tyre Temp FL
+    unit_in: C
+    unit_out: "°C"
+    scale: 1.0
+  tyre_temp_mid_fr:
+    col: Tyre Temp FR
+    unit_in: C
+    unit_out: "°C"
+    scale: 1.0
+  tyre_temp_mid_rl:
+    col: Tyre Temp RL
+    unit_in: C
+    unit_out: "°C"
+    scale: 1.0
+  tyre_temp_mid_rr:
+    col: Tyre Temp RR
+    unit_in: C
+    unit_out: "°C"
+    scale: 1.0
+
+# ---------------------------------------------------------------------------
+# AiM .xrk real (via libxrk) — source auto = "aim_xrk".
+# Nomes de canal variam por logger/idioma → `col` aceita LISTA de candidatos
+# (ChannelMapper._resolve_col tenta cada um). VALIDADO vs Copa Truck 2025 por
+# range de valores em 2026-07-01 (a1459 usa 'Acelerador'/'GPS_*Acc'; a0440
+# Cascavel usa 'Ped'/'Freio_Press'/'InlineAcc').
+# accel GPS/interno já vem em **g** (range medido ±1.7–2.2, NÃO ±10 m/s²);
+# canônico mantido em g p/ display racing (G-G). unit_out=g, scale 1.0 (não
+# reescalar). yaw_rate GPS omitido: ruído/spikes ±4500 deg/s inutilizáveis.
+# ---------------------------------------------------------------------------
+aim_xrk:
+  # O datasource entrega uma coluna `lap_number` já resolvida por janela de
+  # beacon (ver xrk_file.py). Sem esta declaração o mapper não a via, e a
+  # ingestão caía no fallback de "volta única".
+  lap_number:
+    col: lap_number
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  speed:
+    col: GPS Speed
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  throttle:
+    # `EDL8_TPS` é a borboleta da ECU do F3 (medido 0,9..100,0 no
+    # `f3_bortoleto_interlagos.xrk`); `Ped` é o mesmo canal na instalação do
+    # caminhão, em português (medido −6,6..100,3 — o negativo é offset de
+    # sensor). Mesma unidade, mesmo alias.
+    # `Pedal` é a mesma coisa noutra instalação brasileira (Cascavel,
+    # Rafa Lopes). O acervo escreve o mesmo canal de quatro jeitos.
+    col: [Acelerador, Ped, Pedal, EDL8_TPS]
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    # Pressão hidráulica normalizada como proxy de pedal — logger AiM não tem
+    # posição de pedal de freio.
+    #
+    # `BRAKE_F` é o eixo dianteiro do F3, medido 4,4..58,1 bar. `Freio_Press` é
+    # o mesmo tipo de sinal na instalação do caminhão, com ZERO DESLOCADO:
+    # repousa em −1,045 e sobe a +1,085 freando, correlacionando +0,56 com a
+    # desaceleração medida pelo GPS. Cheguei a tratá-lo como canal quebrado por
+    # olhar só o extremo; olhar a distribuição mostrou o offset.
+    #
+    # É por isso que a normalização vai da LINHA DE BASE ao pico e não só pelo
+    # pico (ver `channel_mapper._convert`): dividir pelo máximo deixava o traço
+    # de freio em −0,96 com o piloto fora do pedal.
+    col: [BRAKE_F, Freio_Press]
+    unit_in: bar
+    unit_out: "0-1"
+    normalize_by_max: true
+  rpm:
+    # `EDL8_RPM` é a mesma grandeza na ECU do F3 (medido 561..7131 rpm).
+    col: [RPM, EDL8_RPM]
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  lon_acc:
+    col: [GPS_InlineAcc, InlineAcc]
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  lat_acc:
+    # `LAT_ACC` é o acelerômetro do F3. A unidade não foi assumida pelo nome:
+    # ele correlaciona +0,86 com `GPS_LateralAcc` — que este mesmo alias já
+    # declara em g — com ajuste de 0,967, ou seja, mesma escala.
+    #
+    # `LONG_ACC` do mesmo arquivo ficou de FORA do alias de `lon_acc`: contra a
+    # derivada da velocidade ele correlaciona só +0,18, então não é a
+    # aceleração longitudinal do carro, seja qual for o nome.
+    col: [GPS_LateralAcc, LateralAcc, LAT_ACC]
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  gps_lat:
+    col: GPS Latitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+  gps_lon:
+    col: GPS Longitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+  steering:
+    # STEERING no .xrk do F3 e DESLOCAMENTO DE CREMALHEIRA (unit_type 12 do
+    # CHS = mm; fp16 em metros, medido ±0,05 m e identico ao libxrk). Nao ha
+    # relacao cremalheira->grau no arquivo, entao o canonico guarda o valor
+    # cru e a APRESENTACAO normaliza pra % do esterço maximo da gravacao,
+    # declarando (mesma regua do freio por pressao). Converter pra grau aqui
+    # seria inventar a relacao de direcao do carro.
+    col: STEERING
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+
+aim_drk:
+  lap_number:
+    col: lap_number
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  speed:
+    col: [Speed, "Speed #1", "Speed #2", SPEED, "Gps Speed", "GPS Speed"]
+    unit_in: km/h
+    unit_out: m/s
+    scale: 0.2777777777777778
+  rpm:
+    col: [RPM, Engine, rpm, EDL8_RPM]
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  throttle:
+    col: [Throttle, Acelerador, Ped, Pedal, EDL8_TPS]
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    col: [Brake, BRAKE_F, Freio_Press]
+    unit_in: bar
+    unit_out: "0-1"
+    normalize_by_max: true
+  gps_lat:
+    col: gps_latitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+  gps_lon:
+    col: gps_longitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+
+aim_gpk:
+  speed:
+    col: speed
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  gps_lat:
+    col: gps_latitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+  gps_lon:
+    col: gps_longitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+
+# ---------------------------------------------------------------------------
+# AiM Datalog `.DLF` — source = "aim". Logger AiM (TDL/Solo) com GPS + OBD.
+# Nomes por extenso, separados por `;` na linha depois de `#DATASTART`, com a
+# linha de unidades logo abaixo — as unidades abaixo são as DECLARADAS pelo
+# próprio arquivo, medidas nos 80 `.DLF` do acervo (AMG A45/Cup, Interlagos
+# 2026, 20 Hz, 50..124 canais por arquivo conforme a config do logger).
+#
+# NÃO mapeados de propósito:
+#   lat_acc:  não existe. O arquivo tem `Accel Longitudinal Y` e `Accel Vertical
+#             Z` em g, mas o eixo lateral só aparece como `Gyro Accel Lateral X`
+#             em [deg-s] — isso é VELOCIDADE ANGULAR, não aceleração. Chamar de
+#             lat_acc seria trocar a grandeza (o mesmo erro que a lei de unidade
+#             no topo deste arquivo existe para impedir).
+#   brake:    não existe canal de freio — é logger OBD+GPS, sem harness de
+#             chassi. Sem pressão nem posição de pedal de freio.
+#   steering: não existe canal de ângulo de direção.
+#   tyre_*/susp_*: idem — nenhum sensor de canto neste logger.
+# Consequência declarada: um `.DLF` abre com os widgets de freio, direção,
+# elipse de atrito e pneu degradados. É o logger que não gravou, não a análise
+# que falhou.
+# ---------------------------------------------------------------------------
+aim:
+  speed:
+    # `Vehicle Speed` vem do OBD/roda; `GPS Speed` é o fallback quando a config
+    # do logger não tinha o PID (medido: 78 dos 80 arquivos têm os dois).
+    col: [Vehicle Speed, GPS Speed]
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  rpm:
+    col: Engine RPM
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  gear:
+    col: Gear Position
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  throttle:
+    # `Throttle Position` é a borboleta; `OBD Accelerator Pedal Position D` é o
+    # pedal. Preferimos a borboleta e caímos no pedal quando ela falta.
+    col: [Throttle Position, OBD Accelerator Pedal Position D]
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  lon_acc:
+    # MEDIDO (probe_dlf_axis, 2026-08-22, 10 arquivos): o nome AiM segue a
+    # CONFIGURAÇÃO da instalação, não o eixo físico. `Accel Vertical Z` é o
+    # longitudinal real (corr mediana −0,80 com dv/dt; `Accel Longitudinal Y`
+    # marca −0,54 e fica de fallback) e AMBOS gravam desaceleração como +g —
+    # a escala NEGATIVA converte g→m/s² e devolve a convenção canônica
+    # (frenagem = lon_acc negativo) numa constante só. Aprovado pelo operador
+    # em 2026-08-22 (item 3 do censo). IMU morta (caso `#41`, corr ≈ 0) vira
+    # canal constante e cai no guard de sensor morto da ingestão.
+    col: [Accel Vertical Z, Accel Longitudinal Y]
+    unit_in: g
+    unit_out: m/s2
+    scale: -9.80665
+  yaw_rate:
+    # `Gyro Accel Vertical Z` é o giro em torno do eixo vertical = yaw rate.
+    col: Gyro Accel Vertical Z
+    unit_in: deg/s
+    unit_out: rad/s
+    scale: 0.0174533
+  lap_number:
+    col: Lap Number
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  distance:
+    col: Lap Distance
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  gps_lat:
+    col: GPS Latitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+  gps_lon:
+    col: GPS Longitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+  gps_course:
+    # O header do arquivo declara `deg`, mas o canal grava DECI-graus —
+    # medido no catálogo 2026-08-22: faixa 0–3.599,6 em 61/81 arquivos,
+    # confirmado por 3 fontes independentes (catálogo · estudo F-A §7 ·
+    # releitura de 6 arquivos na sessão do censo). Mesma classe do vbox
+    # logo abaixo (minutos de arco): a peculiaridade da fonte se resolve
+    # AQUI, uma vez — a derivação de `lat_acc` da ingestão consome o
+    # canônico já em graus.
+    col: GPS Course Over Ground
+    unit_in: deci-deg
+    unit_out: deg
+    scale: 0.1
+
+# ---------------------------------------------------------------------------
+# Racelogic VBOX .vbo (GPS + CAN logger) — source = "vbox".
+# Colunas = códigos curtos de [column names] (ver VboFileDataSource). Velocidade
+# em km/h; acelerações em G; lat/long em MINUTOS de arco (convenção VBOX
+# West-positivo → grau WGS84: lat ÷60, lon ÷-60). `time` já vem decorrido do
+# datasource. Canais VBOX_* dependem do mapa de CAN do carro (podem faltar).
+# ---------------------------------------------------------------------------
+vbox:
+  speed:
+    col: velocity
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  lon_acc:
+    col: VBOX_accx
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  lat_acc:
+    col: VBOX_accy
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  throttle:
+    col: VBOX_ath
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    col: VBOX_pbrk
+    unit_in: bar
+    unit_out: "0-1"
+    normalize_by_max: true
+  steering:
+    # Era o único perfil emitindo deg num canônico que é rad (11 perfis) — o
+    # tripwire do contrato (test_channels_contract.py) pegou a deriva.
+    col: VBOX_asteer
+    unit_in: deg
+    unit_out: rad
+    scale: 0.0174533
+  rpm:
+    col: VBOX_rpm
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  gear:
+    col: VBOX_gear
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  lap_number:
+    col: VBOX_lapnumber
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  gps_lat:
+    col: lat
+    unit_in: deg
+    unit_out: deg
+    scale: 0.0166667
+  gps_lon:
+    col: long
+    unit_in: deg
+    unit_out: deg
+    scale: -0.0166667
+
+# ---------------------------------------------------------------------------
+# WinTAX (Magneti Marelli) e Pi Toolbox (Cosworth) — export CSV canônico.
+# Estes NÃO são os binários (.pds/.drk = adiados, decisão D3 KB 2026-07-10): são
+# o CSV de export que já sai com colunas SARU-canônicas (distance_m, speed em m/s,
+# throttle/brake 0-100, lon_acc/lat_acc em g). Os dois dialetos partilham o mesmo
+# schema; a distinção wintax↔pitoolbox vem do banner do arquivo (CsvFileDataSource),
+# não das colunas. Mapa quase-identidade.
+# ---------------------------------------------------------------------------
+pitoolbox: &canonical_csv_export
+  speed:
+    col: speed
+    unit_in: m/s
+    unit_out: m/s
+    scale: 1.0
+  lon_acc:
+    col: lon_acc
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  lat_acc:
+    col: lat_acc
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  throttle:
+    col: throttle
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    col: brake
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  steering:
+    col: steering
+    unit_in: rad
+    unit_out: rad
+    scale: 1.0
+  gear:
+    col: gear
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  rpm:
+    col: rpm
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  distance:
+    col: distance_m
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+
+# WinTAX / WinDarab = mesmo schema do export canônico (alias YAML do perfil pitoolbox).
+wintax: *canonical_csv_export
+windarab: *canonical_csv_export
+
+# ---------------------------------------------------------------------------
+# LTS in-memory (saru-core QSS) — source = "saru_lts".
+# NÃO é um arquivo: é a saída de canais do /lts/run (LtsRunResult.channels,
+# ver lapsim_service._TELEMETRY_CHANNELS) adaptada in-memory para a SA como se
+# fosse uma outing real. Os `col` são os nomes crus do solver (não canônicos).
+# CONTRATO DE FIO: o futuro saru-core-jl (14-DOF) DEVE emitir estes mesmos
+# nomes/unidades de `col` p/ reusar este adapter sem quebrar SA/LTS
+# (ver docs/architecture/api-contracts.md §Canais LTS/SA e MASTER_ADR §3.2).
+# ---------------------------------------------------------------------------
+saru_lts:
+  speed:
+    col: v_kmh
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  lon_acc:
+    col: ax_long_g
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  lat_acc:
+    col: ay_lat_g
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  throttle:
+    col: throttle_pct
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    col: brake_pct
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  steering:
+    col: steering_deg
+    unit_in: deg
+    unit_out: rad
+    scale: 0.0174533
+  gear:
+    col: gear
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  rpm:
+    col: rpm
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  distance:
+    col: distance
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+
+# saru-telemetry-gt7: gateway Go da org (captura GT7 UDP → CSV). Dialeto PRÓPRIO
+# (speed_kph, throttle/brake 0-100, rpm, gear) — distinto do perfil `gt7` acima,
+# que é do gt7telemetry/gt7dashboard (body_velocity m/s, throttle 0-255).
+saru_gt7:
+  # Export CSV do SARU Telemetry GT7 (gateway Go da org).
+  # A ÚNICA rota de export do gateway é por volta — `GET /api/laps/{id}/export.csv`
+  # (mux em vendor/saru-telemetry-gt7/internal/httpapi/server.go), 16 colunas:
+  # timestamp, sequence_id, x, y, z, speed_kph, rpm, gear, throttle, brake, fuel,
+  # tyre_fl, tyre_fr, tyre_rl, tyre_rr, steering_rad → UMA volta, segmentação por
+  # fallback. A 16ª coluna nasceu no submódulo em `4ac00e9`; até `d66b6d5` eram 15.
+  # NÃO existe `GET /api/sessions/{id}/export.csv`: quem quer a sessão inteira
+  # concatena os CSVs por volta no cliente (frontend `features/data/gt7Merge.ts`),
+  # e é esse merge que acrescenta a coluna `lap_number` — daí ela estar mapeada
+  # abaixo como opcional. Um comentário anterior aqui descrevia a rota de sessão
+  # como se existisse; ela nunca existiu no gateway.
+  # timestamp é RFC 3339 (string) — parseado no passo 2b do IngestionService.
+  speed:
+    col: speed_kph
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  throttle:
+    col: throttle
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    col: brake
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  rpm:
+    col: rpm
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  gear:
+    col: gear
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  # O gateway já entrega em RADIANO (domain.Sample.SteeringRad, float32) — não há
+  # conversão a fazer, só nomear. Sem esta entrada a coluna era exportada e
+  # descartada em silêncio no mapeamento.
+  steering:
+    col: steering_rad
+    unit_in: rad
+    unit_out: rad
+    scale: 1.0
+  # lap_number: presente só no export de sessão; ausente no export por volta
+  # (o mapper trata como opcional → fallback de segmentação).
+  lap_number:
+    col: lap_number
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  gps_x:
+    col: x
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  gps_y:
+    col: z                 # eixo Z = plano horizontal no GT7
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  tyre_temp_mid_fl:
+    col: tyre_fl
+    unit_in: "°C"
+    unit_out: "°C"
+    scale: 1.0
+  tyre_temp_mid_fr:
+    col: tyre_fr
+    unit_in: "°C"
+    unit_out: "°C"
+    scale: 1.0
+  tyre_temp_mid_rl:
+    col: tyre_rl
+    unit_in: "°C"
+    unit_out: "°C"
+    scale: 1.0
+  tyre_temp_mid_rr:
+    col: tyre_rr
+    unit_in: "°C"
+    unit_out: "°C"
+    scale: 1.0
+
+# ---------------------------------------------------------------------------
+# FuelTech CSV export — source auto = "fueltech".
+# Nomes comuns de sensores FuelTech (FT450/500/550/600).
+# ---------------------------------------------------------------------------
+fueltech:
+  speed:
+    col: [Velocidade, Speed, V_Roda]
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  throttle:
+    col: [TPS, Borboleta]
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    col: [Pressão de Freio, Brake_Press]
+    unit_in: bar
+    unit_out: "0-1"
+    normalize_by_max: true
+  rpm:
+    col: [RPM, RPM Motor]
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  lon_acc:
+    col: [Acelerômetro X, Accel_X, G_Long]
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  lat_acc:
+    col: [Acelerômetro Y, Accel_Y, G_Lat]
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  gear:
+    col: [Marcha, Gear]
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  gps_lat:
+    col: [GPS Latitude, Latitude]
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+  gps_lon:
+    col: [GPS Longitude, Longitude]
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+
+# ---------------------------------------------------------------------------
+# ProTune CSV export — source auto = "protune".
+# ---------------------------------------------------------------------------
+protune:
+  speed:
+    col: [Velocidade GPS, VelGPS, Speed]
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  throttle:
+    col: [TPS, Acelerador]
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    col: [Pressao_Freio, Freio]
+    unit_in: bar
+    unit_out: "0-1"
+    normalize_by_max: true
+  rpm:
+    col: RPM
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  lon_acc:
+    col: [AccLong, G_Long]
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  lat_acc:
+    col: [AccLat, G_Lat]
+    unit_in: g
+    unit_out: m/s2
+    scale: 9.80665
+  gear:
+    col: Marcha
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+
+# Contêiner `.dat` LISTHEAD do acervo F3 (25 arquivos, Curitiba 2015, F309-021).
+# Nomes e unidades saem do próprio arquivo — cada canal declara nome, unidade e
+# faixa em ASCII, e o leitor confere o medido contra o declarado em 48/48.
+#
+# O que NÃO entra aqui, e por quê (o arquivo tem 48 canais; mapear todos seria
+# repetir o erro do perfil `pitoolbox`, que prometia canal que não existe):
+#   · `Steering` está em **mm** — é potenciômetro linear na cremalheira, não
+#     ângulo. Mapear para `steering` (rad) seria inventar uma conversão.
+#   · `Battery Voltage` declara 1167..1255 V. `Box Voltage` dá 11,7..12,4 V no
+#     mesmo arquivo: a escala do primeiro está quebrada na origem.
+#   · `Gear` declara 1..1 (constante) e `Gear Pot` está em volts.
+#   · `Lambda` declara 2,85e6..5,70e6; `Speed ECU`, `Tank Fuel` e `Laps Left`
+#     são todos zero.
+# Núcleo partilhado da família Pi (chave com `.` = âncora interna, não perfil;
+# o tripwire do contrato a ignora). `.dat` LISTHEAD e `.pid` são o MESMO logger
+# com o mesmo vocabulário de canal — âncora em vez de cópia: manter duas cópias
+# divergiria na primeira correção que alguém fizesse só numa delas (foi assim
+# que sete perfis ficaram entregando `g` para um domínio que assume m/s²).
+.pi_core: &pi_core
+  speed:
+    col: Speed
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  distance_m:
+    col: Distance
+    unit_in: m
+    unit_out: m
+    scale: 1.0
+  throttle:
+    # Unidade declarada é "°", mas a faixa é 0,9..100,0 — é percentual com
+    # rótulo errado na origem. A faixa manda; o rótulo não.
+    col: Throttle Positi
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+  brake:
+    # Pressão hidráulica real (0..60 bar), não posição de pedal. Normalizada
+    # como proxy de pedal, igual ao que `motec_ld` já faz.
+    col: Brake Press F
+    unit_in: bar
+    unit_out: "0-1"
+    normalize_by_max: true
+  rpm:
+    col: RPM
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  lap_number:
+    col: lap_number
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+
+listhead_dat:
+  <<: *pi_core
+  lat_acc:
+    # Declarado em G no ASCII do `.dat`, com valor REAL em G. Converter aqui é
+    # o que impede o erro que zerou o TBI e o Driver Score no perfil `acc`:
+    # todo threshold do domínio assume m/s².
+    col: Acc Lat
+    unit_in: G
+    unit_out: m/s2
+    scale: 9.80665
+  lon_acc:
+    col: Acc Long
+    unit_in: G
+    unit_out: m/s2
+    scale: 9.80665
+
+# `pi_pid` = núcleo SEM lat_acc/lon_acc, de propósito (cerimônia 2026-08-22,
+# Q3b). No binário `.pid` os canais `Acc Lat`/`Acc Long` declaram scale=0,0 no
+# dicionário e saem em CONTAGEM crua 10-bit (medido: 360..607, centro ≈ 512 =
+# provável 0 G); herdar o alias do `.dat` multiplicava contagem por 9,80665 e
+# emitia ~+4.600 m/s² de lixo com cara de dado — a causa raiz de "pi_pid nunca
+# vê frenagem" na calibração de 2026-08-22. Sem par offset/escala arbitrado, o
+# canal FICA FORA do canônico (análise degrada com aviso, como o desenho
+# prevê). Reabrir quando a bancada P1 (Pi Toolbox) entregar o par
+# binário↔export — mesmo gate da escala de damper.
+pi_pid: *pi_core
+
+# ---------------------------------------------------------------------------
+# TrackAddict (HP Tuners) — Raw CSV de celular. source auto = "trackaddict".
+# Formato do track day de 14/08/2026. Verificado contra export real do
+# TrackAddict 4.3.5 / Android 9 (25.219 linhas, 20,0 Hz).
+#
+# As colunas chegam aqui JÁ NORMALIZADAS pelo `TrackAddictCsvDataSource`:
+#   * `Speed (Km/h)` é o nome canônico mesmo quando o aparelho declarou MPH — a
+#     conversão condicional vive no `load()` porque esta gramática só multiplica
+#     por constante fixa, ela não escolhe o fator pela unidade do cabeçalho.
+#   * `Lap` já saiu 1-based (no arquivo é 0-based, com o out-lap em 0).
+#
+# POR QUE NÃO HÁ `lon_acc`/`lat_acc` AQUI — e não é esquecimento.
+# O arquivo traz `Accel X/Y/Z` em g, mas o eixo depende de como o celular estava
+# no suporte, e o TrackAddict não declara a orientação em lugar nenhum. Medido
+# na sessão real (200 fixes de GPS, duas voltas lançadas, acelerômetro agregado
+# no intervalo entre fixes): a maior correlação é `Accel X` contra a aceleração
+# lateral cinemática (v·ω) em apenas −0,536, e nenhum eixo passa de +0,28 contra
+# dv/dt. Isso não sustenta afirmar qual eixo é longitudinal.
+# `lon_acc`/`lat_acc` são OPCIONAIS (`_OPTIONAL_CHANNELS`): ausentes, a análise
+# de pilotagem degrada com aviso. Mapeados errado, sai um diagrama g-g com os
+# eixos trocados e ninguém percebe. Só mapear depois de medir contra uma volta
+# de pista com o celular numa orientação conhecida.
+#
+# ARMADILHA a jusante: a velocidade é GPS-derivada e CONGELADA entre fixes —
+# medido: 0 mudanças de `Speed` fora de `GPS_Update == 1`, em 4.317 linhas sem
+# fix. GPS a 0,934 Hz contra sensores a 20,0 Hz. Derivar aceleração dessa coluna
+# sem filtrar por `GPS_Update` diferencia uma escada: no mesmo trecho, dv/dt cru
+# a 20 Hz devolveu picos de −4851 a +2612 m/s².
+# ---------------------------------------------------------------------------
+trackaddict:
+  # OBRIGATÓRIO, e não é decorativo. `_TIMESTAMP_CANDIDATES` do IngestionService
+  # é ("TIME", "time", "timestamp") e casa por nome EXATO contra as colunas do
+  # arquivo — a coluna daqui chama `Time`, que não casa com nenhum dos três.
+  # Sem esta entrada, `_find_timestamp` devolve None, `_compute_lap_time` cai na
+  # integração ds/v e o tempo sai absurdo sem erro nenhum: medido na sessão real
+  # contra brasilia_gp, a volta de 2:35,138 virou 237:42,409.
+  time:
+    col: Time
+    unit_in: s
+    unit_out: s
+    scale: 1.0
+  speed:
+    col: Speed (Km/h)
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  lap_number:
+    col: Lap
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
+  gps_lat:
+    col: Latitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
+  gps_lon:
+    col: Longitude
+    unit_in: deg
+    unit_out: deg
+    scale: 1.0
