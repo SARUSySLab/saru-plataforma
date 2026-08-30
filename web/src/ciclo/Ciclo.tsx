@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import "../estilo/ciclo.css";
 import { useSelecao } from "../state/selection";
-import { useBaterias, useEventos, useLayouts, useSessoes } from "./useEspinha";
+import { useBaterias, useEventos, useLayouts, usePilotos, useSessoes } from "./useEspinha";
 import {
   criarBateria,
   criarEvento,
@@ -46,9 +46,10 @@ import { FichaDeSetup } from "../gavetas/FichaDeSetup";
 // 4. Contexto e ficha abrem em MODAL (padrao do sistema) e sao renderizados
 //    AQUI, entao funcionam tambem na conta ainda sem relatorio nenhum.
 
-type Passo = "evento" | "sessao" | "bateria" | "pronto";
+type Passo = "evento" | "piloto" | "sessao" | "bateria" | "pronto";
 type ModalAberto =
-  | null | "evento" | "editar-evento" | "sessao" | "editar-sessao" | "bateria" | "editar-bateria";
+  | null | "evento" | "editar-evento" | "sessao" | "editar-sessao" | "bateria" | "editar-bateria"
+  | "telemetria";
 
 function Erro({ e }: { e: unknown }) {
   if (!e) return null;
@@ -101,6 +102,7 @@ function ListaPaginada({ children, compacta = false }: {
   compacta?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const refLista = useRef<HTMLUListElement>(null);
   const [altura, setAltura] = useState(0);
   useEffect(() => {
     const el = ref.current;
@@ -111,11 +113,26 @@ function ListaPaginada({ children, compacta = false }: {
     return () => ro.disconnect();
   }, []);
 
+  // A altura do item NAO pode ser chutada. Item de uma linha (evento) e item
+  // de duas (piloto, sessao, saida, telemetria: titulo + subtitulo) tem
+  // alturas bem diferentes, e o palpite fixo fazia a conta caber mais itens
+  // do que a caixa aguenta -- como a caixa e overflow:hidden, o excedente
+  // sumia cortado no meio, que era o "scroll bugado". Medir o primeiro item
+  // ja renderizado resolve pros dois casos e pra qualquer fonte do usuario.
+  const [alturaMedida, setAlturaMedida] = useState(0);
+  useLayoutEffect(() => {
+    const primeiro = refLista.current?.firstElementChild as HTMLElement | null;
+    if (!primeiro) return;
+    const gap = 2; // mesmo gap de .ciclo-lista
+    const h = primeiro.getBoundingClientRect().height + gap;
+    if (h > 0 && Math.abs(h - alturaMedida) > 0.5) setAlturaMedida(h);
+  });
+
   const [pagina, setPagina] = useState(0);
   const n = children.length;
-  const alturaItem = compacta ? 36 : 48;
+  const alturaItem = alturaMedida > 0 ? alturaMedida : compacta ? 36 : 48;
   // reserva a faixa do pager quando ha mais de uma pagina
-  const porPagina = Math.max(2, Math.floor(Math.max(alturaItem * 2, altura - 26) / alturaItem));
+  const porPagina = Math.max(1, Math.floor(Math.max(alturaItem, altura - 26) / alturaItem));
   const paginado = n > porPagina;
   const totalPaginas = Math.max(1, Math.ceil(n / porPagina));
   const atual = ((pagina % totalPaginas) + totalPaginas) % totalPaginas;
@@ -123,7 +140,7 @@ function ListaPaginada({ children, compacta = false }: {
 
   return (
     <div ref={ref} className="ciclo-lista-caixa">
-      <ul className={`ciclo-lista${compacta ? " compacta" : ""}`}>{visiveis}</ul>
+      <ul ref={refLista} className={`ciclo-lista${compacta ? " compacta" : ""}`}>{visiveis}</ul>
       {paginado && (
         <div className="ciclo-paginas">
           <button type="button" className="ciclo-seta" onClick={() => setPagina(atual - 1)} aria-label="Página anterior">&lsaquo;</button>
@@ -166,11 +183,12 @@ function CamposPaginados({ paginas }: {
 
 export function Ciclo() {
   const {
-    eventoId, sessaoId, bateriaId, setEvento, setSessao, setBateria,
+    eventoId, pilotoId, sessaoId, bateriaId, setEvento, setPiloto, setSessao, setBateria,
     contextoAberto, setContextoAberto, setupAberto, setSetupAberto,
   } = useSelecao();
   const eventos = useEventos();
   const layouts = useLayouts();
+  const pilotos = usePilotos(eventoId);
   const sessoes = useSessoes(eventoId);
   const baterias = useBaterias(sessaoId);
   const [erro, setErro] = useState<unknown>(null);
@@ -195,16 +213,42 @@ export function Ciclo() {
   // cumprido sem desfazer a escolha. Escolher outro item e o que troca (os
   // setters ja zeram os niveis de baixo); escolher o MESMO so volta ao fluxo.
   const [passoForcado, setPassoForcado] = useState<Passo | null>(null);
-  const passoNatural: Passo = !eventoId ? "evento" : !sessaoId ? "sessao" : !bateriaId ? "bateria" : "pronto";
+  const passoNatural: Passo = !eventoId ? "evento" : !pilotoId ? "piloto"
+    : !sessaoId ? "sessao" : !bateriaId ? "bateria" : "pronto";
   const passo: Passo = passoForcado ?? passoNatural;
 
   const evento = eventos.dado?.find((e) => e.id === eventoId) ?? null;
+  const piloto = (pilotos.dado ?? []).find((p) => (p.piloto_id ?? "sem") === pilotoId) ?? null;
   const sessao = sessoes.dado?.find((s) => s.id === sessaoId) ?? null;
+  // So as sessoes do piloto em escopo. O balde "sem" agrupa as sessoes sem
+  // piloto declarado, que e como o acervo antigo aparece.
+  const sessoesDoPiloto = (sessoes.dado ?? []).filter(
+    (s) => !pilotoId || (s.piloto_id ?? "sem") === pilotoId,
+  );
+
+  // Escopo restaurado do localStorage pode trazer uma sessao de OUTRO piloto,
+  // ou de antes do degrau do piloto existir. Quem manda e a SESSAO: ela diz de
+  // quem e, e o escopo se ajusta a ela. Sem isto a trilha mostrava piloto
+  // vazio com sessao preenchida, que e um estado que nao existe no dominio:
+  // nao se chega em sessao sem passar por piloto.
+  useEffect(() => {
+    if (!sessao) return;
+    const dono = sessao.piloto_id ?? "sem";
+    if (dono !== pilotoId) setPiloto(dono);
+  }, [sessao, pilotoId, setPiloto]);
+
+  // A recíproca: sessao escolhida que a lista ainda nao trouxe (evento trocado,
+  // escopo velho) nao pode deixar a tela num passo inalcancavel. Sem piloto, o
+  // caminho volta pro comeco em vez de mostrar sessao orfa.
+  useEffect(() => {
+    if (sessaoId && !pilotoId && sessoes.dado && !sessao) setSessao(null);
+  }, [sessaoId, pilotoId, sessoes.dado, sessao, setSessao]);
   const bateria = baterias.dado?.find((b) => b.id === bateriaId) ?? null;
 
   const alcancavel: Record<Passo, boolean> = {
     evento: true,
-    sessao: eventoId !== null,
+    piloto: eventoId !== null,
+    sessao: pilotoId !== null,
     bateria: sessaoId !== null,
     pronto: bateriaId !== null,
   };
@@ -389,6 +433,7 @@ export function Ciclo() {
 
   const PASSOS: { id: Passo; rotulo: string; resumo: string | null }[] = [
     { id: "evento", rotulo: "Evento", resumo: evento?.name ?? null },
+    { id: "piloto", rotulo: "Piloto", resumo: piloto?.nome ?? null },
     { id: "sessao", rotulo: "Sessão", resumo: sessao ? (sessao.label ?? sessao.type) : null },
     { id: "bateria", rotulo: "Saída pra pista", resumo: bateria ? nomeDoOuting(bateria) : null },
     { id: "pronto", rotulo: "Telemetria", resumo: bateriaId ? `${penduradas.length} arquivo(s)` : null },
@@ -460,19 +505,60 @@ export function Ciclo() {
         </section>
       )}
 
+      {/* --- etapa atual: PILOTO (degrau novo, 30/08) --- */}
+      {passo === "piloto" && (
+        <section className="ciclo-bloco">
+          <header>
+            <h3>Piloto</h3>
+            <span className="ciclo-cabeca-contexto">{evento?.name}</span>
+          </header>
+          {pilotos.carregando ? (
+            <p className="fraco">carregando pilotos...</p>
+          ) : pilotos.dado && pilotos.dado.length > 0 ? (
+            <ListaPaginada>
+              {pilotos.dado.map((p) => {
+                // "sem" nao e id: e o balde das sessoes sem piloto declarado,
+                // que e como o acervo antigo aparece. Sem esse balde elas
+                // sumiriam da tela depois que o filtro por piloto entrou.
+                const chave = p.piloto_id ?? "sem";
+                return (
+                  <li key={chave}>
+                    <button
+                      type="button"
+                      className={chave === pilotoId ? "escolhido" : ""}
+                      onClick={() => { setPiloto(chave); setPassoForcado(null); }}
+                    >
+                      <span className="t">{p.nome}</span>
+                      <span className="q">
+                        {p.sessoes} sessão(ões) · {p.saidas} saída(s) · {p.voltas} voltas
+                        {p.melhor_volta_s != null && ` · melhor ${tempo(p.melhor_volta_s)}`}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ListaPaginada>
+          ) : (
+            <p className="fraco">Nenhuma sessão neste evento ainda.</p>
+          )}
+        </section>
+      )}
+
       {/* --- etapa atual: SESSAO --- */}
       {passo === "sessao" && (
         <section className="ciclo-bloco">
           <header>
             <h3>Sessão</h3>
-            <span className="ciclo-cabeca-contexto">{evento?.name}</span>
+            <span className="ciclo-cabeca-contexto">
+              {evento?.name}{piloto ? ` · ${piloto.nome}` : ""}
+            </span>
             <button type="button" className="criar" onClick={() => setModal("sessao")}>+ sessão</button>
           </header>
           {sessoes.carregando ? (
             <p className="fraco">carregando sessões...</p>
-          ) : sessoes.dado && sessoes.dado.length > 0 ? (
+          ) : sessoesDoPiloto.length > 0 ? (
             <ListaPaginada>
-              {sessoes.dado.map((s) => (
+              {sessoesDoPiloto.map((s) => (
                 <li key={s.id}>
                   <button
                     type="button"
@@ -593,7 +679,17 @@ export function Ciclo() {
           <div className="ciclo-duas">
             {/* coluna A: a telemetria desta bateria */}
             <div className="ciclo-coluna">
-              <h4>Telemetria</h4>
+              <h4>
+                Telemetria
+                {/* Enviar vira MODAL, no mesmo padrao dos outros cadastros
+                    (pedido do Lucas, 30/08): a coluna mostra o que ja existe,
+                    e criar coisa nova sempre comeca por um botao "+". Antes o
+                    formulario ficava aberto embaixo da lista o tempo todo,
+                    ocupando a tela mesmo quando ninguem ia enviar nada. */}
+                <button type="button" className="criar" onClick={() => setModal("telemetria")}>
+                  + telemetria
+                </button>
+              </h4>
               {penduradas.length > 0 ? (
                 <ListaPaginada compacta>
                   {penduradas.map((g) => (
@@ -606,10 +702,10 @@ export function Ciclo() {
                         <button
                           type="button"
                           className="limpar"
-                          title="Solta o arquivo desta saída sem apagar nada"
+                          title="Desfaz o vínculo com esta saída pra pista. O arquivo continua no acervo e pode ser pendurado em outra saída."
                           onClick={() => soltar(g.gravacao_id)}
                         >
-                          soltar
+                          tirar da saída
                         </button>
                         <button
                           type="button"
@@ -626,22 +722,19 @@ export function Ciclo() {
                 <p className="fraco">Nenhum arquivo pendurado ainda.</p>
               )}
 
-              {/* Enviar telemetria AQUI, com a bateria ja escolhida, e o caminho
-                  do dia de pista: o arquivo entra pendurado nela e, processado,
-                  abre direto no Box. */}
-              <div className="ciclo-envio">
-                <EnvioDeTelemetria aoConcluir={() => baterias.recarregar()} />
-              </div>
             </div>
 
             {/* coluna B: o registro do box, com estado de preenchimento
                 (pedido de 29/08: feedback visual quando preenchido) */}
             <div className="ciclo-coluna">
               <h4>Registro do box</h4>
-              <button type="button" className={`ciclo-registro${registros > 0 ? " ok" : ""}`} onClick={() => setContextoAberto(true)}>
+              {/* Vazio e CONVITE, nao aviso: o cartao ja era clicavel, mas
+                  "nao preenchido" em cinza parecia rotulo de estado morto.
+                  Em rosa ele diz o que fazer (pedido do Lucas, 30/08). */}
+              <button type="button" className={`ciclo-registro${registros > 0 ? " ok" : " falta"}`} onClick={() => setContextoAberto(true)}>
                 <span className="cabeca">
                   <span className="nome">Contexto da saída</span>
-                  <span className="estado">{registros > 0 ? "✓ preenchido" : "não preenchido"}</span>
+                  <span className="estado">{registros > 0 ? "✓ preenchido" : "+ adicionar"}</span>
                 </span>
                 <span className="detalhe">
                   {registros > 0
@@ -649,10 +742,10 @@ export function Ciclo() {
                     : "pneu, temperaturas, vento e notas da ida à pista"}
                 </span>
               </button>
-              <button type="button" className={`ciclo-registro${ultimaVersao > 0 ? " ok" : ""}`} onClick={() => setSetupAberto(true)}>
+              <button type="button" className={`ciclo-registro${ultimaVersao > 0 ? " ok" : " falta"}`} onClick={() => setSetupAberto(true)}>
                 <span className="cabeca">
                   <span className="nome">Configurações do carro</span>
-                  <span className="estado">{ultimaVersao > 0 ? `✓ versão ${ultimaVersao}` : "não preenchida"}</span>
+                  <span className="estado">{ultimaVersao > 0 ? `✓ versão ${ultimaVersao}` : "+ adicionar"}</span>
                 </span>
                 <span className="detalhe">
                   {ultimaVersao > 0
@@ -773,6 +866,12 @@ export function Ciclo() {
             <button type="button" className="ghost" onClick={() => setModal(null)}>Cancelar</button>
           </div>
         </form>
+      </Modal>
+
+      {/* Com a saida ja escolhida, o arquivo entra pendurado nela e, depois de
+          processado, abre direto no Box. */}
+      <Modal titulo="Enviar telemetria" aberto={modal === "telemetria"} aoFechar={() => setModal(null)}>
+        <EnvioDeTelemetria aoConcluir={() => { baterias.recarregar(); setModal(null); }} />
       </Modal>
 
       <Modal classe="sem-scroll" titulo="Editar saída pra pista" aberto={modal === "editar-bateria"} aoFechar={() => setModal(null)}>

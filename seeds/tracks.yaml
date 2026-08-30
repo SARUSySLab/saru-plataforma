@@ -505,6 +505,29 @@ tracks:
   - track_id: brasilia_gp
     track_name: "Autódromo Internacional Nelson Piquet — Brasília/DF"
     length_m: 5384.0
+    # MEDIDA do acervo em 30/08, nunca de memoria (regra do catalogo): posicao
+    # no instante dos beacons de volta de 103 gravacoes AiM do proprio
+    # autodromo, 486 passagens. A mediana tem dispersao de 4 m, e 289 das 486
+    # passagens caem dentro de 30 m dela; o resto e GPS ruim de arquivo
+    # isolado, que a mediana ignora por construcao.
+    ref_lat: -15.772782
+    ref_lon: -47.900248
     sector_distances: [1795.0, 3590.0, 5384.0]
-    corners: []
+    # DERIVADAS do acervo em 30/08 por `scripts/derivar_curvas.py --layout
+    # brasilia_gp --comprimento 5384`, nunca de memoria: mediana ponto a ponto
+    # de |lat_acc| nas 8 voltas de fecho mais limpo (fator 0.988-0.993),
+    # nucleo de curvatura sustentada acima de 4.0 m/s^2. As 9 curvas foram
+    # validadas contra minimo local de velocidade -- o apex de TODAS cai a
+    # 0-16 m de um minimo de velocidade medido, que e a assinatura fisica de
+    # curva de verdade. Apex de 0.63 a 0.98 g.
+    corners:
+      - {corner_id: T1, label: "Curva 1", s_start: 176.0, s_apex: 330.0, s_end: 488.0}
+      - {corner_id: T2, label: "Curva 2", s_start: 1128.0, s_apex: 1250.0, s_end: 1408.0}
+      - {corner_id: T3, label: "Curva 3", s_start: 1494.0, s_apex: 1640.0, s_end: 1774.0}
+      - {corner_id: T4, label: "Curva 4", s_start: 1848.0, s_apex: 1962.0, s_end: 2174.0}
+      - {corner_id: T5, label: "Curva 5", s_start: 2886.0, s_apex: 2960.0, s_end: 3046.0}
+      - {corner_id: T6, label: "Curva 6", s_start: 3406.0, s_apex: 3470.0, s_end: 3644.0}
+      - {corner_id: T7, label: "Curva 7", s_start: 3648.0, s_apex: 3794.0, s_end: 3892.0}
+      - {corner_id: T8, label: "Curva 8", s_start: 3952.0, s_apex: 4074.0, s_end: 4216.0}
+      - {corner_id: T9, label: "Última", s_start: 4670.0, s_apex: 4718.0, s_end: 4772.0}
     track_map: null

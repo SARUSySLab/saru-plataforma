@@ -89,6 +89,26 @@ CANAIS_PULSO = ("Beacon", "LAP_BEACON", "Beacon (Internal)")
 # dominio (kart de 1,0 km roda 40 s) e bem acima de qualquer repique.
 MIN_VOLTA_S = 10.0
 
+# Teto de velocidade MEDIA de volta usado para derivar o tempo minimo plausivel
+# quando o comprimento do layout e conhecido. 320 km/h de MEDIA e absurdo para
+# qualquer carro de track day (a media de um GT3 em Interlagos fica perto de
+# 160), entao ele so corta o que e fisicamente impossivel, nunca volta rapida
+# de verdade.
+#
+# Por que isto existe: o `MIN_VOLTA_S` fixo de 10 s nasceu do kartodromo, onde
+# a volta tem 40 s. Aplicado ao Nelson Piquet (5.384 m), ele deixou passar 22
+# "voltas" de 11 a 30 s vindas de beacon repetido, e uma delas virou "melhor
+# volta" de 11,6 s no painel do piloto. Volta de 11 s em 5,4 km seria 1.670
+# km/h. O comprimento da pista ja estava no banco; era so usar.
+TETO_VELOCIDADE_MEDIA_KMH = 320.0
+
+
+def min_volta_por_comprimento(comprimento_m: float | None) -> float:
+    """Piso de tempo de volta para a pista, ou o piso generico se nao souber."""
+    if not comprimento_m or comprimento_m <= 0:
+        return MIN_VOLTA_S
+    return max(MIN_VOLTA_S, comprimento_m / (TETO_VELOCIDADE_MEDIA_KMH / 3.6))
+
 # Raio do gate em volta da coordenada de referencia do layout. 30 m e largo o
 # bastante pra pegar a passagem a 250 km/h amostrada a 10 Hz (6,9 m entre
 # amostras) e estreito o bastante pra nao capturar o box na maioria dos
@@ -397,6 +417,15 @@ def _por_canal(conn, gravacao_id: str, corte: Corte) -> bool:
     if not candidatos:
         corte.tentativas.append("canal: a gravacao nao tem canal de volta")
         return False
+    # o layout ja foi resolvido na etapa 4; quando ele existe, o comprimento
+    # diz qual tempo de volta e fisicamente possivel nesta pista
+    linha_layout = conn.execute(
+        """select l.comprimento_m from gravacao g
+             join layout l on l.id = g.layout_id where g.id = %s""",
+        (gravacao_id,),
+    ).fetchone()
+    min_volta = min_volta_por_comprimento(linha_layout[0] if linha_layout else None)
+
     for nome, uri, metodo, hz in candidatos:
         dados = ler_colunas(uri, [nome])
         if nome not in dados or "t_s" not in dados:
@@ -417,10 +446,11 @@ def _por_canal(conn, gravacao_id: str, corte: Corte) -> bool:
                 "denso demais pra ser volta"
             )
             continue
-        voltas = voltas_de_passagens(instantes)
+        voltas = voltas_de_passagens(instantes, min_volta_s=min_volta)
         if not voltas:
             corte.tentativas.append(
                 f"canal {nome}: {len(instantes)} passagem(ns), nenhuma volta fechada"
+                f" (minimo de {min_volta:.0f} s para esta pista)"
             )
             continue
         corte.voltas = voltas
@@ -478,6 +508,16 @@ def _por_xrk(conn, gravacao_id: str, corte: Corte) -> bool:
         ("aim_drk.lap_beacons_ms", "drk", "drk_indice-1",
          "tabela de voltas do indice .drk"),
     )
+    # mesmo piso do degrau de canal: beacon fisico repetido (carro cruzando a
+    # linha devagar, ou o proprio logger marcando duas vezes) gerava "volta" de
+    # 11 s no Nelson Piquet, que tem 5.384 m
+    linha_layout = conn.execute(
+        """select l.comprimento_m from gravacao g
+             join layout l on l.id = g.layout_id where g.id = %s""",
+        (gravacao_id,),
+    ).fetchone()
+    min_volta = min_volta_por_comprimento(linha_layout[0] if linha_layout else None)
+
     for chave, rotulo, metodo, fonte in fontes:
         linha = conn.execute(
             "select metadata->>%s from gravacao where id = %s",
@@ -500,10 +540,11 @@ def _por_xrk(conn, gravacao_id: str, corte: Corte) -> bool:
                 "fechar uma volta"
             )
             continue
-        voltas = voltas_de_passagens(instantes)
+        voltas = voltas_de_passagens(instantes, min_volta_s=min_volta)
         if not voltas:
             corte.tentativas.append(
-                f"{rotulo}: beacons perto demais pra serem voltas"
+                f"{rotulo}: beacons perto demais pra serem voltas "
+                f"(minimo de {min_volta:.0f} s para esta pista)"
             )
             continue
         corte.voltas = voltas

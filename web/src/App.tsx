@@ -62,7 +62,40 @@ function faltasDeContexto(relatorio: Relatorio): string[] {
   return faltas.length ? faltas : ["o primeiro registro de contexto"];
 }
 
-function PerguntaDaIngestao({ faltas, onAbrir }: { faltas: string[]; onAbrir: () => void }) {
+/** Baterias em que o piloto ja dispensou o aviso de contexto.
+ *
+ *  Fica no navegador de proposito: dispensar e preferencia de quem esta
+ *  olhando agora, nao fato sobre a bateria. Um segundo engenheiro que abrir a
+ *  mesma sessao ainda ve o aviso, porque para ele a informacao continua
+ *  faltando de verdade. E o storage pode falhar (aba privada, site bloqueado),
+ *  entao toda leitura e escrita e protegida: sem ele, o aviso simplesmente
+ *  volta a aparecer, que e o comportamento seguro.
+ */
+const CHAVE_AVISOS = "saru.avisos-dispensados";
+
+function avisosDispensados(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(CHAVE_AVISOS) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+function dispensarAviso(bateriaId: string): void {
+  try {
+    const atuais = new Set(avisosDispensados());
+    atuais.add(bateriaId);
+    localStorage.setItem(CHAVE_AVISOS, JSON.stringify([...atuais]));
+  } catch {
+    // storage indisponivel: o aviso volta no proximo render, e tudo bem
+  }
+}
+
+function PerguntaDaIngestao({ faltas, onAbrir, onDispensar }: {
+  faltas: string[];
+  onAbrir: () => void;
+  onDispensar: () => void;
+}) {
   if (faltas.length === 0) return null;
   return (
     <div className="pergunta">
@@ -72,6 +105,12 @@ function PerguntaDaIngestao({ faltas, onAbrir }: { faltas: string[]; onAbrir: ()
         desde o envio anterior?
       </p>
       <button type="button" className="ghost" onClick={onAbrir}>Preencher contexto</button>
+      {/* Dispensar NAO preenche nada: o contexto continua faltando, e a
+          ressalva segue saindo junto do insight. O que muda e so a cobranca
+          no topo da tela, que o piloto ja leu. */}
+      <button type="button" className="ghost" onClick={onDispensar} title="o aviso some para esta saída neste navegador; o contexto continua faltando">
+        Agora não
+      </button>
     </div>
   );
 }
@@ -100,7 +139,7 @@ function Analyzer({
   gravacaoId: string;
   catalogo: Gravacao[];
 }) {
-  const { volta, compara, refGravacaoId, refVolta, vista, irPara, eventoId, sessaoId, bateriaId, contextoAberto, setContextoAberto, setupAberto, setSetupAberto } = useSelecao();
+  const { volta, compara, refGravacaoId, refVolta, vista, irPara, eventoId, sessaoId, bateriaId, contextoAberto, setContextoAberto, setupAberto, setSetupAberto, setGravacao } = useSelecao();
   const [railAberto, setRailAberto] = useState(true);
 
   const voltas = relatorio.n1.voltas;
@@ -124,6 +163,23 @@ function Analyzer({
   // mentira de contexto, justo no card que existe pra dizer a verdade
   const bateriaDaMelhor = voltas.find((v) => v.n === melhorN)?.bateria?.rotulo ?? null;
   const faltas = faltasDeContexto(relatorio);
+
+  // Captura aberta sem trecho medido, e existe outra melhor no acervo: a
+  // origem do aviso acionavel logo abaixo. `trechos` vem do catalogo, entao
+  // isto nao custa requisicao nova.
+  const doCatalogo = catalogo.find((g) => g.gravacao_id === gravacaoId);
+  const semTrechoAqui = doCatalogo != null && doCatalogo.trechos === 0;
+  const melhorComTrecho = semTrechoAqui
+    ? [...catalogo]
+        .filter((g) => g.bateria_id && g.trechos > 0 && g.finalidade !== "referencia")
+        .sort((a, b) => (b.trechos - a.trechos) || (b.voltas - a.voltas))[0]
+    : undefined;
+  // Dispensa por saida: trocar de saida traz o aviso de volta, porque a
+  // pergunta e sobre AQUELA ida a pista, nao sobre a tela.
+  const [avisoDispensado, setAvisoDispensado] = useState(false);
+  useEffect(() => {
+    setAvisoDispensado(bateriaId != null && avisosDispensados().includes(bateriaId));
+  }, [bateriaId]);
   // O aviso de contexto le a fonte REAL (registros da bateria em escopo), e
   // nao o relatorio: o piloto registrava e o aviso nao reconhecia, entao ele
   // registrava de novo, e de novo (medido em producao em 29/08: 4 registros
@@ -221,8 +277,35 @@ function Analyzer({
                 SEM registro de contexto. Assim que o piloto registra, o aviso
                 some: contexto e por bateria, e completar o registro e decisao
                 dele na gaveta, nao cobranca em loop da tela. */}
-            {eventoId && sessaoId && bateriaId && contextoDaBateria.dado?.length === 0 && (
-              <PerguntaDaIngestao faltas={faltas} onAbrir={() => setContextoAberto(true)} />
+            {/* Escopo preso numa captura sem trecho: os blocos de perda saem
+                degradados e o usuario nao tem como saber que existe outra
+                captura completa a um clique. O aviso e ACIONAVEL, e nao um
+                lamento: leva direto pra melhor do acervo. */}
+            {semTrechoAqui && melhorComTrecho && (
+              <div className="pergunta">
+                <span className="qi">!</span>
+                <p>
+                  Esta captura não tem trecho medido, então "onde ganhar tempo" e o mapa
+                  ficam degradados. O arquivo é curto ou esparso demais para fechar uma volta
+                  na distância da pista.
+                </p>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setGravacao(melhorComTrecho.gravacao_id)}
+                >
+                  Abrir a captura mais completa
+                </button>
+              </div>
+            )}
+
+            {eventoId && sessaoId && bateriaId && contextoDaBateria.dado?.length === 0
+              && !avisoDispensado && (
+              <PerguntaDaIngestao
+                faltas={faltas}
+                onAbrir={() => setContextoAberto(true)}
+                onDispensar={() => { dispensarAviso(bateriaId); setAvisoDispensado(true); }}
+              />
             )}
 
             {/* Box (ex visao geral), ordem de 29/08: duas linhas 1x4 que
@@ -480,7 +563,7 @@ function CascaDiaDePista({ temDado }: { temDado: boolean }) {
  * gravacao ainda em processamento daria tela vazia sem explicacao.
  */
 function AppComSessao() {
-  const { gravacaoId, setGravacao, sincronizarEspinha, volta, compara, refGravacaoId, refVolta, setRefGravacao, vista } =
+  const { gravacaoId, setGravacao, sincronizarEspinha, volta, compara, refGravacaoId, refVolta, setRefGravacao, vista, setVolta } =
     useSelecao();
   const catalogo = useGravacoes(true);
 
@@ -504,10 +587,17 @@ function AppComSessao() {
     // aponta pro dia de pista.
     const lista = catalogo.dado.filter((g) => g.bateria_id && g.finalidade !== "referencia");
     if (lista.length === 0) return;
+    // Entre as que tem trecho, abre a MAIS completa, nao a primeira da lista.
+    // No acervo do Nelson Piquet ha capturas esparsas (um piloto tem 20
+    // arquivos com 2 marcas de volta cada e GPS a 0,4 Hz), e cair numa delas
+    // mostrava o produto degradado logo na primeira tela.
+    const porRiqueza = [...lista].sort(
+      (a, b) => (b.trechos - a.trechos) || (b.voltas - a.voltas),
+    );
     const melhor =
-      lista.find((g) => g.trechos > 0 && g.layout_id) ??
-      lista.find((g) => g.layout_id && g.voltas > 0) ??
-      lista.find((g) => g.voltas > 0) ??
+      porRiqueza.find((g) => g.trechos > 0 && g.layout_id) ??
+      porRiqueza.find((g) => g.layout_id && g.voltas > 0) ??
+      porRiqueza.find((g) => g.voltas > 0) ??
       lista[0];
     setGravacao(melhor.gravacao_id);
   }, [gravacaoId, catalogo.dado, setGravacao]);
@@ -574,6 +664,16 @@ function AppComSessao() {
       setGravacao(null);
     }
   }, [relatorio.erro, refGravacaoId, setGravacao]);
+
+  // Volta que nao existe mais (escopo velho apontando pra gravacao com menos
+  // voltas, ou valor estranho vindo do storage) faz o servidor recusar o
+  // parametro. Voltar pra melhor volta e o unico caminho que devolve a tela ao
+  // usuario, em vez de deixar "o relatorio nao veio" com tudo selecionado.
+  useEffect(() => {
+    if (relatorio.erro && /parâmetro inválido/i.test(relatorio.erro)) {
+      setVolta(null);
+    }
+  }, [relatorio.erro, setVolta]);
 
   // Campeonato tem casca propria e nao depende do catalogo nem do relatorio:
   // sai daqui antes das checagens de erro/carregando deles, senao um catalogo

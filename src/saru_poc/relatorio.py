@@ -262,7 +262,7 @@ def perdas_por_trecho(
                     .get("pico_frenagem", _medida(None, None, "%", False)),
                     pico_envelope_grip=(pilotagem or {})
                     .get(tid, {})
-                    .get("pico_envelope_grip", _medida(None, None, "g", False)),
+                    .get("pico_envelope_grip", _medida(None, None, "m/s2", False)),
                 )
                 if pilotagem is not None
                 else _degradado(
@@ -525,7 +525,11 @@ def _pilotagem_por_trecho(
                 "%" if freio and freio.canonico == "brake" else "bar",
                 pico_freio is not None,
             ),
-            "pico_envelope_grip": _medida(pico_grip, None, "g", pico_grip is not None),
+            # Unidade: m/s2. `valores()` ja devolve o canal na unidade canonica da
+            # casa (aliases.yaml converte g -> m/s2 com fator 9.80665), entao
+            # rotular de "g" aqui mostrava 8 g na tela, um numero que nenhum
+            # pneu entrega -- era o m/s2 com o rotulo errado.
+            "pico_envelope_grip": _medida(pico_grip, None, "m/s2", pico_grip is not None),
         }
     return saida
 
@@ -567,7 +571,7 @@ def montar(
     gravacao_id: str,
     *,
     volta: int | None = None,
-    referencia: int | None = None,
+    referencia: int | str | None = None,
     ref_gravacao_id: str | None = None,
 ) -> dict:
     """Monta o `Relatorio` do contrato pra uma gravacao.
@@ -645,6 +649,9 @@ def montar(
     mv = melhor_volta(voltas, setores_por_volta)
     validas = [v for v in voltas if v["valida"]]
     n_analisada = volta or (validas[-1]["n"] if validas else voltas[-1]["n"])
+    # A palavra "media" chega do seletor de comparacao do front, e nao e numero
+    # de volta: ela pede a media das validas como referencia.
+    pediu_media = isinstance(referencia, str) and referencia.strip().lower() == "media"
 
     # Fonte da volta de referencia: a propria gravacao (default) ou a gravacao
     # cruzada, ja validada pela guarda acima. `voltas_ref_src` unifica os dois
@@ -658,10 +665,16 @@ def montar(
                 "rode a etapa 5 antes"
             )
         mv_ref = melhor_volta(voltas_ref_src, setores_ref_src)
-        n_ref = referencia or mv_ref["melhor_volta_n"]
+        n_ref = mv_ref["melhor_volta_n"] if pediu_media else (referencia or mv_ref["melhor_volta_n"])
     else:
         voltas_ref_src = voltas
-        n_ref = referencia or mv["melhor_volta_n"]
+        # "media" nao e numero de volta: e o pedido de comparar contra a MEDIA
+        # das validas, modo que ja existia aqui embaixo (`ref_media`) mas so
+        # era alcancado por acidente, quando a referencia calhava de ser a
+        # propria volta analisada. O front sempre teve essa opcao no seletor
+        # (`Referencia = number | "media"`), e mandava a palavra para uma rota
+        # que so aceitava inteiro: dava 422 e a tela ficava sem relatorio.
+        n_ref = n_analisada if pediu_media else (referencia or mv["melhor_volta_n"])
 
     # Quando a volta em escopo E a melhor volta da sessao (dentro da MESMA
     # gravacao), comparar com ela mesma da perda zero em todo trecho, e o
@@ -677,7 +690,7 @@ def montar(
     # So se aplica dentro da MESMA gravacao: numero de volta batendo entre
     # DUAS gravacoes diferentes e coincidencia, nao autocomparacao, e a volta
     # da outra gravacao e uma referencia legitima mesmo com o mesmo numero.
-    ref_media = (not cruzada) and n_ref == n_analisada and len(validas) > 1
+    ref_media = pediu_media or ((not cruzada) and n_ref == n_analisada and len(validas) > 1)
 
     tempo_ref = (
         float(np.mean([v["tempo_s"] for v in validas]))

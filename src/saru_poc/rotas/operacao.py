@@ -182,13 +182,101 @@ def editar_evento(evento_id: str, corpo: dict, dono: Dono) -> dict:
 
 # --- sessao e bateria ----------------------------------------------------
 
-SESSAO_COLS = ["id", "event_id", "type", "label", "planned_laps", "starts_at", "ends_at"]
+SESSAO_COLS = ["id", "event_id", "piloto_id", "type", "label", "planned_laps", "starts_at", "ends_at"]
 BATERIA_COLS = ["id", "session_id", "evento_id", "label", "objective", "laps",
                 "fuel_in_l", "fuel_out_l", "started_at", "went_out_at", "created_at"]
 
 
+@router.get("/pilotos")
+def listar_pilotos(dono: Dono) -> list[dict]:
+    with connect() as conn:
+        linhas = conn.execute(
+            """select id, name, apelidos from piloto
+                where user_id = %s order by name""",
+            (dono,),
+        ).fetchall()
+    return [{"id": str(i), "nome": n, "apelidos": a or []} for i, n, a in linhas]
+
+
+@router.post("/pilotos", status_code=201)
+def criar_piloto(corpo: dict, dono: Dono) -> dict:
+    """Cria o piloto, ou devolve o que ja existe com o mesmo nome.
+
+    Idempotente de proposito: o importador de acervo chama isto uma vez por
+    arquivo, e um dia de pista tem varias saidas do mesmo piloto. As grafias
+    novas se acumulam em `apelidos`, que e o de-para usado para reimportar sem
+    refazer a curadoria de identidade.
+    """
+    nome = (corpo.get("nome") or "").strip()
+    if not nome:
+        raise HTTPException(status_code=422, detail="campo 'nome' é obrigatório")
+    apelidos = corpo.get("apelidos") or []
+    if not isinstance(apelidos, list):
+        raise HTTPException(status_code=422, detail="campo 'apelidos' precisa ser lista")
+    with connect() as conn:
+        linha = conn.execute(
+            """insert into piloto (user_id, name, apelidos) values (%s, %s, %s)
+               on conflict (user_id, name) do update
+                 set apelidos = (select array_agg(distinct a) from unnest(
+                       piloto.apelidos || excluded.apelidos) a)
+               returning id, name, apelidos""",
+            (dono, nome, [str(a) for a in apelidos]),
+        ).fetchone()
+        conn.commit()
+    return {"id": str(linha[0]), "nome": linha[1], "apelidos": linha[2] or []}
+
+
+@router.get("/eventos/{evento_id}/pilotos")
+def listar_pilotos_do_evento(evento_id: str, dono: Dono) -> list[dict]:
+    """Quem rodou neste dia, com o tamanho do que cada um fez.
+
+    Degrau novo da espinha (decisao do Lucas, 30/08): evento > PILOTO > sessao.
+    Um dia no Nelson Piquet teve ate 8 pilotos, e sem este passo as sessoes de
+    todos caem no mesmo balaio.
+
+    Sessao sem piloto continua existindo e aparece agrupada em "sem piloto":
+    o acervo antigo nao declara quem dirigiu, e sumir com esse dado seria pior
+    que mostra-lo sem nome.
+    """
+    with connect() as conn:
+        linhas = conn.execute(
+            """select p.id, p.name, p.apelidos,
+                      count(distinct s.id) as sessoes,
+                      count(distinct b.id) as saidas,
+                      count(distinct v.id) as voltas,
+                      min(v.lap_time_s) filter (where v.is_valid) as melhor_volta_s
+                 from sessao s
+                 left join piloto p on p.id = s.piloto_id
+                 left join bateria b on b.session_id = s.id
+                 left join gravacao g on g.bateria_id = b.id
+                 left join volta v on v.session_id = g.id
+                where s.event_id = %s and s.user_id = %s
+                group by p.id, p.name, p.apelidos
+                order by p.name nulls last""",
+            (evento_id, dono),
+        ).fetchall()
+    return [
+        {
+            "piloto_id": str(i) if i else None,
+            "nome": nome or "sem piloto declarado",
+            "apelidos": apelidos or [],
+            "sessoes": ses,
+            "saidas": sai,
+            "voltas": voltas,
+            "melhor_volta_s": float(melhor) if melhor is not None else None,
+        }
+        for i, nome, apelidos, ses, sai, voltas, melhor in linhas
+    ]
+
+
 @router.get("/eventos/{evento_id}/sessoes")
-def listar_sessoes(evento_id: str, dono: Dono) -> list[dict]:
+def listar_sessoes(evento_id: str, dono: Dono, piloto_id: str | None = None) -> list[dict]:
+    """Sessoes do evento. Com `piloto_id`, so as daquele piloto.
+
+    `piloto_id=sem` traz as sessoes sem piloto declarado, que e como o acervo
+    antigo aparece: sem esse valor elas ficariam invisiveis depois que a tela
+    passou a filtrar por piloto.
+    """
     with connect() as conn:
         linhas = conn.execute(
             f"""select s.{', s.'.join(SESSAO_COLS)},
@@ -199,8 +287,11 @@ def listar_sessoes(evento_id: str, dono: Dono) -> list[dict]:
                         where b2.session_id = s.id) as voltas
                   from sessao s
                  where s.event_id = %s and s.user_id = %s
+                   and (%s::text is null
+                        or (%s = 'sem' and s.piloto_id is null)
+                        or s.piloto_id::text = %s)
                  order by s.starts_at nulls last, s.created_at""",
-            (evento_id, dono),
+            (evento_id, dono, piloto_id, piloto_id, piloto_id),
         ).fetchall()
     return [_serializar(l, [*SESSAO_COLS, "baterias", "voltas"]) for l in linhas]
 
@@ -217,11 +308,11 @@ def criar_sessao(evento_id: str, corpo: dict, dono: Dono) -> dict:
             raise HTTPException(status_code=404, detail=NAO_ACHADO)
         try:
             linha = conn.execute(
-                f"""insert into sessao (user_id, event_id, type, label, planned_laps,
-                                        starts_at, ends_at)
-                    values (%s,%s,%s,%s,%s,%s,%s) returning {', '.join(SESSAO_COLS)}""",
-                (dono, evento_id, tipo, corpo.get("label"), corpo.get("planned_laps"),
-                 corpo.get("starts_at"), corpo.get("ends_at")),
+                f"""insert into sessao (user_id, event_id, piloto_id, type, label,
+                                        planned_laps, starts_at, ends_at)
+                    values (%s,%s,%s,%s,%s,%s,%s,%s) returning {', '.join(SESSAO_COLS)}""",
+                (dono, evento_id, corpo.get("piloto_id"), tipo, corpo.get("label"),
+                 corpo.get("planned_laps"), corpo.get("starts_at"), corpo.get("ends_at")),
             ).fetchone()
         except Exception as e:
             raise HTTPException(status_code=422, detail=f"sessão inválida: {e}") from e

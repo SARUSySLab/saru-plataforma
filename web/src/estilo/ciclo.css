@@ -18,17 +18,22 @@
 /* A trilha NAVEGA (pedido 2.1 de 29/08): cada passo alcancavel e um botao que
    abre a lista daquele nivel sem desfazer a escolha. O resumo embaixo do
    rotulo diz O QUE esta escolhido, entao a trilha tambem e o mapa do dia. */
-.ciclo-trilha { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s2); list-style: none; }
+/* Cinco passos desde 30/08, quando o PILOTO entrou entre evento e sessao. O
+   grid era fixo em 4 colunas e a Telemetria caia sozinha numa segunda linha.
+   `auto-fit` com minimo estreito mantem os cinco na mesma faixa em tela de
+   trabalho e quebra em duas linhas so quando a janela e mesmo pequena. */
+.ciclo-trilha { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s2); list-style: none; }
 .ciclo-trilha li { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
 .ciclo-trilha li.feito { border-color: var(--ok); }
 .ciclo-trilha li.atual { border-color: var(--brand); background: var(--brand-soft); }
-.ciclo-trilha .trilha-link, .ciclo-trilha .trilha-morta { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 7px 10px; background: none; border: none; text-align: left; }
+.ciclo-trilha .trilha-link, .ciclo-trilha .trilha-morta { display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 0; padding: 7px 9px; background: none; border: none; text-align: left; }
 .ciclo-trilha .trilha-link { cursor: pointer; }
 .ciclo-trilha .trilha-link:hover .trilha-rotulo { color: var(--brand); }
 .ciclo-trilha .trilha-rotulo { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--faint); }
 .ciclo-trilha li.feito .trilha-rotulo { color: var(--ok); }
 .ciclo-trilha li.atual .trilha-rotulo { color: var(--brand); }
-.ciclo-trilha .trilha-resumo { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ciclo-trilha .trilha-resumo { font-size: 11.5px; min-width: 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ciclo-trilha .trilha-morta .trilha-rotulo { opacity: .5; }
 
 .ciclo-bloco { flex: 1; min-height: 0; overflow: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
@@ -94,8 +99,8 @@
 
 /* botao de criacao do nivel: alinhado a direita, na cor de destaque da marca
    (pedido de 29/08). E a ACAO principal da etapa, o resto do header e rotulo. */
-.ciclo-bloco header .criar { margin-left: auto; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--brand); background: var(--brand-soft); border: 1px solid var(--brand); border-radius: var(--r-sm); padding: 3px 10px; cursor: pointer; }
-.ciclo-bloco header .criar:hover { background: var(--brand); color: var(--bg); }
+.ciclo-bloco header .criar, .ciclo-coluna h4 .criar { margin-left: auto; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--brand); background: var(--brand-soft); border: 1px solid var(--brand); border-radius: var(--r-sm); padding: 3px 10px; cursor: pointer; }
+.ciclo-bloco header .criar:hover, .ciclo-coluna h4 .criar:hover { background: var(--brand); color: var(--bg); }
 
 /* dentro do modal o formulario respira em UMA coluna: 2 colunas em 440px
    apertava rotulo e campo (pedido de 29/08) */
@@ -161,3 +166,13 @@
    porque e ele que traria o formato do idioma do navegador de volta. */
 .cdh-oculto { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .cdh-erro { font-size: 11px; color: var(--danger); align-self: center; }
+
+/* O "+ telemetria" mora no titulo da coluna, igual ao "+ sessao" e ao
+   "+ saida" moram no cabecalho dos blocos deles. */
+.ciclo-coluna h4 { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+
+/* Registro vazio e convite clicavel, nao estado morto: a cor da marca diz
+   que dali sai uma acao (pedido do Lucas, 30/08). */
+.ciclo-registro.falta { border-color: var(--brand); }
+.ciclo-registro.falta .estado { color: var(--brand); font-weight: 700; }
+.ciclo-registro.falta:hover { background: var(--brand-soft); }

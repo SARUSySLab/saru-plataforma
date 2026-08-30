@@ -52,6 +52,19 @@ function avisarExpiracao(): void {
 function mensagemDoErro(status: number, corpo: unknown): string {
   const detalhe = (corpo as { detail?: unknown } | null)?.detail;
   if (typeof detalhe === "string") return detalhe;
+  // O 422 de VALIDACAO do FastAPI traz `detail` como LISTA de erros, com
+  // `loc` e `msg`. Sem este ramo ele caia no generico "falha na requisicao
+  // (422)", e pior: a recuperacao automatica do erro de pista no App procura a
+  // palavra "pista" na mensagem, entao ela nunca disparava e a tela ficava
+  // presa em "o relatorio nao veio" com tudo selecionado (medido em 30/08).
+  if (Array.isArray(detalhe) && detalhe.length > 0) {
+    const partes = detalhe.slice(0, 3).map((d) => {
+      const item = d as { loc?: unknown[]; msg?: string };
+      const campo = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : null;
+      return campo ? `${String(campo)}: ${item.msg ?? "valor inválido"}` : String(item.msg ?? "");
+    });
+    return `parâmetro inválido (${partes.join("; ")})`;
+  }
   if (detalhe && typeof detalhe === "object" && "erro" in detalhe) {
     return String((detalhe as { erro: unknown }).erro);
   }

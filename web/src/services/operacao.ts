@@ -36,6 +36,8 @@ export interface Sessao {
   /** Quantas baterias a sessao reune, e quantas voltas elas somam. */
   baterias?: number;
   voltas?: number;
+  /** Quem dirigiu. Nulo no acervo antigo, que nao declara piloto. */
+  piloto_id: string | null;
 }
 
 export interface Bateria {
@@ -133,8 +135,27 @@ export const criarEvento = (dados: Partial<Evento>) =>
  *  mandar outro campo nao tem efeito. */
 export const editarEvento = (eventoId: string, dados: Partial<Evento>) =>
   tocando(enviarPatch<Evento>(`/eventos/${eventoId}`, dados));
-export const listarSessoes = (eventoId: string) =>
-  obter<Sessao[]>(`/eventos/${eventoId}/sessoes`);
+/** Quem rodou no dia. Degrau novo da espinha: evento > PILOTO > sessao. */
+export interface PilotoDoEvento {
+  piloto_id: string | null;
+  nome: string;
+  apelidos: string[];
+  sessoes: number;
+  saidas: number;
+  voltas: number;
+  melhor_volta_s: number | null;
+}
+export const listarPilotosDoEvento = (eventoId: string) =>
+  obter<PilotoDoEvento[]>(`/eventos/${eventoId}/pilotos`);
+
+/** Sessoes do evento. `pilotoId` nulo traz todas; "sem" traz as sem piloto
+ *  declarado, que e como o acervo antigo aparece. */
+export const listarSessoes = (eventoId: string, pilotoId?: string | null) =>
+  obter<Sessao[]>(
+    pilotoId
+      ? `/eventos/${eventoId}/sessoes?piloto_id=${encodeURIComponent(pilotoId)}`
+      : `/eventos/${eventoId}/sessoes`,
+  );
 /** Edita a sessao (nome, tipo). Mesma lista branca do backend. */
 export const editarSessao = (sessaoId: string, dados: Partial<Sessao>) =>
   tocando(enviarPatch<Sessao>(`/sessoes/${sessaoId}`, dados));

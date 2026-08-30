@@ -86,6 +86,10 @@ from saru_poc.pipeline.decomposicao import (  # noqa: E402
 )
 from saru_poc.pipeline.leitura import escolher_canal, ler_colunas  # noqa: E402
 
+# Nasceu fixo em Curitiba (ver o contexto acima). Virou parametro em 30/08 pra
+# derivar tambem o Nelson Piquet, que entrou no catalogo com 3 setores e ZERO
+# curva: sem curva catalogada, o bloco "onde ganhar tempo" so tem o modo de
+# micro-setor e o modo por curva sai degradado, dizendo o porque.
 LAYOUT_ID = "curitiba"
 LENGTH_M = 3695.0
 
@@ -117,6 +121,10 @@ LARGURA_MIN_NUCLEO_M = 15.0
 TOL_APEX_VELOCIDADE_M = 90.0
 
 N_VOLTAS_PADRAO = 8
+
+# Fracao minima da grade de distancia que `lat_acc` precisa cobrir pra volta
+# entrar na mediana. Volta abaixo disso e descartada inteira.
+COBERTURA_MIN_DA_VOLTA = 0.8
 
 
 @dataclass
@@ -184,8 +192,20 @@ def canal_interpolado_no_tempo(
     dados = ler_colunas(canal.uri, [canal.nome_bruto])
     if "t_s" not in dados or canal.nome_bruto not in dados:
         return None
-    t_canal = dados["t_s"]
-    v_canal = canal.valores(dados)
+    t_canal = np.asarray(dados["t_s"], dtype=float)
+    v_canal = np.asarray(canal.valores(dados), dtype=float)
+
+    # O Parquet tem uma linha por instante de amostragem do arquivo INTEIRO, e
+    # cada canal so preenche as linhas da propria taxa: um canal de 10 Hz num
+    # arquivo que tem canal de 50 Hz vem com 80% de NaN. `np.interp` propaga
+    # esses NaN pro alvo, o que aqui esvaziava o perfil da volta. Ficar so com
+    # as amostras reais antes de interpolar e o que reconstroi a serie
+    # continua -- que e exatamente o que interpolar quer dizer.
+    real = np.isfinite(t_canal) & np.isfinite(v_canal)
+    if real.sum() < 2:
+        return None
+    t_canal, v_canal = t_canal[real], v_canal[real]
+
     ordem = np.argsort(t_canal)
     return np.interp(t_alvo, t_canal[ordem], v_canal[ordem])
 
@@ -460,30 +480,67 @@ def rotular(curvas: list[Curva]) -> list[str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--layout", default="curitiba", help="id do layout no catalogo")
+    ap.add_argument("--comprimento", type=float, default=None,
+                    help="comprimento do layout em metros (default: o do banco)")
     ap.add_argument("--n-voltas", type=int, default=N_VOLTAS_PADRAO)
     ap.add_argument("--grade", type=float, default=GRADE_PASSO_M)
     ap.add_argument("--fundir-esesse", action="store_true", default=True)
     ap.add_argument("--nao-fundir-esesse", dest="fundir_esesse", action="store_false")
     args = ap.parse_args()
 
+    globals()["LAYOUT_ID"] = args.layout
+    if args.comprimento:
+        globals()["LENGTH_M"] = args.comprimento
+    else:
+        with connect() as conn:
+            linha = conn.execute(
+                "select comprimento_m from layout where id = %s", (LAYOUT_ID,)
+            ).fetchone()
+        if linha is None:
+            print(f"ERRO: layout {LAYOUT_ID} nao existe no catalogo.")
+            return 1
+        globals()["LENGTH_M"] = float(linha[0])
+
     grade = np.arange(0.0, LENGTH_M + args.grade, args.grade)
 
     with connect() as conn:
         candidatas = escolher_voltas(conn, args.n_voltas * 2)  # folga p/ descarte
-        print(f"== Curitiba: {len(candidatas)} voltas candidatas (de {args.n_voltas * 2} pedidas) ==")
+        print(f"== {LAYOUT_ID}: {len(candidatas)} voltas candidatas (de {args.n_voltas * 2} pedidas) ==")
         coleta = coletar_voltas(conn, candidatas[: args.n_voltas], grade)
 
-    lat_acc = coleta["lat_acc"]
-    speed = coleta["speed"]
-    usadas = coleta["usadas"]
+    lat_acc = np.asarray(coleta["lat_acc"], dtype=float)
+    speed = np.asarray(coleta["speed"], dtype=float)
+    usadas = list(coleta["usadas"])
+
+    # Volta com buraco grande na grade (canal que nao cobre a volta inteira,
+    # ou lacuna de amostragem) contamina a mediana ponto a ponto: `np.median`
+    # propaga NaN, entao UMA volta sem cobertura zera o perfil inteiro e o
+    # detector reporta "0 nucleos" como se a pista nao tivesse curva. Duas
+    # protecoes, nesta ordem: descartar a volta que nao cobre o minimo da
+    # grade, e usar `nanmedian` no que sobrou (buraco pontual de uma volta
+    # nao derruba o ponto, as outras sustentam).
+    cobertura = np.mean(np.isfinite(lat_acc), axis=1)
+    tem_cobertura = cobertura >= COBERTURA_MIN_DA_VOLTA
+    for i, (volta, _fator, _origem) in enumerate(usadas):
+        if not tem_cobertura[i]:
+            print(
+                f"  [fora] volta {volta.lap_number} ({volta.volta_id[:8]}): "
+                f"lat_acc cobre so {cobertura[i] * 100:.0f}% da grade "
+                f"(minimo {COBERTURA_MIN_DA_VOLTA * 100:.0f}%)"
+            )
+    lat_acc = lat_acc[tem_cobertura]
+    speed = speed[tem_cobertura]
+    usadas = [v for i, v in enumerate(usadas) if tem_cobertura[i]]
+
     if len(usadas) < 5:
         print(f"ERRO: so {len(usadas)} voltas utilizaveis, menos que o minimo de 5.")
         return 1
 
     print(f"\n{len(usadas)} voltas entraram na mediana.")
 
-    lat_acc_mediana = np.median(lat_acc, axis=0)
-    speed_mediana = np.median(speed, axis=0)
+    lat_acc_mediana = np.nanmedian(lat_acc, axis=0)
+    speed_mediana = np.nanmedian(speed, axis=0)
 
     nucleos = detectar_nucleos(lat_acc_mediana, grade)
     print(f"\n{len(nucleos)} nucleos de curvatura sustentada (|lat_acc| > {LIMIAR_FORTE} m/s^2):")

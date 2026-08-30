@@ -258,7 +258,12 @@ def test_rrk_pseudo_registro_com_contador_errado_levanta_erro(
 )
 def test_le_os_68_gpk_reais_do_acervo(leitor_gpk: LeitorAimGpk) -> None:
     arquivos = _todos_gpk_do_acervo()
-    assert len(arquivos) == 68
+    # Piso, nao numero cravado: o acervo e uma pasta VIVA (a importacao do
+    # Nelson Piquet de 30/08 levou os .xrk de 66 pra 224). O que o teste quer
+    # provar e que o leitor da conta de TUDO que existe no acervo, e cravar a
+    # contagem so garantia falha toda vez que chega arquivo novo -- ruido, nao
+    # regressao.
+    assert len(arquivos) >= 68
 
     falharam: list[str] = []
     for caminho in arquivos:
@@ -280,7 +285,12 @@ def test_le_os_68_gpk_reais_do_acervo(leitor_gpk: LeitorAimGpk) -> None:
 )
 def test_le_os_67_rrk_reais_do_acervo(leitor_rrk: LeitorAimRrk) -> None:
     arquivos = _todos_rrk_do_acervo()
-    assert len(arquivos) == 67
+    # Piso, nao numero cravado: o acervo e uma pasta VIVA (a importacao do
+    # Nelson Piquet de 30/08 levou os .xrk de 66 pra 224). O que o teste quer
+    # provar e que o leitor da conta de TUDO que existe no acervo, e cravar a
+    # contagem so garantia falha toda vez que chega arquivo novo -- ruido, nao
+    # regressao.
+    assert len(arquivos) >= 67
 
     falharam: list[str] = []
     multi_segmento = 0

@@ -4,11 +4,13 @@ import {
   listarBaterias,
   listarEventos,
   listarLayouts,
+  listarPilotosDoEvento,
   listarSessoes,
   listarTrechos,
   type Bateria,
   type Evento,
   type Layout,
+  type PilotoDoEvento,
   type Sessao,
   type Trecho,
 } from "../services/operacao";
@@ -24,10 +26,21 @@ export const useEventos = () => {
 
 export const useLayouts = () => useRequisicao<Layout[]>(() => listarLayouts(), []);
 
-export const useSessoes = (eventoId: string | null) => {
+/** Pilotos que rodaram no evento. Degrau entre evento e sessao (30/08). */
+export const usePilotos = (eventoId: string | null) => {
+  const versao = useSelecao((e) => e.versaoEspinha);
+  return useRequisicao<PilotoDoEvento[]>(
+    () => listarPilotosDoEvento(eventoId as string), [eventoId, versao], eventoId !== null,
+  );
+};
+
+/** Sessoes do evento, filtradas pelo piloto quando ha um em escopo. */
+export const useSessoes = (eventoId: string | null, pilotoId: string | null = null) => {
   const versao = useSelecao((e) => e.versaoEspinha);
   return useRequisicao<Sessao[]>(
-    () => listarSessoes(eventoId as string), [eventoId, versao], eventoId !== null,
+    () => listarSessoes(eventoId as string, pilotoId),
+    [eventoId, pilotoId, versao],
+    eventoId !== null,
   );
 };
 

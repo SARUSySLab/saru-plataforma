@@ -190,7 +190,11 @@ export function BarraEscopo({
   // Retratil, versao 1.9 (escolha A do Vitor): recolher esconde SO a linha de
   // referencia; a analisada fica sempre aberta e operavel. O estado e da
   // sessao de uso, nao persiste.
-  const [aberto, setAberto] = useState(true);
+  //
+  // Nasce FECHADA (pedido do Lucas, 30/08): comparar com outra captura e o
+  // caso menos frequente, e a linha extra ocupava o topo da analise o tempo
+  // todo. Quem vai comparar abre.
+  const [aberto, setAberto] = useState(false);
 
   // item 1.11 (29/08): mudar o escopo fora do Box NAO navega sozinho
   // ("qualquer tela incomoda se nao for a de analise"): aparece um aviso com
@@ -220,7 +224,10 @@ export function BarraEscopo({
             evento e gesto do Dia de pista, nao daqui. */}
         <div className="escopo-campo">
           <span className="k">Evento</span>
-          <span className="v">
+          <span
+            className="v"
+            title={eventos.dado?.find((ev) => ev.id === eventoId)?.name ?? undefined}
+          >
             {eventos.dado?.find((ev) => ev.id === eventoId)?.name
               ?? relatorio.layout?.nome
               ?? "pista não resolvida"}

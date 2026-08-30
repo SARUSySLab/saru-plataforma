@@ -71,6 +71,13 @@ interface Selecao {
    * gravacao solta (decisao D3) roda sem espinha nenhuma, e e caso valido.
    */
   eventoId: string | null;
+  /**
+   * Piloto em escopo, degrau entre evento e sessao (decisao do Lucas, 30/08).
+   * Um dia de pista tem varios pilotos, e a sessao pertence a um deles.
+   * O valor "sem" nao e id: e o balde das sessoes sem piloto declarado, que e
+   * como o acervo antigo aparece. Sem esse balde elas sumiriam da tela.
+   */
+  pilotoId: string | null;
   sessaoId: string | null;
   bateriaId: string | null;
   /**
@@ -144,6 +151,8 @@ interface Selecao {
    */
   sincronizarEspinha: (evento: string | null, sessao: string | null, bateria: string | null) => void;
   setEvento: (id: string | null) => void;
+  /** Piloto em escopo. "sem" e o balde das sessoes sem piloto declarado. */
+  setPiloto: (id: string | null) => void;
   setSessao: (id: string | null) => void;
   tocarEspinha: () => void;
   tocarCatalogo: () => void;
@@ -186,7 +195,7 @@ const CHAVE = "saru.escopo";
 
 type Escopo = Pick<
   Selecao,
-  | "eventoId" | "sessaoId" | "bateriaId" | "gravacaoId"
+  | "eventoId" | "pilotoId" | "sessaoId" | "bateriaId" | "gravacaoId"
   | "volta" | "compara" | "trecho"
   | "refEventoId" | "refSessaoId" | "refBateriaId" | "refGravacaoId" | "refVolta" | "refTrecho"
   | "vista"
@@ -206,7 +215,7 @@ function lerEscopo(): Partial<Escopo> {
 function gravarEscopo(e: Selecao): void {
   try {
     const escopo: Escopo = {
-      eventoId: e.eventoId, sessaoId: e.sessaoId, bateriaId: e.bateriaId,
+      eventoId: e.eventoId, pilotoId: e.pilotoId, sessaoId: e.sessaoId, bateriaId: e.bateriaId,
       gravacaoId: e.gravacaoId, volta: e.volta, compara: e.compara, trecho: e.trecho,
       vista: e.vista,
       refEventoId: e.refEventoId, refSessaoId: e.refSessaoId, refBateriaId: e.refBateriaId,
@@ -234,7 +243,7 @@ export function limparEscopo(): void {
     // storage bloqueado: o reset da store abaixo ainda vale
   }
   useSelecao.setState({
-    eventoId: null, sessaoId: null, bateriaId: null, gravacaoId: null,
+    eventoId: null, pilotoId: null, sessaoId: null, bateriaId: null, gravacaoId: null,
     volta: null, compara: null, trecho: null, intervalo: null, cursor_m: null,
     refEventoId: null, refSessaoId: null, refBateriaId: null, refGravacaoId: null,
     refVolta: null, refTrecho: null,
@@ -250,6 +259,7 @@ export const useSelecao = create<Selecao>((set) => ({
   refVolta: guardado.refVolta ?? null,
   refTrecho: guardado.refTrecho ?? null,
   eventoId: guardado.eventoId ?? null,
+  pilotoId: guardado.pilotoId ?? null,
   sessaoId: guardado.sessaoId ?? null,
   bateriaId: guardado.bateriaId ?? null,
   gravacaoId: guardado.gravacaoId ?? null,
@@ -277,7 +287,8 @@ export const useSelecao = create<Selecao>((set) => ({
   // recurso que devolve 404, ou pior, mostrar rotulo de uma bateria com numero
   // de outra.
   sincronizarEspinha: (eventoId, sessaoId, bateriaId) => set({ eventoId, sessaoId, bateriaId }),
-  setEvento: (eventoId) => set({ eventoId, sessaoId: null, bateriaId: null }),
+  setEvento: (eventoId) => set({ eventoId, pilotoId: null, sessaoId: null, bateriaId: null }),
+  setPiloto: (pilotoId) => set({ pilotoId, sessaoId: null, bateriaId: null }),
   setSessao: (sessaoId) => set({ sessaoId, bateriaId: null }),
   tocarEspinha: () => set((e) => ({ versaoEspinha: e.versaoEspinha + 1 })),
   tocarCatalogo: () => set((e) => ({ versaoCatalogo: e.versaoCatalogo + 1 })),

@@ -208,7 +208,10 @@ def obter_relatorio(
     gravacao_id: str,
     dono: Dono,
     volta: Annotated[int | None, Query(description="volta em escopo")] = None,
-    referencia: Annotated[int | None, Query(description="volta de referencia")] = None,
+    referencia: Annotated[
+        str | None,
+        Query(description="volta de referencia (numero) ou 'media' das validas"),
+    ] = None,
     ref_gravacao: Annotated[
         str | None,
         Query(description="gravacao da referencia, quando for de OUTRA captura"),
@@ -234,11 +237,26 @@ def obter_relatorio(
         if ref_gravacao is not None:
             _minha(conn, ref_gravacao, dono)
         try:
+            # `referencia` chega como texto porque aceita numero OU a palavra
+            # "media" (o seletor de comparacao do front sempre teve as duas).
+            ref: int | str | None = referencia
+            if isinstance(referencia, str) and referencia.strip():
+                if referencia.strip().lower() == "media":
+                    ref = "media"
+                elif referencia.strip().lstrip("-").isdigit():
+                    ref = int(referencia)
+                else:
+                    raise HTTPException(
+                        status_code=422,
+                        detail="referencia tem que ser um numero de volta ou 'media'",
+                    )
+            elif isinstance(referencia, str):
+                ref = None
             rel = montar(
                 conn,
                 gravacao_id,
                 volta=volta,
-                referencia=referencia,
+                referencia=ref,
                 ref_gravacao_id=ref_gravacao,
             )
         except ReferenciaDePistaDiferente as e:

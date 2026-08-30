@@ -336,7 +336,12 @@ def test_arquivo_inexistente_levanta_erro(tmp_path: Path, leitor: LeitorXrk) -> 
 @pytest.mark.skipif(not _todos_do_acervo(), reason="acervo nao montado nesta maquina")
 def test_le_os_66_arquivos_reais_do_acervo(leitor: LeitorXrk) -> None:
     arquivos = _todos_do_acervo()
-    assert len(arquivos) == 66
+    # Piso, nao numero cravado: o acervo e uma pasta VIVA (a importacao do
+    # Nelson Piquet de 30/08 levou os .xrk de 66 pra 224). O que o teste quer
+    # provar e que o leitor da conta de TUDO que existe no acervo, e cravar a
+    # contagem so garantia falha toda vez que chega arquivo novo -- ruido, nao
+    # regressao.
+    assert len(arquivos) >= 66
 
     abriram = 0
     parciais = 0
@@ -377,7 +382,12 @@ def test_ler_os_66_arquivos_bate_com_inspecionar(leitor: LeitorXrk) -> None:
     o n_amostras que inspecionar() declarou pro mesmo canal (os dois leem
     o mesmo fluxo de registros: divergencia e bug, nao ruido)."""
     arquivos = _todos_do_acervo()
-    assert len(arquivos) == 66
+    # Piso, nao numero cravado: o acervo e uma pasta VIVA (a importacao do
+    # Nelson Piquet de 30/08 levou os .xrk de 66 pra 224). O que o teste quer
+    # provar e que o leitor da conta de TUDO que existe no acervo, e cravar a
+    # contagem so garantia falha toda vez que chega arquivo novo -- ruido, nao
+    # regressao.
+    assert len(arquivos) >= 66
 
     leram = 0
     falharam_ler: list[str] = []
