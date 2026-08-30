@@ -43,6 +43,8 @@ dashauto_realdash:
     # frame 0x14080601, offset 2, length 2, conversion V/1000
   gear:
     col: Marcha
+    unit_in: "-"
+    unit_out: "-"
     realdash_target_id: 200
     # frame 0x14080601, offset 6, length 2
   intake_temp:
@@ -54,6 +56,8 @@ dashauto_realdash:
   lambda:
     col: Lambda 1
     realdash_target_id: 254
+    unit_in: "-"
+    unit_out: "-"
     # frame 0x14080602, offset 0, length 2, conversion V/1000
   map_press:
     col: Manifold Absolute Pressure

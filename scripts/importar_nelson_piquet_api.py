@@ -57,7 +57,14 @@ def main() -> int:
     base = args.api.rstrip("/")
     # timeout generoso no upload: o maior arquivo do acervo tem 5,7 MB e a
     # recepcao e sincrona (o pipeline e que roda em background)
-    with httpx.Client(base_url=base, timeout=180.0, follow_redirects=True) as cli:
+    # Uma queda de TLS no meio de 103 uploads matava a rodada inteira com
+    # `httpx.ReadError: UNEXPECTED_EOF`, e o que ja tinha subido ficava pela
+    # metade. O transporte com retry reconecta sozinho; a idempotencia acima e
+    # que torna seguro repetir.
+    transporte = httpx.HTTPTransport(retries=5)
+    with httpx.Client(
+        base_url=base, timeout=180.0, follow_redirects=True, transport=transporte
+    ) as cli:
         r = cli.post("/api/auth/login", json={"email": args.email, "senha": args.senha})
         if r.status_code != 200:
             print(f"erro: login falhou ({r.status_code}) {r.text[:200]}", file=sys.stderr)
@@ -127,9 +134,19 @@ def main() -> int:
                     print(f"  {piloto}: sessao {rotulo}, {len(bloco)} saida(s)")
                     baterias_da_sessao = cli.get(f"/api/sessoes/{sessao_id}/baterias").json()
 
+                    # Duas saidas do MESMO minuto geram a mesma etiqueta (o
+                    # Andre tem gravacoes as 09:47:22 e 09:47:39), e a
+                    # idempotencia por label entao casava a segunda com a
+                    # bateria da primeira: o vinculo levava 409 e a segunda
+                    # saida ficava vazia pra sempre. Desempate por segundo,
+                    # igual ao importador local.
+                    vistos_no_bloco: dict[str, int] = {}
                     for i in bloco:
                         minutos = i["duracao_s"] / 60
                         etiqueta = f"{i['quando']:%Hh%M}, {i['veiculo']}"
+                        vistos_no_bloco[etiqueta] = vistos_no_bloco.get(etiqueta, 0) + 1
+                        if vistos_no_bloco[etiqueta] > 1:
+                            etiqueta = f"{i['quando']:%Hh%M:%S}, {i['veiculo']}"
                         if minutos > SAIDA_LONGA_MIN:
                             etiqueta += f" ({minutos:.0f} min, logger ligado entre idas)"
                         ja_b = [b for b in baterias_da_sessao if b.get("label") == etiqueta]
