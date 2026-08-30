@@ -1,0 +1,151 @@
+# Perfil de origem: gateway Dash Auto falando protocolo RealDash CAN.
+# Derivado dos 5 XML de definicao que a propria Dash Auto compartilhou na conta
+# My RealDash do Vitor Saru, baixados em 29/08/2026 pela URL assinada do portal.
+# Copia dos XML e do dicionario de 470 canais do RealDash em
+# dados_telemetria/realdash-dashauto/.
+#
+# ATENCAO, duas coisas que o mapa nao entrega e que o SARU exige:
+#   1. NAO existe canal de posicao. Sem GPS Latitude (22) e Longitude (23) nao
+#      ha corte de volta por GPS, mapa de pista nem perda por trecho. O
+#      vocabulario do RealDash TEM esses canais; o hardware do Dash Auto nao os
+#      emite. A posicao precisa entrar por outra fonte.
+#   2. NAO existe freio, esterco nem aceleracao lateral e longitudinal.
+#      Sem eles, fase de frenagem e envelope de grip nao existem.
+#
+# A temperatura de pneu vem como canal CUSTOMIZADO (name=TPMS_FL_TEMP), nao no
+# targetId canonico 232 a 235. No datalog ela sai pelo nome local, nao pelo
+# nome do RealDash. Mapeada abaixo pelo nome.
+
+dashauto_realdash:
+  batt_volt:
+    col: Battery Voltage
+    realdash_target_id: 12
+    unit_in: "V"
+    unit_out: "V"
+    # frame 0x140811ff:0x12,3,1, offset 4, length 2, conversion V/100
+  fuel_flow:
+    col: Consumo_Instantaneo
+    realdash_target_id: 203
+    unit_in: "L/100km"
+    unit_out: "L/100km"
+    # frame 3228, offset 0, length 2, conversion V/10
+  fuel_level:
+    col: Combustivel
+    unit_in: "%"
+    unit_out: "%"
+    # frame 3220, offset 0, length 2
+  fuel_press:
+    col: PressaoCombustivel
+    realdash_target_id: 202
+    unit_in: "bar"
+    unit_out: "kPa"
+    scale: 100.0
+    # frame 0x14080601, offset 2, length 2, conversion V/1000
+  gear:
+    col: Marcha
+    realdash_target_id: 200
+    # frame 0x14080601, offset 6, length 2
+  intake_temp:
+    col: Intake Air Temperature
+    realdash_target_id: 27
+    unit_in: "C"
+    unit_out: "C"
+    # frame 0x14080600, offset 4, length 2, conversion V/10
+  lambda:
+    col: Lambda 1
+    realdash_target_id: 254
+    # frame 0x14080602, offset 0, length 2, conversion V/1000
+  map_press:
+    col: Manifold Absolute Pressure
+    realdash_target_id: 31
+    unit_in: "bar"
+    unit_out: "kPa"
+    scale: 100.0
+    # frame 0x14080600, offset 2, length 2, conversion (V/10)+100
+  oil_press:
+    col: PressaoOleo
+    realdash_target_id: 151
+    unit_in: "bar"
+    unit_out: "kPa"
+    scale: 100.0
+    # frame 0x14080601, offset 0, length 2, conversion V/100000
+  oil_temp:
+    col: Engine Oil Temperature
+    realdash_target_id: 152
+    unit_in: "C"
+    unit_out: "C"
+    # frame 0x14080602, offset 4, length 2, conversion V/10
+  rpm:
+    col: RPM
+    realdash_target_id: 37
+    unit_in: "rpm"
+    unit_out: "rpm"
+    # frame 0x14080602, offset 2, length 2
+  speed:
+    col: Vehicle Speed
+    realdash_target_id: 64
+    unit_in: "km/h"
+    unit_out: "m/s"
+    scale: 0.2777777777777778
+    # frame 3218, offset 2, length 2
+  throttle:
+    col: Throttle Position
+    realdash_target_id: 42
+    unit_in: "%"
+    unit_out: "0-1"
+    scale: 0.01
+    # frame 0x14080600, offset 0, length 2, conversion V/10
+  tyre_press_fl:
+    col: TPMS_FL_PSI
+    realdash_target_id: 240
+    unit_in: "psi"
+    unit_out: "kPa"
+    scale: 6.89476
+    # frame 3224, offset 0, length 2, conversion V/21.8
+  tyre_press_fr:
+    col: TPMS_FR_PSI
+    realdash_target_id: 241
+    unit_in: "psi"
+    unit_out: "kPa"
+    scale: 6.89476
+    # frame 3224, offset 2, length 2, conversion V/21.8
+  tyre_press_rl:
+    col: TPMS_RL_PSI
+    realdash_target_id: 242
+    unit_in: "psi"
+    unit_out: "kPa"
+    scale: 6.89476
+    # frame 3224, offset 4, length 2, conversion V/21.8
+  tyre_press_rr:
+    col: TPMS_RR_PSI
+    realdash_target_id: 243
+    unit_in: "psi"
+    unit_out: "kPa"
+    scale: 6.89476
+    # frame 3224, offset 6, length 2, conversion V/21.8
+  tyre_temp_mid_fl:
+    col: TPMS_FL_TEMP
+    unit_in: "C"
+    unit_out: "C"
+    # frame 3225, offset 0, length 2
+  tyre_temp_mid_fr:
+    col: TPMS_FR_TEMP
+    unit_in: "C"
+    unit_out: "C"
+    # frame 3225, offset 2, length 2
+  tyre_temp_mid_rl:
+    col: TPMS_RL_TEMP
+    unit_in: "C"
+    unit_out: "C"
+    # frame 3225, offset 4, length 2
+  tyre_temp_mid_rr:
+    col: TPMS_RR_TEMP
+    unit_in: "C"
+    unit_out: "C"
+    # frame 3225, offset 6, length 2
+  water_temp:
+    col: Coolant Temperature
+    realdash_target_id: 14
+    unit_in: "C"
+    unit_out: "C"
+    # frame 0x14080600, offset 6, length 2, conversion V/10

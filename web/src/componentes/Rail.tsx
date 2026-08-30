@@ -67,20 +67,20 @@ export function Rail({ temDado, onRecolher }: {
         </button>
       </div>
 
-      {!temDado && (
-        <p className="rail-indisponivel">
-          Sem telemetria aberta. O funil e o Saruê ficam desativados até chegar um
-          arquivo com volta cortada.
-        </p>
-      )}
-
       {/* Dia de pista PRIMEIRO e destacado (pedido de 29/08): e a primeira
           coisa que o usuario configura, e o envio de telemetria mora dentro
           dele (o item proprio de envio saiu da sidebar pelo mesmo motivo). */}
       <nav className="niveis" aria-label="Operação do dia">
         <button type="button" className="nivel destaque" aria-current={vista.tipo === "ciclo"} onClick={() => irPara({ tipo: "ciclo" })}>
           <span className="n"><Icone nome="calendario" /></span>
-          <span><span className="t">Dia de pista</span><span className="q">Evento, sessão, outing e envio</span></span>
+          <span><span className="t">Dia de pista</span><span className="q">Evento, sessão, saída pra pista e envio</span></span>
+        </button>
+        {/* Campeonato NAO depende de telemetria da conta: le a cronometragem
+            externa (live timing do autodromo). Fica habilitado sempre, mesmo
+            sem gravacao nenhuma, porque a fonte dele e outra. */}
+        <button type="button" className="nivel destaque" aria-current={vista.tipo === "campeonato"} onClick={() => irPara({ tipo: "campeonato" })}>
+          <span className="n"><Icone nome="bandeira" /></span>
+          <span><span className="t">Campeonato</span><span className="q">Grid ao vivo, mapa e clima</span></span>
         </button>
       </nav>
 

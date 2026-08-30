@@ -252,7 +252,7 @@ export function BarraEscopo({
         </div>
 
         <div className="escopo-campo editavel">
-          <span className="k">Outing</span>
+          <span className="k">Saída pra pista</span>
           {!sessaoId ? (
             // cascata: bateria so depois da sessao
             <span className="v fraco-cascata">escolha a sessão</span>
@@ -260,9 +260,9 @@ export function BarraEscopo({
             <select
               value={bateriaId ?? ""}
               onChange={(e) => escolherBateria(e.target.value)}
-              aria-label="Outing em escopo"
+              aria-label="Saída pra pista em escopo"
             >
-              <option value="" disabled>escolha o outing</option>
+              <option value="" disabled>escolha a saída</option>
               {baterias.dado
                 .filter(({ sessao: s }) => s.id === sessaoId)
                 .map(({ bateria: b }) => (
@@ -408,7 +408,7 @@ export function BarraEscopo({
         </div>
 
         <div className="escopo-campo editavel">
-          <span className="k">Outing</span>
+          <span className="k">Saída pra pista</span>
           {modoBase ? (
             <span className="v">base de dados · não se aplica</span>
           ) : !refEventoId ? (
@@ -420,9 +420,9 @@ export function BarraEscopo({
             <select
               value={refBateriaId ?? ""}
               onChange={(e) => escolherBateriaRef(e.target.value)}
-              aria-label="Outing da referência"
+              aria-label="Saída pra pista da referência"
             >
-              <option value="" disabled>escolha o outing</option>
+              <option value="" disabled>escolha a saída</option>
               {refBaterias.dado.map(({ bateria: b }) => (
                 <option key={b.id} value={b.id}>
                   {b.label ?? hora(b.went_out_at)}
@@ -431,7 +431,7 @@ export function BarraEscopo({
               ))}
             </select>
           ) : (
-            <span className="v">nenhum outing com telemetria nesta sessão</span>
+            <span className="v">nenhuma saída com telemetria nesta sessão</span>
           )}
         </div>
 
@@ -440,7 +440,7 @@ export function BarraEscopo({
           {refEventoId && !refGravacaoId ? (
             // cascata: evento escolhido mas bateria ainda nao. A volta e da
             // gravacao pendurada na bateria, entao nao ha o que listar antes.
-            <span className="v">escolha o outing</span>
+            <span className="v">escolha a saída</span>
           ) : refGravacaoId ? (
             // gravacao de outro arquivo: a unica coisa que se sabe dela aqui e
             // quantas voltas tem (o catalogo), nao qual e a melhor ou invalida,

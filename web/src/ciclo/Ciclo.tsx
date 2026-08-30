@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import "../estilo/ciclo.css";
 import { useSelecao } from "../state/selection";
 import { useBaterias, useEventos, useLayouts, useSessoes } from "./useEspinha";
@@ -21,6 +21,7 @@ import { useGravacoes } from "../dados/useGravacoes";
 import { useContexto } from "../dados/useContexto";
 import { useSetup } from "../dados/useSetup";
 import { Modal } from "../componentes/Modal";
+import { CampoDataHora } from "../componentes/CampoDataHora";
 import { ContextoDaBateria } from "../gavetas/ContextoDaBateria";
 import { FichaDeSetup } from "../gavetas/FichaDeSetup";
 
@@ -69,7 +70,7 @@ function Data({ iso }: { iso: string | null }) {
 
 /** Nome do outing na tela: o label cadastrado, senao a hora de saida. */
 function nomeDoOuting(b: { label: string | null; went_out_at: string | null }): string {
-  return b.label ?? `outing das ${hora(b.went_out_at)}`;
+  return b.label ?? `saída das ${hora(b.went_out_at)}`;
 }
 
 function hora(iso: string | null): string {
@@ -86,6 +87,81 @@ function paraInputDatetime(iso: string | null): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Lista que NUNCA rola (pedido de 29/08: o dia de pista inteiro cabe numa
+ * tela). A altura disponivel e medida (ResizeObserver) e o que nao couber
+ * vira pagina, com setas manuais. Mesma linguagem do leaderboard do
+ * campeonato, sem o rodizio automatico: aqui a lista e de trabalho, nao
+ * telao.
+ */
+function ListaPaginada({ children, compacta = false }: {
+  children: ReactNode[];
+  compacta?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [altura, setAltura] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setAltura(el.clientHeight));
+    ro.observe(el);
+    setAltura(el.clientHeight);
+    return () => ro.disconnect();
+  }, []);
+
+  const [pagina, setPagina] = useState(0);
+  const n = children.length;
+  const alturaItem = compacta ? 36 : 48;
+  // reserva a faixa do pager quando ha mais de uma pagina
+  const porPagina = Math.max(2, Math.floor(Math.max(alturaItem * 2, altura - 26) / alturaItem));
+  const paginado = n > porPagina;
+  const totalPaginas = Math.max(1, Math.ceil(n / porPagina));
+  const atual = ((pagina % totalPaginas) + totalPaginas) % totalPaginas;
+  const visiveis = paginado ? children.slice(atual * porPagina, (atual + 1) * porPagina) : children;
+
+  return (
+    <div ref={ref} className="ciclo-lista-caixa">
+      <ul className={`ciclo-lista${compacta ? " compacta" : ""}`}>{visiveis}</ul>
+      {paginado && (
+        <div className="ciclo-paginas">
+          <button type="button" className="ciclo-seta" onClick={() => setPagina(atual - 1)} aria-label="Página anterior">&lsaquo;</button>
+          <span>página {atual + 1} de {totalPaginas}</span>
+          <button type="button" className="ciclo-seta" onClick={() => setPagina(atual + 1)} aria-label="Próxima página">&rsaquo;</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Campos de formulario em paginas, pro modal que NAO rola (pedido de 29/08:
+ * cadastro grande pagina em vez de rolar). As paginas ocultas continuam
+ * MONTADAS (atributo hidden), entao o valor digitado sobrevive a navegacao e
+ * o submit envia o formulario inteiro. Campo required fica na pagina 1, que
+ * sempre foi vista antes do submit.
+ */
+function CamposPaginados({ paginas }: {
+  paginas: { titulo: string; campos: ReactNode }[];
+}) {
+  const [atual, setAtual] = useState(0);
+  return (
+    <>
+      {paginas.map((pg, i) => (
+        <div key={pg.titulo} className="ciclo-form-pagina" hidden={i !== atual}>
+          {pg.campos}
+        </div>
+      ))}
+      {paginas.length > 1 && (
+        <div className="ciclo-paginas form">
+          <button type="button" className="ciclo-seta" disabled={atual === 0} onClick={() => setAtual(atual - 1)} aria-label="Página anterior">&lsaquo;</button>
+          <span>{paginas[atual].titulo} · {atual + 1} de {paginas.length}</span>
+          <button type="button" className="ciclo-seta" disabled={atual === paginas.length - 1} onClick={() => setAtual(atual + 1)} aria-label="Próxima página">&rsaquo;</button>
+        </div>
+      )}
+    </>
+  );
 }
 
 export function Ciclo() {
@@ -306,7 +382,7 @@ export function Ciclo() {
       </label>
       <label>
         Começa em
-        <input name="starts_at" type="datetime-local" required defaultValue={paraInputDatetime(padrao?.starts_at ?? null)} />
+        <CampoDataHora name="starts_at" required defaultValue={paraInputDatetime(padrao?.starts_at ?? null)} />
       </label>
     </>
   );
@@ -314,7 +390,7 @@ export function Ciclo() {
   const PASSOS: { id: Passo; rotulo: string; resumo: string | null }[] = [
     { id: "evento", rotulo: "Evento", resumo: evento?.name ?? null },
     { id: "sessao", rotulo: "Sessão", resumo: sessao ? (sessao.label ?? sessao.type) : null },
-    { id: "bateria", rotulo: "Outing", resumo: bateria ? nomeDoOuting(bateria) : null },
+    { id: "bateria", rotulo: "Saída pra pista", resumo: bateria ? nomeDoOuting(bateria) : null },
     { id: "pronto", rotulo: "Telemetria", resumo: bateriaId ? `${penduradas.length} arquivo(s)` : null },
   ];
 
@@ -352,7 +428,7 @@ export function Ciclo() {
           {eventos.carregando ? (
             <p className="fraco">carregando eventos...</p>
           ) : eventos.dado && eventos.dado.length > 0 ? (
-            <ul className="ciclo-lista">
+            <ListaPaginada>
               {eventos.dado.map((e) => (
                 <li key={e.id}>
                   <button
@@ -377,7 +453,7 @@ export function Ciclo() {
                   </button>
                 </li>
               ))}
-            </ul>
+            </ListaPaginada>
           ) : (
             <p className="fraco">Nenhum evento ainda. Crie o primeiro no botão acima.</p>
           )}
@@ -395,7 +471,7 @@ export function Ciclo() {
           {sessoes.carregando ? (
             <p className="fraco">carregando sessões...</p>
           ) : sessoes.dado && sessoes.dado.length > 0 ? (
-            <ul className="ciclo-lista">
+            <ListaPaginada>
               {sessoes.dado.map((s) => (
                 <li key={s.id}>
                   <button
@@ -406,7 +482,7 @@ export function Ciclo() {
                     <span className="t">{s.label ?? s.type}</span>
                     {/* uma sessao E um conjunto de baterias: a contagem delas
                         diz mais que o tipo repetido do rotulo */}
-                    <span className="q">{s.baterias ?? 0} outing(s) · {s.voltas ?? 0} voltas</span>
+                    <span className="q">{s.baterias ?? 0} saída(s) · {s.voltas ?? 0} voltas</span>
                   </button>
                   {s.id === sessaoId && (
                     <button type="button" className="limpar" onClick={() => setModal("editar-sessao")}>
@@ -422,7 +498,7 @@ export function Ciclo() {
                   </button>
                 </li>
               ))}
-            </ul>
+            </ListaPaginada>
           ) : (
             <p className="fraco">Nenhuma sessão neste evento. Crie a primeira no botão acima.</p>
           )}
@@ -433,16 +509,16 @@ export function Ciclo() {
       {passo === "bateria" && (
         <section className="ciclo-bloco">
           <header>
-            <h3>Outing</h3>
+            <h3>Saídas pra pista</h3>
             <span className="ciclo-cabeca-contexto">
               {evento?.name}{sessao ? ` · ${sessao.label ?? sessao.type}` : ""}
             </span>
-            <button type="button" className="criar" onClick={() => setModal("bateria")}>+ outing</button>
+            <button type="button" className="criar" onClick={() => setModal("bateria")}>+ saída</button>
           </header>
           {baterias.carregando ? (
             <p className="fraco">carregando baterias...</p>
           ) : baterias.dado && baterias.dado.length > 0 ? (
-            <ul className="ciclo-lista">
+            <ListaPaginada>
               {baterias.dado.map((b) => (
                 <li key={b.id}>
                   <button
@@ -464,16 +540,16 @@ export function Ciclo() {
                     type="button"
                     className="limpar perigo"
                     onClick={() =>
-                      setConfirmar({ tipo: "bateria", id: b.id, rotulo: b.label ?? `outing das ${hora(b.went_out_at)}` })
+                      setConfirmar({ tipo: "bateria", id: b.id, rotulo: b.label ?? `saída das ${hora(b.went_out_at)}` })
                     }
                   >
                     excluir
                   </button>
                 </li>
               ))}
-            </ul>
+            </ListaPaginada>
           ) : (
-            <p className="fraco">Nenhum outing nesta sessão. Registre a saída no botão acima.</p>
+            <p className="fraco">Nenhuma saída pra pista nesta sessão. Registre no botão acima.</p>
           )}
         </section>
       )}
@@ -482,7 +558,7 @@ export function Ciclo() {
       {passo === "pronto" && bateria && (
         <section className="ciclo-bloco">
           <header>
-            <h3>{bateria.label ?? `Outing das ${hora(bateria.went_out_at)}`}</h3>
+            <h3>{bateria.label ?? `Saída das ${hora(bateria.went_out_at)}`}</h3>
             <span className="ciclo-cabeca-contexto">
               {evento?.name}{sessao ? ` · ${sessao.label ?? sessao.type}` : ""}
               {` · saiu às ${hora(bateria.went_out_at)}`}
@@ -505,7 +581,7 @@ export function Ciclo() {
               entre baterias da mesma sessao e o gesto mais repetido do dia. */}
           {(baterias.dado?.length ?? 0) > 1 && (
             <div className="ciclo-irmas">
-              <span className="fraco">outros outings:</span>
+              <span className="fraco">outras saídas:</span>
               {baterias.dado!.filter((b) => b.id !== bateriaId).map((b) => (
                 <button key={b.id} type="button" className="ghost" onClick={() => setBateria(b.id)}>
                   {nomeDoOuting(b)}{b.voltas ? ` · ${b.voltas} voltas` : ""}
@@ -519,7 +595,7 @@ export function Ciclo() {
             <div className="ciclo-coluna">
               <h4>Telemetria</h4>
               {penduradas.length > 0 ? (
-                <ul className="ciclo-lista compacta">
+                <ListaPaginada compacta>
                   {penduradas.map((g) => (
                     <li key={g.gravacao_id} className="linha-gravacao">
                       <span className="t">
@@ -530,7 +606,7 @@ export function Ciclo() {
                         <button
                           type="button"
                           className="limpar"
-                          title="Solta o arquivo deste outing sem apagar nada"
+                          title="Solta o arquivo desta saída sem apagar nada"
                           onClick={() => soltar(g.gravacao_id)}
                         >
                           soltar
@@ -545,7 +621,7 @@ export function Ciclo() {
                       </span>
                     </li>
                   ))}
-                </ul>
+                </ListaPaginada>
               ) : (
                 <p className="fraco">Nenhum arquivo pendurado ainda.</p>
               )}
@@ -564,7 +640,7 @@ export function Ciclo() {
               <h4>Registro do box</h4>
               <button type="button" className={`ciclo-registro${registros > 0 ? " ok" : ""}`} onClick={() => setContextoAberto(true)}>
                 <span className="cabeca">
-                  <span className="nome">Contexto do outing</span>
+                  <span className="nome">Contexto da saída</span>
                   <span className="estado">{registros > 0 ? "✓ preenchido" : "não preenchido"}</span>
                 </span>
                 <span className="detalhe">
@@ -575,13 +651,13 @@ export function Ciclo() {
               </button>
               <button type="button" className={`ciclo-registro${ultimaVersao > 0 ? " ok" : ""}`} onClick={() => setSetupAberto(true)}>
                 <span className="cabeca">
-                  <span className="nome">Ficha de setup</span>
+                  <span className="nome">Configurações do carro</span>
                   <span className="estado">{ultimaVersao > 0 ? `✓ versão ${ultimaVersao}` : "não preenchida"}</span>
                 </span>
                 <span className="detalhe">
                   {ultimaVersao > 0
                     ? `${setup.dado!.length} versão(ões) salvas`
-                    : "pressões, alturas, asas: o carro com que este outing saiu"}
+                    : "pressões, alturas, asas: o carro com que esta saída foi feita"}
                 </span>
               </button>
             </div>
@@ -590,12 +666,12 @@ export function Ciclo() {
       )}
 
       <p className="ciclo-nota">
-        Telemetria entra por aqui, pendurada no outing: é o vínculo com o evento que
+        Telemetria entra por aqui, pendurada na saída pra pista: é o vínculo com o evento que
         liga a análise ao seu dia de pista e permite comparar dia com dia.
       </p>
 
       {/* --- modais de cadastro/edicao (pedido de 29/08) --- */}
-      <Modal titulo="Novo evento" aberto={modal === "evento"} aoFechar={() => setModal(null)}>
+      <Modal classe="sem-scroll" titulo="Novo evento" aberto={modal === "evento"} aoFechar={() => setModal(null)}>
         <form className="ciclo-form" onSubmit={(ev) => { ev.preventDefault(); novoEvento(ev.currentTarget); }}>
           {camposDeEvento()}
           <Erro e={erro} />
@@ -606,7 +682,7 @@ export function Ciclo() {
         </form>
       </Modal>
 
-      <Modal titulo="Editar evento" aberto={modal === "editar-evento"} aoFechar={() => setModal(null)}>
+      <Modal classe="sem-scroll" titulo="Editar evento" aberto={modal === "editar-evento"} aoFechar={() => setModal(null)}>
         <form className="ciclo-form" onSubmit={(ev) => { ev.preventDefault(); salvarEvento(ev.currentTarget); }}>
           {evento && camposDeEvento({ name: evento.name, track_id: evento.track_id, starts_at: evento.starts_at, tipo: evento.tipo })}
           <Erro e={erro} />
@@ -617,7 +693,7 @@ export function Ciclo() {
         </form>
       </Modal>
 
-      <Modal titulo="Nova sessão" aberto={modal === "sessao"} aoFechar={() => setModal(null)}>
+      <Modal classe="sem-scroll" titulo="Nova sessão" aberto={modal === "sessao"} aoFechar={() => setModal(null)}>
         <form className="ciclo-form" onSubmit={(ev) => { ev.preventDefault(); novaSessao(ev.currentTarget); }}>
           <label>
             Nome da sessão
@@ -632,11 +708,11 @@ export function Ciclo() {
           </label>
           <label>
             Janela: começa
-            <input name="starts_at" type="datetime-local" />
+            <CampoDataHora name="starts_at" />
           </label>
           <label>
             Janela: termina
-            <input name="ends_at" type="datetime-local" />
+            <CampoDataHora name="ends_at" rotulo="Data do fim" />
           </label>
           <Erro e={erro} />
           <div className="ciclo-acoes">
@@ -646,7 +722,7 @@ export function Ciclo() {
         </form>
       </Modal>
 
-      <Modal titulo="Editar sessão" aberto={modal === "editar-sessao"} aoFechar={() => setModal(null)}>
+      <Modal classe="sem-scroll" titulo="Editar sessão" aberto={modal === "editar-sessao"} aoFechar={() => setModal(null)}>
         <form className="ciclo-form" onSubmit={(ev) => { ev.preventDefault(); salvarSessao(ev.currentTarget); }}>
           <label>
             Nome da sessão
@@ -661,11 +737,11 @@ export function Ciclo() {
           </label>
           <label>
             Janela: começa
-            <input name="starts_at" type="datetime-local" defaultValue={paraInputDatetime(sessao?.starts_at ?? null)} />
+            <CampoDataHora name="starts_at" defaultValue={paraInputDatetime(sessao?.starts_at ?? null)} />
           </label>
           <label>
             Janela: termina
-            <input name="ends_at" type="datetime-local" defaultValue={paraInputDatetime(sessao?.ends_at ?? null)} />
+            <CampoDataHora name="ends_at" rotulo="Data do fim" defaultValue={paraInputDatetime(sessao?.ends_at ?? null)} />
           </label>
           <Erro e={erro} />
           <div className="ciclo-acoes">
@@ -675,7 +751,7 @@ export function Ciclo() {
         </form>
       </Modal>
 
-      <Modal titulo="Novo outing: saída para a pista" aberto={modal === "bateria"} aoFechar={() => setModal(null)}>
+      <Modal classe="sem-scroll" titulo="Nova saída pra pista" aberto={modal === "bateria"} aoFechar={() => setModal(null)}>
         <form className="ciclo-form" onSubmit={(ev) => { ev.preventDefault(); novaBateria(ev.currentTarget); }}>
           <label>
             Nome
@@ -689,42 +765,60 @@ export function Ciclo() {
             Saída
             {/* default = agora: o horario e da MAQUINA (2.1.5.4), o campo
                 existe pra correcao explicita, nao pra digitacao de rotina */}
-            <input name="went_out_at" type="datetime-local" defaultValue={paraInputDatetime(new Date().toISOString())} />
+            <CampoDataHora name="went_out_at" defaultValue={paraInputDatetime(new Date().toISOString())} />
           </label>
           <Erro e={erro} />
           <div className="ciclo-acoes">
-            <button type="submit" className="primario" disabled={criando}>Registrar outing</button>
+            <button type="submit" className="primario" disabled={criando}>Registrar saída</button>
             <button type="button" className="ghost" onClick={() => setModal(null)}>Cancelar</button>
           </div>
         </form>
       </Modal>
 
-      <Modal titulo="Editar outing" aberto={modal === "editar-bateria"} aoFechar={() => setModal(null)}>
+      <Modal classe="sem-scroll" titulo="Editar saída pra pista" aberto={modal === "editar-bateria"} aoFechar={() => setModal(null)}>
         <form className="ciclo-form" onSubmit={(ev) => { ev.preventDefault(); salvarBateria(ev.currentTarget); }}>
-          <label>
-            Nome
-            <input name="label" defaultValue={bateria?.label ?? ""} />
-          </label>
-          <label>
-            Objetivo
-            <input name="objective" defaultValue={bateria?.objective ?? ""} />
-          </label>
-          <label>
-            Saída
-            <input name="went_out_at" type="datetime-local" required defaultValue={paraInputDatetime(bateria?.went_out_at ?? null)} />
-          </label>
-          <label>
-            Voltas
-            <input name="laps" type="number" min={0} step={1} defaultValue={bateria?.laps ?? ""} />
-          </label>
-          <label>
-            Litros na saída
-            <input name="fuel_out_l" type="number" min={0} step={0.1} defaultValue={bateria?.fuel_out_l ?? ""} />
-          </label>
-          <label>
-            Litros na volta
-            <input name="fuel_in_l" type="number" min={0} step={0.1} defaultValue={bateria?.fuel_in_l ?? ""} />
-          </label>
+          <CamposPaginados
+            paginas={[
+              {
+                titulo: "Identificação",
+                campos: (
+                  <>
+                    <label>
+                      Nome
+                      <input name="label" defaultValue={bateria?.label ?? ""} />
+                    </label>
+                    <label>
+                      Objetivo
+                      <input name="objective" defaultValue={bateria?.objective ?? ""} />
+                    </label>
+                    <label>
+                      Saída
+                      <CampoDataHora name="went_out_at" required defaultValue={paraInputDatetime(bateria?.went_out_at ?? null)} />
+                    </label>
+                  </>
+                ),
+              },
+              {
+                titulo: "Números da saída",
+                campos: (
+                  <>
+                    <label>
+                      Voltas
+                      <input name="laps" type="number" min={0} step={1} defaultValue={bateria?.laps ?? ""} />
+                    </label>
+                    <label>
+                      Litros na saída
+                      <input name="fuel_out_l" type="number" min={0} step={0.1} defaultValue={bateria?.fuel_out_l ?? ""} />
+                    </label>
+                    <label>
+                      Litros na volta
+                      <input name="fuel_in_l" type="number" min={0} step={0.1} defaultValue={bateria?.fuel_in_l ?? ""} />
+                    </label>
+                  </>
+                ),
+              },
+            ]}
+          />
           <Erro e={erro} />
           <div className="ciclo-acoes">
             <button type="submit" className="primario" disabled={criando}>Salvar</button>
@@ -743,10 +837,10 @@ export function Ciclo() {
               {confirmar.tipo === "gravacao"
                 ? "A telemetria e tudo que deriva dela (voltas, trechos, análises) serão apagados. Não dá para desfazer."
                 : confirmar.tipo === "bateria"
-                ? "O outing, o contexto e a ficha de setup dele serão apagados. A telemetria pendurada NÃO é apagada: vira arquivo solto."
+                ? "A saída, o contexto e as configurações do carro dela serão apagados. A telemetria pendurada NÃO é apagada: vira arquivo solto."
                 : confirmar.tipo === "sessao"
-                ? "A sessão e os outings dela serão apagados (com contexto e setup). As telemetrias NÃO são apagadas: viram arquivos soltos."
-                : "O evento, as sessões e os outings dele serão apagados (com contexto e setup). As telemetrias NÃO são apagadas: viram arquivos soltos."}
+                ? "A sessão e as saídas dela serão apagadas (com contexto e configurações do carro). As telemetrias NÃO são apagadas: viram arquivos soltos."
+                : "O evento, as sessões e as saídas dele serão apagados (com contexto e configurações do carro). As telemetrias NÃO são apagadas: viram arquivos soltos."}
             </p>
             <Erro e={erro} />
             <div className="ciclo-acoes">

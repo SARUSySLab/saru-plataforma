@@ -52,6 +52,15 @@ class Config:
     openrouter_modelo: str = os.getenv("SARU_OPENROUTER_MODELO", "anthropic/claude-sonnet-4.5")
 
     # --- clima ---
+    # meteoblue: escolha do Lucas (29/08, visao de campeonato), e a fonte que
+    # a propria industria de corrida usa (produto "meteoblue na pista"). Free
+    # tier nao comercial com chave; limite por CHAVE, nao por IP, entao nao
+    # sofre o 429 compartilhado do Railway. Sem a chave setada, a cascata
+    # continua a anterior (nada muda ate a chave existir).
+    meteoblue_key: str | None = os.getenv("SARU_METEOBLUE_KEY") or None
+    meteoblue_base: str = os.getenv(
+        "SARU_METEOBLUE_BASE", "https://my.meteoblue.com/packages/basic-1h"
+    )
     # Open-Meteo: sem chave, sem cadastro, licenca livre pra uso nao comercial.
     # Trocar de provedor mexe so em `clima.py`.
     clima_base: str = os.getenv("SARU_CLIMA_BASE", "https://api.open-meteo.com/v1/forecast")

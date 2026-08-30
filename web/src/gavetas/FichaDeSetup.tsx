@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRequisicao } from "../dados/requisicao";
 import { editarSetup, excluirSetup, salvarSetup, versoesSetup, type Dono, type VersaoSetup } from "../services/operacao";
+import { Passos } from "../componentes/Passos";
 import { Gaveta } from "./Gaveta";
 import "../estilo/gavetas.css";
 
@@ -152,7 +153,7 @@ export function FichaDeSetup({ aberta, dono, alvoId, onFechar }: {
       })
       .catch((e: unknown) => {
         setSalvando(false);
-        setErroSalvar(e instanceof Error ? e.message : "falha ao salvar ficha de setup");
+        setErroSalvar(e instanceof Error ? e.message : "falha ao salvar as configurações do carro");
       });
   };
 
@@ -202,13 +203,13 @@ export function FichaDeSetup({ aberta, dono, alvoId, onFechar }: {
     );
 
   return (
-    <Gaveta aberta={aberta} titulo="Ficha de setup" eyebrow="Contexto · bloco 13" onFechar={onFechar}>
+    <Gaveta aberta={aberta} titulo="Configurações do carro" eyebrow="Contexto · bloco 13" onFechar={onFechar}>
       {carregando && <p className="nota">Carregando ficha...</p>}
       {erro && <p className="nota erro-txt">Falha ao carregar: {erro}</p>}
 
       {!carregando && !erro && (
         <>
-          {!atual && <p className="nota">Ainda não há ficha de setup para esta bateria.</p>}
+          {!atual && <p className="nota">Ainda não há configurações do carro para esta saída.</p>}
 
           <div className="grupo">
             <h5>
@@ -220,6 +221,14 @@ export function FichaDeSetup({ aberta, dono, alvoId, onFechar }: {
               comparar "o que mudou da bateria 2 pra 3".
             </p>
 
+            {/* Paginado (pedido do Lucas, 30/08): a modal nao rola. Os
+                passos seguem o que ja existia como agrupamento no arquivo,
+                os campos preenchidos, a lista de campos comuns e as notas,
+                em vez de fatiar por altura. Passo escondido continua montado,
+                entao o que foi digitado sobrevive a navegacao. */}
+            <Passos
+              passos={[
+                { id: "campos", rotulo: "Campos", conteudo: (<>
             <div className="pares-setup">
               {pares.length === 0 && <p className="nota">Nenhum campo ainda. Adicione um abaixo.</p>}
               {pares.map((p) => (
@@ -244,6 +253,8 @@ export function FichaDeSetup({ aberta, dono, alvoId, onFechar }: {
             </div>
             <button type="button" className="btn-secundario" onClick={adicionarCampo}>+ campo</button>
 
+                </>) },
+                { id: "comuns", rotulo: "Campos comuns", conteudo: (<>
             {/* As sugestoes ficam DEPOIS do editor, nao antes: quem ja sabe o
                 que quer digita direto, e quem nao sabe encontra a lista logo
                 abaixo sem ela roubar a tela. */}
@@ -272,8 +283,8 @@ export function FichaDeSetup({ aberta, dono, alvoId, onFechar }: {
                 </div>
               ))}
             </div>
-          </div>
-
+                </>) },
+                { id: "notas", rotulo: "Notas", conteudo: (<>
           <div className="grupo">
             <h5>Notas da versão</h5>
             <textarea
@@ -284,6 +295,10 @@ export function FichaDeSetup({ aberta, dono, alvoId, onFechar }: {
             />
           </div>
 
+                </>) },
+              ]}
+            />
+          </div>
           {erroSalvar && <p className="nota erro-txt">{erroSalvar}</p>}
 
           <button type="button" className="btn-primario" onClick={salvar} disabled={salvando}>

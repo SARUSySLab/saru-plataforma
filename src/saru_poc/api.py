@@ -46,8 +46,10 @@ from .contrato import carregar, validar
 from .db import connect
 from .relatorio import ReferenciaDePistaDiferente, amostras, montar
 from .rotas import auth as rotas_auth
+from .rotas import campeonato as rotas_campeonato
 from .rotas import clima as rotas_clima
 from .rotas import operacao as rotas_operacao
+from .rotas import vivo as rotas_vivo
 from .rotas import sarue as rotas_sarue
 
 app = FastAPI(
@@ -75,6 +77,8 @@ app.include_router(rotas_auth.router)
 app.include_router(rotas_operacao.router)
 app.include_router(rotas_sarue.router)
 app.include_router(rotas_clima.router)
+app.include_router(rotas_campeonato.router)
+app.include_router(rotas_vivo.router)
 
 
 def _validado(dado: dict, raiz: str) -> dict:

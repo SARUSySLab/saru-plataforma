@@ -198,7 +198,7 @@ export function EnvioDeTelemetria({ aoConcluir, referencia = false }: {
     if (!alvo) return false;
     try {
       await vincularGravacao(alvo, g.gravacao_id);
-      setVinculo("pendurada no outing em escopo");
+      setVinculo("pendurada na saída pra pista em escopo");
       return true;
     } catch (e) {
       // o arquivo ja esta no servidor e analisavel; so o vinculo falhou, e a
@@ -208,7 +208,7 @@ export function EnvioDeTelemetria({ aoConcluir, referencia = false }: {
       setVinculo(
         e instanceof ErroDaApi
           ? e.message
-          : "o arquivo entrou, mas não consegui pendurar no outing",
+          : "o arquivo entrou, mas não consegui pendurar na saída",
       );
       return false;
     }
@@ -234,9 +234,9 @@ export function EnvioDeTelemetria({ aoConcluir, referencia = false }: {
       await vincularGravacao(nova.id, g.gravacao_id);
       setBateria(nova.id);
       baterias.recarregar();
-      setVinculo("outing criado e telemetria pendurada nele");
+      setVinculo("saída criada e telemetria pendurada nela");
     } catch (e) {
-      setVinculo(e instanceof ErroDaApi ? e.message : "não consegui criar o outing");
+      setVinculo(e instanceof ErroDaApi ? e.message : "não consegui criar a saída");
     }
   }
 
@@ -453,13 +453,13 @@ export function EnvioDeTelemetria({ aoConcluir, referencia = false }: {
           {!referencia && !bateriaId && !vinculo && (
             <div className="envio-bateria">
               <p>
-                Esta telemetria está <b>solta</b>, sem outing. Pendure num outing para
-                ela ter contexto, ficha de setup e comparação com os outros dias.
+                Esta telemetria está <b>solta</b>, sem saída pra pista. Pendure numa saída para
+                ela ter contexto, configurações do carro e comparação com os outros dias.
               </p>
 
               {baterias.dado && baterias.dado.length > 0 && (
                 <label>
-                  Pendurar num outing existente
+                  Pendurar numa saída existente
                   <select
                     defaultValue=""
                     onChange={async (e) => {
@@ -468,17 +468,17 @@ export function EnvioDeTelemetria({ aoConcluir, referencia = false }: {
                       setBateria(id);
                       try {
                         await vincularGravacao(id, fase.gravacao.gravacao_id);
-                        setVinculo("pendurada no outing escolhido");
+                        setVinculo("pendurada na saída escolhida");
                       } catch (err) {
                         setVinculo(
                           err instanceof ErroDaApi
                             ? err.message
-                            : "não consegui pendurar nesse outing",
+                            : "não consegui pendurar nessa saída",
                         );
                       }
                     }}
                   >
-                    <option value="" disabled>escolha o outing</option>
+                    <option value="" disabled>escolha a saída</option>
                     {baterias.dado.map(({ sessao: s, bateria: b }) => (
                       <option key={b.id} value={b.id}>
                         {s.label ?? s.type} · {b.label ?? (b.went_out_at
@@ -492,11 +492,11 @@ export function EnvioDeTelemetria({ aoConcluir, referencia = false }: {
 
               {sessaoId ? (
                 <button type="button" className="ghost" onClick={() => criarEPendurar(fase.gravacao)}>
-                  Criar outing agora e pendurar
+                  Criar saída pra pista agora e pendurar
                 </button>
               ) : (
                 <p className="peso">
-                  Escolha um evento e uma sessão em <b>Dia de pista</b> para poder criar o outing.
+                  Escolha um evento e uma sessão em <b>Dia de pista</b> para poder criar a saída.
                 </p>
               )}
             </div>

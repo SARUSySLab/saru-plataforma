@@ -6,6 +6,13 @@
 // (regra da casa: dependência nova é decisão do Lucas).
 
 const PATHS: Record<string, React.ReactNode> = {
+  // campeonato: bandeira de chegada no mastro
+  bandeira: (
+    <>
+      <path d="M5 21V4" />
+      <path d="M5 4h13l-2.5 3.5L18 11H5" />
+    </>
+  ),
   // visão geral: quatro quadros, o dashboard
   grade: (
     <>

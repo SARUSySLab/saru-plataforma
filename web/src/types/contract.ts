@@ -260,6 +260,9 @@ export interface PontoPrevisao {
   horario: string;
   temperatura_c: number;
   condicao: string | null;
+  /** Chance de chuva em 0 a 100. `null` quando a fonte nao entrega o campo:
+   *  ausencia de dado nao vira zero, que seria afirmar tempo seco. */
+  chuva_prob?: number | null;
 }
 
 export interface TempoComPrevisao {

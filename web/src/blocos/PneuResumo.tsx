@@ -74,14 +74,14 @@ export function PneuResumo({ bateriaId, canais, serie, aoAbrirContexto }: {
           <p className="heroi-sub">
             {selo === "medido"
               ? "média dos cantos, telemetria da volta em foco"
-              : "carcaça informada na ficha de setup"}
+              : "carcaça informada nas configurações do carro"}
           </p>
         </>
       ) : (
         <p className="nota">
           {bateriaId
-            ? "Sem canal de temperatura de pneu e sem carcaça na ficha de setup."
-            : "Gravação solta: pendure num outing para ter contexto de pneu."}
+            ? "Sem canal de temperatura de pneu e sem carcaça nas configurações do carro."
+            : "Gravação solta: pendure numa saída pra pista para ter contexto de pneu."}
         </p>
       )}
 

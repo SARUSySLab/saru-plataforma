@@ -116,9 +116,9 @@ export function Consumo({ consumo, voltas, emEscopo, bateriaRotulo, bateriaEscop
           </p>
         </div>
         <div>
-          <p className="eyebrow">Outing em escopo</p>
+          <p className="eyebrow">Saída pra pista em escopo</p>
           <p className="heroi" style={{ fontSize: 28, color: "var(--muted)" }}>
-            {bateria.disponivel ? `${bateria.litros_por_volta.toFixed(2)} L` : "sem outing"}
+            {bateria.disponivel ? `${bateria.litros_por_volta.toFixed(2)} L` : "sem saída"}
           </p>
           <p className="heroi-sub">
             {bateria.disponivel

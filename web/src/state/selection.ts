@@ -39,7 +39,12 @@ export type Vista =
   | { tipo: "envio" }
   // O dia de pista: evento, sessao, bateria. Fora do funil porque e o que
   // organiza a telemetria, nao um nivel de zoom sobre ela.
-  | { tipo: "ciclo" };
+  | { tipo: "ciclo" }
+  // A visao de campeonato (29/08): o grid inteiro pela cronometragem externa
+  // (live timing MyLaps/Orbits via relay). Fora do funil porque nao le a
+  // telemetria da conta: e outro zoom, o mais aberto de todos, o autodromo
+  // visto de cima. Nao depende de gravacao nenhuma.
+  | { tipo: "campeonato" };
 
 export type MapMode = "speed" | "brake" | "gear" | "delta";
 // "all" (default de 29/08) mistura curva nomeada com micro-setor: catalogo

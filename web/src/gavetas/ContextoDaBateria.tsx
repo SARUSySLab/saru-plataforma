@@ -17,6 +17,7 @@ import {
 import { climaDoLayout } from "../services/clima";
 import { ErroDaApi } from "../services/api";
 import type { CapturaContextoSessao } from "../types/ingestao";
+import { Passos } from "../componentes/Passos";
 import { Gaveta } from "./Gaveta";
 import "../estilo/gavetas.css";
 
@@ -477,7 +478,7 @@ export function ContextoDaBateria({ aberta, dono, alvoId, layoutId, onFechar }: 
   };
 
   return (
-    <Gaveta aberta={aberta} titulo="Contexto do outing" eyebrow="Captura · bloco 15" onFechar={onFechar}>
+    <Gaveta aberta={aberta} titulo="Contexto da saída pra pista" eyebrow="Captura · bloco 15" onFechar={onFechar}>
       {carregando && <p className="nota">Carregando contexto...</p>}
       {erro && <p className="nota erro-txt">Falha ao carregar: {erro}</p>}
 
@@ -550,6 +551,14 @@ export function ContextoDaBateria({ aberta, dono, alvoId, layoutId, onFechar }: 
               </p>
             )}
 
+            {/* Paginado (pedido do Lucas, repetido em 30/08): a modal nao
+                rola. Os passos seguem o que o campo SIGNIFICA, nao fatia de
+                altura: pneu, ambiente, o que o piloto e o engenheiro contam,
+                e combustivel. O botao de salvar fica fora dos passos, sempre
+                a um clique, em qualquer passo. */}
+            <Passos
+              passos={[
+                { id: "pneu", rotulo: "Pneu", conteudo: (<>
             <div className={`campo destaque ${pneuEstado ? "ok" : "falta"}`}>
               <label>Estado do pneu</label>
               <select value={pneuEstado} onChange={(e) => setPneuEstado(e.target.value as "" | "novo" | "usado")}>
@@ -572,6 +581,39 @@ export function ContextoDaBateria({ aberta, dono, alvoId, layoutId, onFechar }: 
               />
             </div>
 
+            {/* pressao-alvo a quente e carcaca medida: cadastro migrou pra ca
+                (Fase 12), o Box virou so leitura. Nao vao no POST de contexto,
+                vao pras configuracoes do carro por baixo dos panos, por isso
+                aparecem como "falta" sem travar o registro. */}
+            <div className={`campo destaque ${pressaoAlvoQuente.trim() ? "ok" : "falta"}`}>
+              <label>Pressão-alvo a quente (psi)</label>
+              <input
+                type="number"
+                step="0.5"
+                value={pressaoAlvoQuente}
+                placeholder="o sistema perguntou"
+                onChange={(e) => setPressaoAlvoQuente(e.target.value)}
+              />
+            </div>
+            <div className={`campo destaque ${carcacaMedida.trim() ? "ok" : "falta"}`}>
+              <label>Carcaça medida (°C)</label>
+              <input
+                type="number"
+                step="1"
+                value={carcacaMedida}
+                placeholder="vazio = Box estima"
+                onChange={(e) => setCarcacaMedida(e.target.value)}
+              />
+            </div>
+            {erroSetup && <p className="nota erro-txt">{erroSetup}</p>}
+
+            {/* combustivel: cadastro migrou pra ca (Fase 11), Box virou so
+                leitura. Sem bateria em escopo nao ha onde guardar (a
+                gravacao solta nao tem fuel_in_l/fuel_out_l), entao os campos
+                ficam desabilitados com o motivo em vez de aceitar e perder o
+                numero em silencio. */}
+                </>) },
+                { id: "ambiente", rotulo: "Ambiente", conteudo: (<>
             {/* auto enquanto ninguem mexeu (verde, rotulo "auto" vem do
                 app.css); no primeiro toque perde o auto e vira destaque
                 comum, como qualquer campo que o piloto preenche. */}
@@ -630,6 +672,8 @@ export function ContextoDaBateria({ aberta, dono, alvoId, layoutId, onFechar }: 
               />
             </div>
 
+                </>) },
+                { id: "notas", rotulo: "Notas", conteudo: (<>
             <div className={`campo destaque ${horario.trim() ? "ok" : "falta"}`}>
               <label>Horário</label>
               <input value={horario} placeholder="o sistema perguntou" onChange={(e) => setHorario(e.target.value)} />
@@ -643,40 +687,8 @@ export function ContextoDaBateria({ aberta, dono, alvoId, layoutId, onFechar }: 
               <textarea value={notasEngenheiro} placeholder="o sistema perguntou" onChange={(e) => setNotasEngenheiro(e.target.value)} />
             </div>
 
-            {/* pressao-alvo a quente e carcaca medida: cadastro migrou pra
-                ca (Fase 12), o Box (`PressaoAFrio.tsx`, bloco 16) virou so
-                leitura. Nao vao no POST de contexto acima, vao pra ficha de
-                setup por baixo dos panos (ver nota da Fase 12 no topo do
-                arquivo); por isso ficam marcadas "falta" so visualmente,
-                igual notas/litros, sem travar o registro de contexto se
-                ficarem vazias. */}
-            <div className={`campo destaque ${pressaoAlvoQuente.trim() ? "ok" : "falta"}`}>
-              <label>Pressão-alvo a quente (psi)</label>
-              <input
-                type="number"
-                step="0.5"
-                value={pressaoAlvoQuente}
-                placeholder="o sistema perguntou"
-                onChange={(e) => setPressaoAlvoQuente(e.target.value)}
-              />
-            </div>
-            <div className={`campo destaque ${carcacaMedida.trim() ? "ok" : "falta"}`}>
-              <label>Carcaça medida (°C)</label>
-              <input
-                type="number"
-                step="1"
-                value={carcacaMedida}
-                placeholder="vazio = Box estima"
-                onChange={(e) => setCarcacaMedida(e.target.value)}
-              />
-            </div>
-            {erroSetup && <p className="nota erro-txt">{erroSetup}</p>}
-
-            {/* combustivel: cadastro migrou pra ca (Fase 11), Box virou so
-                leitura. Sem bateria em escopo nao ha onde guardar (a
-                gravacao solta nao tem fuel_in_l/fuel_out_l), entao os campos
-                ficam desabilitados com o motivo em vez de aceitar e perder o
-                numero em silencio. */}
+                </>) },
+                { id: "combustivel", rotulo: "Combustível", conteudo: (<>
             {dono !== "baterias" && (
               <p className="nota">
                 Sem bateria, não há onde guardar o combustível: os campos abaixo ficam desabilitados
@@ -706,6 +718,10 @@ export function ContextoDaBateria({ aberta, dono, alvoId, layoutId, onFechar }: 
               />
             </div>
             {erroCombustivel && <p className="nota erro-txt">{erroCombustivel}</p>}
+
+                </>) },
+              ]}
+            />
 
             {erroSalvar && <p className="nota erro-txt">{erroSalvar}</p>}
 

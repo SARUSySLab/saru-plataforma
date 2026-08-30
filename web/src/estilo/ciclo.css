@@ -5,8 +5,15 @@
    `vh` porque a barra do browser no mobile some e volta, e `vh` congela na
    altura do carregamento. `align-content: center` no lugar de place-items pra
    o card nao encolher quando o conteudo passa da altura da area. */
-.ciclo-area { min-height: 62dvh; display: grid; justify-items: center; align-content: center; }
-.ciclo { width: min(880px, 100%); display: flex; flex-direction: column; gap: var(--s4); }
+/* Trava de viewport (pedido de 29/08, mesma regra do campeonato): a casca
+   prende a pagina em 100dvh e aqui tudo e flex + min-height 0 + overflow
+   hidden. O que nao cabe nao rola: PAGINA (ver ListaPaginada). O
+   enquadramento centrado saiu junto com o scroll: a area agora e coluna que
+   preenche a altura que a casca da. */
+.ciclo-area { flex: 1; min-height: 0; display: flex; justify-content: center; overflow: hidden; padding-top: var(--s3); }
+.ciclo { width: min(880px, 100%); min-height: 0; display: flex; flex-direction: column; gap: var(--s3); }
+.ciclo-trilha { flex-shrink: 0; }
+.ciclo-nota { flex-shrink: 0; }
 
 /* A trilha NAVEGA (pedido 2.1 de 29/08): cada passo alcancavel e um botao que
    abre a lista daquele nivel sem desfazer a escolha. O resumo embaixo do
@@ -24,7 +31,17 @@
 .ciclo-trilha .trilha-resumo { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ciclo-trilha .trilha-morta .trilha-rotulo { opacity: .5; }
 
-.ciclo-bloco { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
+.ciclo-bloco { flex: 1; min-height: 0; overflow: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
+.ciclo-bloco > header { flex-shrink: 0; }
+
+/* caixa da lista paginada: mede a altura sobrando e mostra so o que cabe */
+.ciclo-lista-caixa { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.ciclo-lista-caixa .ciclo-lista { flex: 1; min-height: 0; overflow: hidden; }
+.ciclo-paginas { flex-shrink: 0; height: 24px; display: flex; align-items: center; justify-content: space-between; gap: var(--s2); font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.ciclo-paginas.form { justify-content: center; grid-column: 1 / -1; }
+.ciclo-seta { font-size: 15px; line-height: 1; padding: 0 8px; color: var(--muted); background: transparent; border: 1px solid var(--border-strong); border-radius: var(--r-sm); cursor: pointer; }
+.ciclo-seta:hover:not(:disabled) { background: var(--brand-soft); }
+.ciclo-seta:disabled { opacity: .35; cursor: default; }
 .ciclo-bloco header { display: flex; align-items: baseline; gap: var(--s2); }
 .ciclo-bloco h3 { font-size: 14px; font-weight: 600; }
 .ciclo-escolhido { font-size: 13px; color: var(--text); }
@@ -97,7 +114,8 @@
 
 /* o passo da bateria escolhida em DUAS colunas: telemetria e registro do box
    (reorganizacao de 29/08). Em tela estreita empilha. */
-.ciclo-duas { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); align-items: start; }
+.ciclo-duas { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); align-items: stretch; }
+.ciclo-coluna { min-height: 0; display: flex; flex-direction: column; gap: var(--s2); overflow: hidden; }
 @media (max-width: 720px) { .ciclo-duas { grid-template-columns: 1fr; } }
 .ciclo-coluna { display: flex; flex-direction: column; gap: var(--s2); min-width: 0; }
 .ciclo-coluna > h4 { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--faint); font-weight: 700; }
@@ -115,3 +133,31 @@
 
 /* acoes da linha de gravacao pendurada (soltar/excluir lado a lado) */
 .ciclo-lista.compacta .linha-gravacao .acoes { display: flex; gap: var(--s2); flex: none; }
+
+/* Modal de cadastro NAO rola (pedido de 29/08): teto de altura com overflow
+   escondido; formulario que nao couber pagina (CamposPaginados). So os
+   cadastros do ciclo usam a variante: as gavetas grandes (contexto/ficha)
+   continuam com o comportamento proprio delas. */
+.modal-cartao.sem-scroll { max-height: 90dvh; overflow: hidden; display: flex; flex-direction: column; }
+.modal-cartao.sem-scroll .ciclo-form { min-height: 0; overflow: hidden; }
+.ciclo-form-pagina { display: grid; grid-template-columns: 1fr; gap: var(--s3); grid-column: 1 / -1; }
+.ciclo-form-pagina[hidden] { display: none; }
+
+/* --- campo de data e hora (formato brasileiro, pedido de 30/08) ----------- */
+
+.campo-data-hora { display: flex; gap: var(--s2); align-items: flex-end; flex-wrap: wrap; }
+.cdh-parte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cdh-hora { max-width: 92px; }
+.cdh-rotulo { font-family: var(--mono); font-size: 9px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--faint); }
+.cdh-entrada { position: relative; display: flex; align-items: center; }
+.cdh-entrada input[type="text"] { padding-right: 26px; }
+.campo-data-hora input[type="text"] { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.campo-data-hora input[aria-invalid="true"] { border-color: var(--danger); }
+.cdh-calendario { position: absolute; right: 4px; display: flex; align-items: center;
+  color: var(--faint); background: none; border: none; cursor: pointer; padding: 2px; }
+.cdh-calendario:hover { color: var(--brand); }
+/* O nativo existe so pra abrir o calendario: ele nunca e lido nem exibido,
+   porque e ele que traria o formato do idioma do navegador de volta. */
+.cdh-oculto { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.cdh-erro { font-size: 11px; color: var(--danger); align-self: center; }

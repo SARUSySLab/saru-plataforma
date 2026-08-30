@@ -30,6 +30,7 @@ import { ContextoDaBateria } from "./gavetas/ContextoDaBateria";
 import { FichaDeSetup } from "./gavetas/FichaDeSetup";
 import { PainelSarue } from "./sarue/PainelSarue";
 import { Ciclo } from "./ciclo/Ciclo";
+import { Campeonato } from "./campeonato/Campeonato";
 import type { Gravacao } from "./services/gravacoes";
 import { Login } from "./sessao/Login";
 import { useSessao } from "./sessao/useSessao";
@@ -290,27 +291,6 @@ function Analyzer({
           </>
         )}
 
-        {/* "envio" avulso deixou de existir (regra de 29/08): telemetria so
-            entra pelo dia de pista, com a bateria na mao. A vista antiga
-            redireciona pro ciclo pra nao quebrar escopo persistido. */}
-        {vista.tipo === "envio" && (
-          <>
-            <CabecaDaPagina titulo="Dia de pista" pergunta="Evento, sessão e outing" onVoltar={voltarParaGeral} />
-            <Ciclo />
-          </>
-        )}
-
-        {vista.tipo === "ciclo" && (
-          <>
-            <CabecaDaPagina
-              titulo="Dia de pista"
-              pergunta="Evento, sessão e outing"
-              onVoltar={voltarParaGeral}
-            />
-            <Ciclo />
-          </>
-        )}
-
       </main>
 
       {/* O Saruê e sidebar direita, no modelo da Lana: montado SEMPRE, com FAB
@@ -406,16 +386,7 @@ function SemRelatorio({
           </div>
         </div>
 
-        {vista.tipo === "envio" || vista.tipo === "ciclo" ? (
-          <>
-            <CabecaDaPagina
-              titulo="Dia de pista"
-              pergunta="Evento, sessão e outing"
-              onVoltar={() => irPara({ tipo: "geral" })}
-            />
-            <Ciclo />
-          </>
-        ) : (
+        {(
           <div className="estado-vazio">
             <h2>Nenhuma gravação analisável</h2>
             <p>{motivo}</p>
@@ -433,6 +404,74 @@ function SemRelatorio({
 }
 
 /**
+ * Casca da visao de campeonato: UM header so (pedido de 29/08). O titulo da
+ * visao mora na navbar, onde as outras cascas poem "SARU Analyzer / sem
+ * sessão aberta", e nao existe CabecaDaPagina aqui: eram dois headers pra
+ * dizer a mesma coisa, e esta visao precisa de cada pixel vertical (regra:
+ * cabe inteira numa tela, sem scroll).
+ *
+ * E casca propria, nao um ramo do Analyzer/SemRelatorio, porque o campeonato
+ * nao depende de relatorio nenhum: a fonte dele e a cronometragem externa.
+ */
+function CascaCampeonato({ temDado }: { temDado: boolean }) {
+  const { irPara } = useSelecao();
+  const [railAberto, setRailAberto] = useState(true);
+  return (
+    <div className={`app camp-app${railAberto ? "" : " recolhido"}`}>
+      <Rail temDado={temDado} onRecolher={() => setRailAberto(false)} />
+      <main className="principal justa camp-principal">
+        <div className="navbar">
+          {!railAberto && (
+            <button type="button" className="ghost" onClick={() => setRailAberto(true)} title="Abrir painel">
+              &rsaquo;&rsaquo; painel
+            </button>
+          )}
+          <div>
+            <h2>Campeonato</h2>
+            <p className="meta">o grid inteiro, ao vivo</p>
+          </div>
+          <div className="espaco" />
+          <button type="button" className="ghost" onClick={() => irPara({ tipo: "geral" })}>&lsaquo; Box</button>
+        </div>
+        <Campeonato />
+      </main>
+    </div>
+  );
+}
+
+/**
+ * Casca da tela de dia de pista, mesma receita da CascaCampeonato (pedidos de
+ * 29/08): UM header so, com o titulo na navbar, e a pagina TRAVADA no
+ * viewport (100dvh, overflow hidden). Quem garante que o conteudo cabe e o
+ * proprio Ciclo, paginando as listas; a casca so impede a pagina de rolar.
+ */
+function CascaDiaDePista({ temDado }: { temDado: boolean }) {
+  const { irPara } = useSelecao();
+  const [railAberto, setRailAberto] = useState(true);
+  return (
+    <div className={`app camp-app${railAberto ? "" : " recolhido"}`}>
+      <Rail temDado={temDado} onRecolher={() => setRailAberto(false)} />
+      <main className="principal justa camp-principal">
+        <div className="navbar">
+          {!railAberto && (
+            <button type="button" className="ghost" onClick={() => setRailAberto(true)} title="Abrir painel">
+              &rsaquo;&rsaquo; painel
+            </button>
+          )}
+          <div>
+            <h2>Dia de pista</h2>
+            <p className="meta">evento, sessão, saída pra pista e envio</p>
+          </div>
+          <div className="espaco" />
+          <button type="button" className="ghost" onClick={() => irPara({ tipo: "geral" })}>&lsaquo; Box</button>
+        </div>
+        <Ciclo />
+      </main>
+    </div>
+  );
+}
+
+/**
  * Resolve QUAL gravacao esta aberta e busca o relatorio dela.
  *
  * A escolha default e "a mais recente que ja tem volta cortada", que e a
@@ -441,7 +480,7 @@ function SemRelatorio({
  * gravacao ainda em processamento daria tela vazia sem explicacao.
  */
 function AppComSessao() {
-  const { gravacaoId, setGravacao, sincronizarEspinha, volta, compara, refGravacaoId, refVolta, setRefGravacao } =
+  const { gravacaoId, setGravacao, sincronizarEspinha, volta, compara, refGravacaoId, refVolta, setRefGravacao, vista } =
     useSelecao();
   const catalogo = useGravacoes(true);
 
@@ -536,6 +575,18 @@ function AppComSessao() {
     }
   }, [relatorio.erro, refGravacaoId, setGravacao]);
 
+  // Campeonato tem casca propria e nao depende do catalogo nem do relatorio:
+  // sai daqui antes das checagens de erro/carregando deles, senao um catalogo
+  // fora do ar derrubaria uma visao que nem o usa. Fica DEPOIS de todos os
+  // hooks acima de proposito (a licao do "Rendered more hooks").
+  if (vista.tipo === "campeonato") {
+    return <CascaCampeonato temDado={!!gravacaoId} />;
+  }
+  // dia de pista idem: casca propria, independe de catalogo e relatorio
+  if (vista.tipo === "ciclo" || vista.tipo === "envio") {
+    return <CascaDiaDePista temDado={!!gravacaoId} />;
+  }
+
   if (catalogo.erro) {
     return (
       <Aviso
@@ -552,7 +603,7 @@ function AppComSessao() {
   // telemetria e nao oferecia por onde enviar a primeira.
   if (!catalogo.dado || catalogo.dado.length === 0) {
     return (
-      <SemRelatorio motivo="Nenhuma telemetria pendurada num dia de pista. Monte o dia (evento, sessão e outing) e envie o arquivo de lá: é ele que liga a análise ao seu evento." />
+      <SemRelatorio motivo="Nenhuma telemetria pendurada num dia de pista. Monte o dia (evento, sessão e saída pra pista) e envie o arquivo de lá: é ele que liga a análise ao seu evento." />
     );
   }
 
@@ -562,7 +613,7 @@ function AppComSessao() {
   // senao a tela fica em "Carregando" pra sempre.
   if (!gravacaoId) {
     return (
-      <SemRelatorio motivo="Nenhuma telemetria pendurada num dia de pista. Monte o dia (evento, sessão e outing) e envie o arquivo de lá: é ele que liga a análise ao seu evento." />
+      <SemRelatorio motivo="Nenhuma telemetria pendurada num dia de pista. Monte o dia (evento, sessão e saída pra pista) e envie o arquivo de lá: é ele que liga a análise ao seu evento." />
     );
   }
 
@@ -572,7 +623,7 @@ function AppComSessao() {
     // sessao) nao e um erro a reportar: o effect acima ja vai limpar o
     // escopo, e ate la a tela mostra o estado vazio neutro, sem botao de
     // tentar de novo (pedido de 29/08: nao ha o que tentar)
-    return <SemRelatorio motivo={/encontrad/i.test(relatorio.erro) ? "Nenhuma telemetria pendurada num dia de pista. Monte o dia (evento, sessão e outing) e envie o arquivo de lá: é ele que liga a análise ao seu evento." : `O relatório desta gravação não veio: ${relatorio.erro}`} />;
+    return <SemRelatorio motivo={/encontrad/i.test(relatorio.erro) ? "Nenhuma telemetria pendurada num dia de pista. Monte o dia (evento, sessão e saída pra pista) e envie o arquivo de lá: é ele que liga a análise ao seu evento." : `O relatório desta gravação não veio: ${relatorio.erro}`} />;
   }
   // dado antigo fica na tela durante a recarga por troca de escopo: apagar tudo
   // a cada troca de volta faria a tela piscar a cada clique

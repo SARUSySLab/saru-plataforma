@@ -138,6 +138,45 @@ def _texto_metno(symbol_code: str | None) -> str | None:
     return _CONDICAO_METNO.get(base, "condição não catalogada")
 
 
+def _pct(valor: Any) -> int | None:
+    """Probabilidade de chuva em 0 a 100, ou None quando a fonte nao entrega.
+
+    Fonte que nao tem o campo devolve None e a tela DECLARA que nao tem, em vez
+    de mostrar zero: zero por cento de chance de chuva e uma afirmacao forte, e
+    ausencia de dado nao e ausencia de chuva (mesma regra do B2).
+    """
+    if valor is None:
+        return None
+    try:
+        return max(0, min(100, round(float(valor))))
+    except (TypeError, ValueError):
+        return None
+
+
+def _float_ou_nulo(valor: Any) -> float | None:
+    """Numero da fonte, ou None quando ela nao entrega. Nunca zero por omissao."""
+    if valor is None:
+        return None
+    try:
+        return round(float(valor), 1)
+    except (TypeError, ValueError):
+        return None
+
+
+def _graus(valor: Any) -> int | None:
+    """Direcao DE ONDE o vento vem, em graus (0 = norte), ou None.
+
+    Convencao meteorologica, que e a das quatro fontes: 90 graus significa
+    vento vindo de leste, nao indo para leste. A tela traduz para a rosa.
+    """
+    if valor is None:
+        return None
+    try:
+        return round(float(valor)) % 360
+    except (TypeError, ValueError):
+        return None
+
+
 def _buscar_open_meteo(lat: float, lon: float, horas: int) -> dict[str, Any]:
     """`dict` normalizado (sem `buscado_em`/`defasado`, isso quem poe e `previsao`).
 
@@ -148,8 +187,8 @@ def _buscar_open_meteo(lat: float, lon: float, horas: int) -> dict[str, Any]:
         params={
             "latitude": lat,
             "longitude": lon,
-            "current": "temperature_2m,wind_speed_10m,weather_code",
-            "hourly": "temperature_2m,weather_code",
+            "current": "temperature_2m,wind_speed_10m,weather_code,relative_humidity_2m,wind_direction_10m,soil_temperature_0cm",
+            "hourly": "temperature_2m,weather_code,precipitation_probability",
             "wind_speed_unit": "kmh",
             "forecast_days": 2,
             "timezone": "auto",
@@ -164,6 +203,9 @@ def _buscar_open_meteo(lat: float, lon: float, horas: int) -> dict[str, Any]:
     tempos = horario.get("time") or []
     temps = horario.get("temperature_2m") or []
     codigos = horario.get("weather_code") or []
+    # o Open-Meteo so tem probabilidade na serie horaria, nao no `current`:
+    # o "agora" vira a hora corrente da serie, nao um numero inventado.
+    probs = horario.get("precipitation_probability") or []
 
     # a serie comeca na hora atual, nao na meia-noite: a tela pergunta "como
     # vai estar na minha bateria", e bateria e daqui a pouco
@@ -171,13 +213,29 @@ def _buscar_open_meteo(lat: float, lon: float, horas: int) -> dict[str, Any]:
     inicio = next((i for i, t in enumerate(tempos) if t >= agora_iso), 0)
     fatia = slice(inicio, inicio + horas)
 
+    probs_fatia = (probs or [None] * len(tempos))[fatia]
     return {
         "temperatura_atual_c": float(atual.get("temperature_2m") or 0.0),
         "vento_kmh": float(atual.get("wind_speed_10m")) if atual.get("wind_speed_10m") is not None else None,
         "condicao_atual": _texto_open_meteo(atual.get("weather_code")),
+        "chuva_prob_atual": _pct(probs_fatia[0]) if probs_fatia else None,
+        "umidade_pct": _pct(atual.get("relative_humidity_2m")),
+        "vento_dir_graus": _graus(atual.get("wind_direction_10m")),
+        # PROXY, nao medida: `soil_temperature_0cm` e SOLO MODELADO, nao
+        # asfalto sob sol. A diferenca entre os dois passa de 15 graus num dia
+        # limpo, e temperatura de pista decide pressao de pneu. Nenhuma das 16
+        # APIs pesquisadas em 30/08 tem pista de verdade; o numero honesto so
+        # vem de pirometro na box. Por isso o campo viaja com a fonte ao lado:
+        # quem exibe e obrigado a declarar de onde veio.
+        "pista_estimada_c": _float_ou_nulo(atual.get("soil_temperature_0cm")),
+        "pista_estimada_fonte": (
+            "soil_temperature_0cm" if atual.get("soil_temperature_0cm") is not None else None
+        ),
         "previsao_horaria": [
-            {"horario": t, "temperatura_c": float(c), "condicao": _texto_open_meteo(w)}
-            for t, c, w in zip(tempos[fatia], temps[fatia], codigos[fatia], strict=False)
+            {"horario": t, "temperatura_c": float(c), "condicao": _texto_open_meteo(w), "chuva_prob": _pct(pr)}
+            for t, c, w, pr in zip(
+                tempos[fatia], temps[fatia], codigos[fatia], probs_fatia, strict=False
+            )
         ],
         "fonte": "open-meteo",
     }
@@ -211,18 +269,32 @@ def _buscar_openweather(lat: float, lon: float, horas: int) -> dict[str, Any]:
     quantidade = max(1, -(-horas // 3))
 
     vento_ms = (atual.get("wind") or {}).get("speed")
+    # `pop` do OpenWeather e fracao (0 a 1) e so existe no forecast: o agora
+    # herda o primeiro bloco de 3 h, que e o bloco em que estamos.
+    def _pop(item: dict[str, Any]) -> int | None:
+        valor = item.get("pop")
+        return _pct(float(valor) * 100) if valor is not None else None
+
     return {
         "temperatura_atual_c": float((atual.get("main") or {}).get("temp") or 0.0),
         "vento_kmh": round(float(vento_ms) * 3.6, 1) if vento_ms is not None else None,
         "condicao_atual": ((atual.get("weather") or [{}])[0]).get("description"),
+        "chuva_prob_atual": _pop(lista[0]) if lista else None,
+        "umidade_pct": _pct((atual.get("main") or {}).get("humidity")),
+        "vento_dir_graus": _graus((atual.get("wind") or {}).get("deg")),
         "previsao_horaria": [
             {
                 "horario": str(item.get("dt_txt") or "").replace(" ", "T")[:16],
                 "temperatura_c": float((item.get("main") or {}).get("temp") or 0.0),
                 "condicao": ((item.get("weather") or [{}])[0]).get("description"),
+                "chuva_prob": _pop(item),
             }
             for item in lista[:quantidade]
         ],
+        # nenhuma destas fontes expoe temperatura de solo nem de pista: o
+        # campo sai nulo em vez de derivar chute a partir do ar.
+        "pista_estimada_c": None,
+        "pista_estimada_fonte": None,
         "fonte": "openweather",
     }
 
@@ -276,37 +348,153 @@ def _buscar_metno(lat: float, lon: float, horas: int) -> dict[str, Any]:
     detalhes_atual = _detalhes(primeiro)
     vento_ms = detalhes_atual.get("wind_speed")
 
+    def _chuva(item: dict[str, Any]) -> int | None:
+        # so next_1_hours traz a probabilidade; nos ultimos itens da serie ela
+        # some junto com o symbol_code, e ai o campo sai None.
+        det = ((item.get("data") or {}).get("next_1_hours") or {}).get("details") or {}
+        return _pct(det.get("probability_of_precipitation"))
+
     return {
         "temperatura_atual_c": float(detalhes_atual.get("air_temperature") or 0.0),
         "vento_kmh": round(float(vento_ms) * 3.6, 1) if vento_ms is not None else None,
         "condicao_atual": _texto_metno(_simbolo(primeiro)),
+        "chuva_prob_atual": _chuva(primeiro),
+        "umidade_pct": _pct(detalhes_atual.get("relative_humidity")),
+        "vento_dir_graus": _graus(detalhes_atual.get("wind_from_direction")),
         "previsao_horaria": [
             {
                 "horario": str(item.get("time") or "")[:16],
                 "temperatura_c": float(_detalhes(item).get("air_temperature") or 0.0),
                 "condicao": _texto_metno(_simbolo(item)),
+                "chuva_prob": _chuva(item),
             }
             for item in fatia
         ],
+        # nenhuma destas fontes expoe temperatura de solo nem de pista: o
+        # campo sai nulo em vez de derivar chute a partir do ar.
+        "pista_estimada_c": None,
+        "pista_estimada_fonte": None,
         "fonte": "met.no",
     }
 
 
-def _buscar(lat: float, lon: float, horas: int) -> dict[str, Any]:
-    """Cascata de provedores (incidente 29/08, ver docstring do modulo).
+def _buscar_meteoblue(lat: float, lon: float, horas: int) -> dict[str, Any]:
+    """Mesmo shape dos outros, fonte meteoblue (primaria desde 29/08).
 
-    Primario: OpenWeather se a chave existir (limite por chave), senao
-    Open-Meteo (limite por IP, a causa do 429 em producao). Se o primario
-    falhar, met.no entra antes de desistir: ele limita por User-Agent, nao
-    por IP nem chave, entao nao herda o problema de nenhum dos dois. Se os
-    dois falharem, propaga o erro do met.no (o ultimo tentado); quem decide
-    servir cache vencido em vez de estourar 502 e `previsao`, nao aqui.
+    Escolha do Lucas na sessao da visao de campeonato: e o provedor que a
+    propria industria de automobilismo usa ("meteoblue na pista de corrida").
+    Pacote `basic-1h`: serie horaria de temperatura, vento e precipitacao.
+
+    A condicao textual sai da PRECIPITACAO medida (mm/h), nao do pictocode:
+    a semantica exata do pictocode por hora nao foi validada com chave real
+    ainda, e chutar tabela de icone e inventar tempo. Chuva em mm e fato.
     """
-    primario = _buscar_openweather if CONFIG.openweather_key else _buscar_open_meteo
-    try:
-        return primario(lat, lon, horas)
-    except httpx.HTTPError:
-        return _buscar_metno(lat, lon, horas)
+    resposta = httpx.get(
+        CONFIG.meteoblue_base,
+        params={"apikey": CONFIG.meteoblue_key, "lat": lat, "lon": lon, "format": "json"},
+        timeout=8.0,
+    )
+    resposta.raise_for_status()
+    bruto = resposta.json()
+
+    serie = bruto.get("data_1h") or {}
+    tempos = serie.get("time") or []
+    temps = serie.get("temperature") or []
+    ventos = serie.get("windspeed") or []
+    chuvas = serie.get("precipitation") or []
+    if not tempos or not temps:
+        raise httpx.HTTPError("meteoblue respondeu sem data_1h")
+
+    def _condicao(mm: Any) -> str | None:
+        if mm is None:
+            return None
+        mm = float(mm)
+        if mm > 2.0:
+            return f"chuva forte ({mm:.1f} mm/h)"
+        if mm > 0.2:
+            return f"chuva ({mm:.1f} mm/h)"
+        if mm > 0.0:
+            return "garoa"
+        return None
+
+    # a serie comeca no inicio do dia local: corta a partir de agora, igual
+    # aos outros provedores (a tela pergunta pela proxima janela de horas)
+    agora_local = datetime.now(timezone.utc).astimezone()
+    agora_txt = agora_local.strftime("%Y-%m-%d %H:00")
+    inicio = next((i for i, t in enumerate(tempos) if str(t) >= agora_txt), 0)
+    fatia = slice(inicio, inicio + horas)
+
+    def _em(lista: list, i: int) -> Any:
+        return lista[i] if i < len(lista) else None
+
+    vento_ms = _em(ventos, inicio)
+    # o basic-1h pode ou nao trazer a probabilidade dependendo do pacote
+    # contratado; sem chave real pra confirmar, le se existir e declara None
+    # se nao existir, em vez de assumir que a ausencia significa tempo seco.
+    probs = serie.get("precipitation_probability") or []
+    probs_fatia = (probs or [None] * len(tempos))[fatia]
+    return {
+        "temperatura_atual_c": float(_em(temps, inicio) or 0.0),
+        "vento_kmh": round(float(vento_ms) * 3.6, 1) if vento_ms is not None else None,
+        "condicao_atual": _condicao(_em(chuvas, inicio)),
+        "chuva_prob_atual": _pct(_em(probs, inicio)),
+        "umidade_pct": _pct(_em(serie.get("relativehumidity") or [], inicio)),
+        "vento_dir_graus": _graus(_em(serie.get("winddirection") or [], inicio)),
+        "previsao_horaria": [
+            {
+                "horario": str(t).replace(" ", "T"),
+                "temperatura_c": float(c or 0.0),
+                "condicao": _condicao(ch),
+                "chuva_prob": _pct(pr),
+            }
+            for t, c, ch, pr in zip(
+                tempos[fatia], temps[fatia],
+                (chuvas or [None] * len(tempos))[fatia], probs_fatia, strict=False
+            )
+        ],
+        # nenhuma destas fontes expoe temperatura de solo nem de pista: o
+        # campo sai nulo em vez de derivar chute a partir do ar.
+        "pista_estimada_c": None,
+        "pista_estimada_fonte": None,
+        "fonte": "meteoblue",
+    }
+
+
+def _buscar(lat: float, lon: float, horas: int) -> dict[str, Any]:
+    """Cascata de provedores, na ordem decidida em 30/08.
+
+    ORDEM: Open-Meteo primeiro, sempre, mesmo havendo chave dos outros.
+    Decisao do Lucas depois de comparar 16 fontes de clima: e o unico com
+    multi-modelo transparente (ECMWF, ICON, GFS), tem todos os campos que a
+    tela usa (umidade, direcao e rajada de vento, probabilidade e milimetros
+    de chuva) e expoe temperatura de solo, o unico proxy possivel de
+    temperatura de pista. A ordem anterior (meteoblue na frente) nasceu da
+    urgencia do incidente de 429, nao de criterio de corrida.
+
+    Depois dele vem quem tiver chave, porque limite por chave nao herda o
+    problema de IP compartilhado que derrubou a producao em 29/08, e por
+    ultimo o met.no, que limita por User-Agent e por isso nao depende nem de
+    IP nem de chave: e o fallback que sempre pode ser tentado.
+
+    Percorre a lista INTEIRA, nao para no primeiro erro: antes so havia duas
+    tentativas, e uma fonte fora do ar levava direto ao fim da fila. Se todas
+    falharem, propaga o erro da ultima; quem decide servir cache vencido em
+    vez de estourar 502 e `previsao`, nao aqui.
+    """
+    tentativas = [_buscar_open_meteo]
+    if CONFIG.meteoblue_key:
+        tentativas.append(_buscar_meteoblue)
+    if CONFIG.openweather_key:
+        tentativas.append(_buscar_openweather)
+    tentativas.append(_buscar_metno)
+
+    erro: httpx.HTTPError | None = None
+    for buscar in tentativas:
+        try:
+            return buscar(lat, lon, horas)
+        except httpx.HTTPError as e:
+            erro = e
+    raise erro if erro is not None else httpx.HTTPError("nenhum provedor de clima configurado")
 
 
 def _ler_cache(lat_chave: float, lon_chave: float) -> tuple[dict[str, Any], datetime] | None:
