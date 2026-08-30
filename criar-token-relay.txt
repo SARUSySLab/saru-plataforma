@@ -1,0 +1,10 @@
+# Cria o usuario maquina "relay-mbr" no banco LOCAL e imprime o token (aparece 1x).
+# Rode a partir da raiz do repo saru-poc-trackday.
+
+cd ~/Desktop/trabalho/clientes/saru/saru-poc-trackday && uv run python -c "
+from saru_poc import auth
+with auth.connect() as c:
+    r = c.execute(\"select id from usuario where role in ('owner','admin','gestor') order by role limit 1\").fetchone()
+assert r, 'nenhum usuario gestor no banco local: crie um owner antes'
+print('TOKEN:', auth.criar_maquina('relay-mbr', r[0])['token'])
+"

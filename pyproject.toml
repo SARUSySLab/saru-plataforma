@@ -26,6 +26,10 @@ dependencies = [
 [project.optional-dependencies]
 # Leitor nativo AiM .xrk. Isolado porque puxa binario e nao pode travar o setup.
 aim = ["libxrk>=0.12"]
+# Relay de live timing na pista. So o notebook da pista instala isto; o
+# smbprotocol (SMB2/3 puro-python) so e usado quando a fonte e `smb://`, pra
+# ler os XML do PC de cronometragem que nao serve HTTP. httpx ja e core.
+relay = ["smbprotocol>=1.14"]
 dev = ["pytest>=8.3", "ruff>=0.7"]
 
 [project.scripts]

@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 """Relay de live timing: rede local do autodromo -> backend do SARU.
 
-Roda num notebook na pista, do lado de dentro da LAN onde o Orbits/MyLaps
-publica o `resultspage`. Le a fonte (URL http da rede local, ou arquivo, pra
-teste), e POSTa o XML pro `/api/campeonato/ingest` sempre que ele MUDA (hash
-sha256; o backend dedupa de novo por hash, entao repostar e inofensivo).
+Roda num notebook na pista, do lado de dentro da LAN. Le a fonte e POSTa o XML
+pro `/api/campeonato/ingest` sempre que ele MUDA (hash sha256; o backend dedupa
+de novo por hash, entao repostar e inofensivo).
 
-Autenticacao: usuario maquina (decisao do Lucas, 29/08). Crie um em
+A fonte pode vir de tres jeitos, por prefixo do `--fonte`:
+  - `smb://usuario@host/share/caminho` : le o arquivo de um compartilhamento
+    SMB do PC de cronometragem. E o caso REAL do 12o MBR: o PC (nome de rede
+    AMELIO-I3) NAO serve HTTP, publica os XML como arquivos por SMB em
+    `C:\\Users\\<usuario>\\XML`. A senha vem do ambiente (`SARU_SMB_PASSWORD`),
+    nunca em argv; o usuario pode vir na URL ou em `SARU_SMB_USER`. O host pode
+    ser IP ou nome (o IP muda por DHCP, o nome AMELIO-I3 e estavel se resolver
+    na LAN). Requer `smbprotocol` (grupo opcional `relay` do pyproject).
+  - `http://.../current.xml` : caso de um cronometro que sirva HTTP na LAN.
+  - caminho de arquivo local : pra teste com o XML baixado.
+
+Autenticacao no backend: usuario maquina (decisao do Lucas, 29/08). Crie um em
 `POST /api/campeonato/maquinas` logado como owner/admin, guarde o token que so
 aparece uma vez, e exporte `SARU_MAQUINA_TOKEN` aqui.
 
 Uso:
-    SARU_MAQUINA_TOKEN=saru_mq_... \\
+    SARU_MAQUINA_TOKEN=saru_mq_... SARU_SMB_PASSWORD=... \\
     python scripts/relay_livetiming.py \\
-        --fonte http://192.168.0.10/livetiming/current.xml \\
+        --fonte smb://amelio@192.125.125.10/Users/amelio/XML/current.xml \\
         --api https://saru.lassoftware.com.br \\
         --intervalo 2
 
@@ -21,7 +31,8 @@ Uso:
     python scripts/relay_livetiming.py --fonte ~/Downloads/current.xml \\
         --api http://127.0.0.1:8010 --uma-vez
 
-Proposital: stdlib + httpx, sem importar o pacote da PoC. O relay roda numa
+Proposital: stdlib + httpx no caminho comum, sem importar o pacote da PoC; o
+`smbprotocol` so e importado quando a fonte e `smb://`. O relay roda numa
 maquina que NAO e a do backend; quanto menos ele precisar, mais facil e
 carregar so este arquivo no notebook da pista.
 """
@@ -38,7 +49,45 @@ from pathlib import Path
 import httpx
 
 
+# Sessoes SMB ja registradas, por host: register_session autentica uma vez e o
+# smbclient reusa a conexao, entao nao reautentica a cada leitura (a cada 2 s).
+_sessoes_smb: set[str] = set()
+
+
+def _ler_smb(fonte: str) -> bytes:
+    """Le um arquivo de um share SMB. Senha so via env, nunca em argv."""
+    from urllib.parse import unquote, urlparse
+
+    # Import preguicoso: quem usa fonte local ou http nao precisa do smbprotocol.
+    import smbclient  # do pacote smbprotocol
+
+    partes = urlparse(fonte)
+    host = partes.hostname
+    usuario = (
+        unquote(partes.username)
+        if partes.username
+        else os.environ.get("SARU_SMB_USER", "").strip()
+    )
+    senha = os.environ.get("SARU_SMB_PASSWORD", "")
+    caminho = partes.path.lstrip("/")
+    if not host or not usuario or not senha:
+        raise RuntimeError(
+            "smb: preciso de host e usuario na URL (smb://usuario@host/share/...) "
+            "ou SARU_SMB_USER, e SARU_SMB_PASSWORD no ambiente"
+        )
+    if host not in _sessoes_smb:
+        # NTLM por padrao; dialetos SMB2/3 negociados. encrypt=None deixa o
+        # servidor decidir (o Windows do evento pode nao exigir criptografia).
+        smbclient.register_session(host, username=usuario, password=senha)
+        _sessoes_smb.add(host)
+    unc = "\\\\" + host + "\\" + caminho.replace("/", "\\")
+    with smbclient.open_file(unc, mode="rb") as arquivo:
+        return arquivo.read()
+
+
 def ler_fonte(fonte: str, cliente: httpx.Client) -> bytes:
+    if fonte.startswith("smb://"):
+        return _ler_smb(fonte)
     if fonte.startswith(("http://", "https://")):
         resposta = cliente.get(fonte, timeout=5.0)
         resposta.raise_for_status()
@@ -115,6 +164,17 @@ def main() -> int:
                         )
                         return 3
                     resposta.raise_for_status()
+                    # Atualiza o hash e loga SO quando de fato postou o feed
+                    # principal. Antes isto estava aninhado no `if destino_avisos`,
+                    # entao sem --avisos o relay nunca atualizava ultimo_sha (em
+                    # loop repostava identico todo ciclo) nem logava, e o
+                    # resposta.json() so existe neste ramo.
+                    ultimo_sha = sha
+                    dado = resposta.json()
+                    print(
+                        f"[{time.strftime('%H:%M:%S')}] postado sha={sha[:10]} "
+                        f"novo={dado.get('novo')} passagens={dado.get('passagens_novas')}"
+                    )
                 if destino_avisos:
                     # Mesmo controle por hash do feed principal: o arquivo de
                     # avisos muda poucas vezes por dia, e reenviar identico so
@@ -131,12 +191,10 @@ def main() -> int:
                         )
                         r_avisos.raise_for_status()
                         ultimo_sha_avisos = sha_avisos
-                    ultimo_sha = sha
-                    dado = resposta.json()
-                    print(
-                        f"[{time.strftime('%H:%M:%S')}] postado sha={sha[:10]} "
-                        f"novo={dado.get('novo')} passagens={dado.get('passagens_novas')}"
-                    )
+                        print(
+                            f"[{time.strftime('%H:%M:%S')}] avisos postados "
+                            f"sha={sha_avisos[:10]}"
+                        )
                 atraso_erro = 5.0
             except KeyboardInterrupt:
                 return 0
