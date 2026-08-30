@@ -498,12 +498,12 @@ tracks:
   #   * nelson_piquet.yaml — 3800 m, auto-marcado "a validar", contradiz tudo
   #   * Wikipedia PT / mods de Assetto Corsa — 5476 m / 12 curvas, layout 1974-2014
   #
-  # sector_distances: terços, convenção SARU. NÃO há setor oficial publicado — o
+  # sector_distances: terços, convenção SARU. NÃO há setor oficial publicado, o
   # relatório precisa dizer isso. corners vazio de propósito: nomear curva antes de
   # ver traçado real produz janela deslocada, e `detect_braking_points` só procura em
   # [s_start, s_apex] e OMITE em silêncio a curva onde não acha frenagem.
   - track_id: brasilia_gp
-    track_name: "Autódromo Internacional Nelson Piquet — Brasília/DF"
+    track_name: "Autódromo Internacional Nelson Piquet, Brasília/DF"
     length_m: 5384.0
     # MEDIDA do acervo em 30/08, nunca de memoria (regra do catalogo): posicao
     # no instante dos beacons de volta de 103 gravacoes AiM do proprio
