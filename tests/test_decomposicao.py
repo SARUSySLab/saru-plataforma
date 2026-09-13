@@ -133,6 +133,19 @@ def test_curitiba_recusa_e_a_mensagem_traz_o_tamanho_do_erro() -> None:
     assert "fora de" in motivo
 
 
+def test_curitiba_layout_correto_3695_fecha_com_sucesso() -> None:
+    """Com a decisao de Vitor em 2026-09-13 (Curitiba misto 3.695 m),
+    as 67 voltas de 3.749 m fecham perfeitamente dentro da faixa [0.90, 1.10].
+    """
+    s = np.linspace(0.0, 3749.0, 200)
+    fechado, fator, motivo = fechar_no_layout(s, 3695.0)
+    assert fechado is not None, "volta com Curitiba 3695 m deve fechar com sucesso"
+    assert motivo is None
+    assert fator == pytest.approx(3695.0 / 3749.0)
+    assert FATOR_MIN <= fator <= FATOR_MAX
+    assert fechado[-1] == pytest.approx(3695.0)
+
+
 def test_fator_1_09_passa_e_1_11_recusa() -> None:
     """A borda e dura dos dois lados, ancorada em numero absoluto.
 

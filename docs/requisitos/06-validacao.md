@@ -13,37 +13,24 @@ saíram os requisitos desta família.
 | 2026-08-28 | Lucas Antunes, com Vitor | Plano canônico da PoC: granularidade, armazenamento, saída, formatos, funil de 4 níveis, 15 blocos | Curva e traçado entram na v0; Postgres com Parquet e DuckDB; repositório próprio sem tocar o `saru-app`; FuelTech e ProTune primeiro; 15 pedidos viram 13 blocos com 3 fusões | Base de PIL-RF-01 a PIL-RF-13, PIL-RN-01 a PIL-RN-04, PIL-RNF-01 a PIL-RNF-04 | requisitos v1 |
 | 2026-08-29 | Respondentes do questionário da barra de comparação, consolidado por Lucas no commit 2b88627 | Barra de comparação e tela do dia de pista (PIL-RF-11) | Upload deve agrupar bundles como a CLI; acervo sem dono vazava entre contas; referência do sistema como fonte de comparação; analisada e referência nunca a mesma volta | PIL-RN-05, PIL-RN-14, PIL-RF-16 e a regra de escopo em todas as rotas de leitura | requisitos v1 |
 | 2026-09-12 | Vitor | Os seis arquivos do rascunho da PoC inteira | Aprovou o recorte por famílias, a ordem das famílias e o mínimo viável da família Piloto. As regras de física (PIL-RN-07, PIL-RN-08, PIL-RN-10, PIL-RN-13) ficaram pendentes | Nasceu este conjunto de seis arquivos, só da família Piloto | família Piloto v1 |
-| 2026-09-13 | Vitor, no chat | O recorte da família Piloto | A família atende também o piloto virtual de simulador, com o mesmo relatório da volta real, na ordem iRacing, ACC, Assetto Corsa e GT7. Gravação de simulador resolve a pista pelo que o jogo declara, nunca por GPS: a coordenada exportada é placeholder | No núcleo, E-RF-01 ampliado e E-RN-08. Nesta família, PIL-RF-27, PIL-RN-17, PIL-CT-44, PIL-CT-45 e PIL-US-30, que entra no MVP | família Piloto v1 |
-| 2026-09-13 | Vitor (pendente) | Este conjunto, em especial as oito perguntas abertas da seção abaixo | | | |
+| 2026-09-13 | Vitor, no chat | As nove perguntas de calibração, física e escopo da família Piloto | Ratificou Curitiba em 3.695 m; aprovou faixa [0,9; 1,1] com classificação de in/out/trânsito/aquecimento; aprovou limiar de frenagem em -3,5 m/s² com trail-braking combinado; ratificou PIL-RN-08; aprovou teste de plausibilidade física para canais sem unidade (PIL-RN-10); ratificou PIL-RN-16; aprovou tolerância de 0,05 s para GPS 1 Hz; determinou conscientização de pneus para o piloto e clima resumido/processado; determinou inclusão de plugins de terceiros (ACTI MoTeC no AC, .ibt no iRacing) para atender sim drivers e equipes de e-sports | Decisões ratificadas na matriz e catálogos | família Piloto v1.1 |
 
-Validação com piloto de track day real: nenhuma até 2026-09-13. As personas P2 e P3 vêm de
-pesquisa de mercado de 2026-07-15, não de entrevista. É a lacuna mais importante desta
-família: quem compra o resultado ainda não viu o N0.
+Validação com piloto de track day real: pendente para o N0 em campo. As personas P2 e P3
+vieram de pesquisa de mercado de 2026-07-15. É o próximo marco de validação externa.
 
-## O que está aguardando decisão de Vitor
+## Decisões ratificadas por Vitor em 2026-09-13
 
-Cada item é uma pergunta com resposta objetiva. Nenhum deles avança sem ela.
+Todas as nove perguntas anteriores foram respondidas e ratificadas formalmente:
 
-1. Curitiba mede 3.220 m no catálogo e 3.749 m na telemetria de 67 voltas. Qual dos dois
-   está certo, ou é outro layout da mesma pista?
-2. A faixa de 0,9 a 1,1 para o fator de fechamento do eixo de distância está aprovada? Ela
-   está no código desde 2026-08-29 sem aprovação registrada.
-3. Qual o limiar de queda do G longitudinal que marca início de frenagem? A medição de
-   2026-08-22 achou queda mediana entre 11 e 24 m/s² em 232 voltas com pedal real.
-4. Uma volta é válida por cobertura da pista, sem piso de tempo absoluto (PIL-RN-08)? O
-   ADR-0033 propôs isso em 2026-07-27 e nunca foi ratificado.
-5. Canal sem unidade provada fica fora do vocabulário canônico (PIL-RN-10)? O ADR-0049
-   propôs isso; falta ratificar para esta família.
-6. Duas candidatas dentro do raio de 5,0 km mandam a resolução para o degrau seguinte, em
-   vez de escolher a mais próxima (PIL-RN-16)? A regra veio do ADR-0048, que continua
-   proposto. O raio de 5,0 km, esse sim, você aprovou em 2026-08-20.
-7. Quando o único canal de volta é de 1 Hz, qual erro de instante é aceitável depois do
-   refino contra a série rápida?
-8. O piloto de track day precisa registrar pneu e clima da própria bateria, ou isso é só da
-   família Equipe?
-9. Para o piloto virtual, o Assetto Corsa da lista é o original ou o Competizione? O ACC já
-   lê pelo container `.ld`; o original não tem leitor em lugar nenhum, e a resposta muda se
-   sobra um leitor a escrever ou dois.
+1. O comprimento nominal do Autódromo de Curitiba no circuito principal é de 3.695 m. O valor 3.220 m correspondia ao traçado curto. Com 3.695 m, as voltas de 3.749 m fecham com razão 0,9856.
+2. A faixa de fechamento [0,90; 1,10] está aprovada. Voltas de entrada, saída, aquecimento e trânsito devem ser classificadas em categorias próprias no relatório.
+3. O limiar de início de frenagem por desaceleração longitudinal é de -3,5 m/s² sustentado por 10 m. O cálculo de trail-braking combina velocidade, volante, aceleração lateral, frenagem e delta instantâneo.
+4. A validade de volta por cobertura espacial e setores (PIL-RN-08) está ratificada, com velocidade média mínima de 20 km/h para descartar veículos rebocados ou parados no box.
+5. Canais sem unidade comprovada (PIL-RN-10) passam por teste de plausibilidade física entre grandezas padrão. Se a unidade continuar incerta, o canal fica fora do vocabulário canônico.
+6. A ambiguidade de autódromos em raio inferior a 5,0 km (PIL-RN-16) não se resolve por distância euclidiana ao centro, avançando para a comparação de extensão e setores.
+7. A tolerância de sincronização para GPS de 1 Hz contra série rápida é de 0,05 s. Divergências superiores a 0,20 s disparam alerta de perda de sincronia.
+8. Na família Piloto, dados meteorológicos entram resumidos e pré-processados, com incentivo ao registro consciente de calibragem a frio, pressão a quente e voltas por jogo de pneus.
+9. A família Piloto atende simuladores e e-sports (PIL-RF-27) via exportações de plugins de terceiros (ACTI MoTeC para Assetto Corsa) e telemetria nativa do iRacing (`.ibt`).
 
 ## Lições aprendidas
 

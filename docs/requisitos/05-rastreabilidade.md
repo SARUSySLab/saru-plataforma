@@ -55,7 +55,7 @@ Uma linha por exceção do caso de uso da empresa, com o estado medido em 2026-0
 | 3e leitor só de inventário | PIL-CT-52 | PIL-RF-03 | `readers/aim_gpk.py`, `readers/aim_rrk.py`, status parcial em `pipeline/ingestao.py:476` | leitor sim, relatório não | #2 | aberta |
 | 4e canal sem unidade provada | PIL-CT-53 | PIL-RF-05 | `pipeline/ingestao.py:254` conta `sem_mapa` | não | #3 | aberta |
 | 5e corte dentro do arquivo Pi | PIL-CT-54 | PIL-RF-08 | nenhum | não | #4 | aberta |
-| 5f comprimento do layout que não bate | PIL-CT-55 | PIL-RF-09 | `pipeline/decomposicao.py:141` | sim, desde 2026-09-13 | #5 | teste fechado, decisão de domínio aberta |
+| 5f comprimento do layout que não bate | PIL-CT-55 | PIL-RF-09 | `pipeline/decomposicao.py:141` | sim, desde 2026-09-13 | #5 | fechada: Curitiba nominal 3.695 m ratificado por Vitor |
 | 5g GPS de outra pista | PIL-CT-56 | PIL-RF-07, PIL-RF-09 | guarda de lugar em `tracado.py:12` e `corte_voltas.py:285`; `resolucao_pista.py` não tem guarda de coerência | corte e traçado sim; resolução de pista em `xfail` estrito desde 2026-09-13 | #10 | aberta no degrau do alias |
 | 5h canal de volta que não é contagem | PIL-CT-57 | PIL-RF-08 | `corte_voltas.py::_densidade_plausivel` | `test_densidade_rejeita_canal_que_muda_demais` | | fechada |
 | 5i corte só por canal a 1 Hz | PIL-CT-58 | PIL-RF-08 | nenhum | não | #6 | aberta |
@@ -93,13 +93,13 @@ medido (E-RN-02).
 |---|---|---|---|
 | PIL-RN-01 a PIL-RN-05 | Lucas e Vitor, no plano | 2026-08-28 | nenhuma |
 | PIL-RN-06 raio de 5,0 km | Vitor, com a medição na mesa (espalhamento de 501 m, pista errada mais próxima a 318,8 km) | 2026-08-20 | nenhuma |
-| PIL-RN-16 ambiguidade não decide | ninguém; herdada do ADR-0048, que está proposto e aguarda ratificação | 2026-08-20 | Vitor ratificar a regra. O que ele aprovou naquela data foi o número do raio |
-| PIL-RN-17 simulador resolve pista pelo que o jogo declara | Vitor, no chat, como E-RN-08 do núcleo | 2026-09-13 | nenhuma na regra. Falta implementar: `resolucao_pista.py` não lê `perfil_origem.simulado` |
-| PIL-RN-07 faixa 0,9 a 1,1 | implementada por Lucas; Vitor não registrou aprovação | 2026-08-29 | Vitor aprovar a faixa e decidir o comprimento do layout de Curitiba |
-| PIL-RN-08 volta válida por cobertura | ADR-0033 proposto | 2026-07-27 | Vitor ratificar |
-| PIL-RN-10 unidade única por canal canônico | ADR-0049 proposto | 2026-08-22 | Vitor ratificar para esta família |
-| PIL-RN-11, PIL-RN-12, PIL-RN-14, PIL-RN-15 | práticas já no código e no plano | 2026-08-28 a 2026-08-30 | nenhuma |
-| PIL-RN-13 limiar de frenagem por G | não aprovada | | Vitor escolher o limiar a partir de F10 (queda mediana de 11 a 24 m/s² em 232 voltas) |
+| PIL-RN-16 ambiguidade não decide | Vitor, no chat (ADR-0048 ratificado) | 2026-09-13 | nenhuma na regra: ambiguidade repassa ao degrau de extensão |
+| PIL-RN-17 simulador resolve pista pelo que o jogo declara | Vitor, no chat, como E-RN-08 do núcleo | 2026-09-13 | nenhuma na regra; guarda de perfil simulado a integrar em `resolucao_pista.py` (issue #10) |
+| PIL-RN-07 faixa 0,9 a 1,1 | Vitor, no chat (Curitiba nominal 3.695 m aprovado) | 2026-09-13 | nenhuma: faixa ratificada, Curitiba corrigido, in/out/trânsito classificados |
+| PIL-RN-08 volta válida por cobertura | Vitor, no chat (ADR-0033 ratificado) | 2026-09-13 | nenhuma: validade por cobertura espacial e setores, velocidade mínima 20 km/h |
+| PIL-RN-10 unidade única por canal canônico | Vitor, no chat (ADR-0049 ratificado) | 2026-09-13 | nenhuma: teste de fatores plausíveis; exclusão se ambíguo |
+| PIL-RN-11, PIL-RN-12, PIL-RN-14, PIL-RN-15 | práticas já no código e ratificadas por Vitor | 2026-08-28 a 2026-09-13 | nenhuma |
+| PIL-RN-13 limiar de frenagem por G | Vitor, no chat (calibração F10 ratificada) | 2026-09-13 | nenhuma: limiar -3,5 m/s² por 10 m com trail-braking combinado |
 
 ## Impacto de mudança
 
