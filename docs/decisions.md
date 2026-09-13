@@ -19,7 +19,9 @@ na pasta guarda-chuva) e o chat com Vitor.
 | 2026-09-13 | Repositório da empresa `saru` nasce no usuário `vitormtt`, privado, com `main` protegida; a PoC fica na organização | Proteção de branch é gratuita no pessoal (Pro de estudante) e paga na organização | Team pago; repositório público | aprovada |
 | 2026-09-13 | E-RF-09: estimar parâmetros do carro a partir do dado e simular volta com modelo de piloto | Nunca tinha sido escrito; existe em pedaços | | aprovada |
 | 2026-09-13 | Carro de referência da física: Porsche 911 GT3 Cup 991.1, 991.2 e 992.1 | Acervo real da Porsche Cup Brasil | 992 GT3 R (calibração antiga) | aprovada |
-| pendente | Estratégia de merge: squash com histórico linear | Um commit por PR | Merge commit | recomendada |
+| 2026-09-13 | Ao mesclar um PR, os commits dele viram um só na `main` (squash), e a `main` fica uma linha reta de commits | Um commit por PR facilita ler o histórico e gerar a lista de mudanças de cada versão | Merge com commit de junção, que preserva todos os commits da branch | aprovada |
+| 2026-09-13 | Espelho pessoal antigo renomeado para `vitormtt/SARU-espelho-2026-06`; `vitormtt/saru` criado com regras de proteção da `main` (sem apagar, sem reescrever histórico, mudança só por PR) que valem também para administradores | O nome `saru` colidia com o espelho; a proteção só cumpre o papel se ninguém puder ignorá-la | Manter o nome antigo; deixar exceção para administrador | aprovada |
+| 2026-09-13 | Contato de segurança da organização é vitormttoledo@gmail.com, publicado em `SECURITY.md` do perfil `.github` | Relato de falha precisa de um canal que não seja issue pública, e hoje só Vitor responde | Não se aplica: não há outro endereço da empresa | aprovada |
 | pendente | Documentação por repositório, sem portal MkDocs | Portal morreu em julho | Reviver `saru-docs` | recomendada |
 | pendente | `SPM.md` acaba; estado vivo vira issue | Ninguém lia | Manter | recomendada |
 | pendente | ADR mestre único em `saru/docs/adr/` | Hoje em 4 lugares | | recomendada |
