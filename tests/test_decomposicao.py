@@ -110,6 +110,53 @@ def test_faixa_de_fator_e_estreita_de_proposito() -> None:
     assert FATOR_MAX == 1.1
 
 
+def test_curitiba_recusa_e_a_mensagem_traz_o_tamanho_do_erro() -> None:
+    """Caso real de 67 voltas do acervo (excecao 5f do E-UC-01, PIL-CT-14 e
+    PIL-CT-55): o layout do catalogo diz 3.220 m e o carro anda 3.749 m.
+
+    O teste anterior cobre a divergencia grosseira (fator 3,9, pista trocada).
+    Esta e a divergencia SUTIL, 16% fora, que e onde a guarda decide entre
+    calibracao e catalogo errado. A mensagem tem que carregar os dois numeros
+    medidos, porque e por ela que Vitor decide qual dos dois comprimentos vale;
+    ate la a volta fica sem decomposicao, e nao com setor escalado por 1,16.
+
+    O `fator` do codigo e o inverso da razao citada no README: aqui
+    3.220 / 3.749 = 0,859, la 3.749 / 3.220 = 1,164. Sao a mesma divergencia.
+    """
+    s = np.linspace(0.0, 3749.0, 200)
+    fechado, fator, motivo = fechar_no_layout(s, 3220.0)
+    assert fechado is None, "volta recusada nao pode voltar com eixo escalado"
+    assert fator == pytest.approx(3220.0 / 3749.0)
+    assert fator < FATOR_MIN
+    assert motivo is not None
+    assert "3749" in motivo and "3220" in motivo
+    assert "fora de" in motivo
+
+
+def test_fator_1_09_passa_e_1_11_recusa() -> None:
+    """A borda e dura dos dois lados, ancorada em numero absoluto.
+
+    Os quatro fatores sao literais, nao derivados de FATOR_MIN e FATOR_MAX. Uma
+    versao anterior deste teste construia os pontos a partir das proprias
+    constantes (`FATOR_MAX * 0.99`), e por isso continuava verde quando a faixa
+    era alargada de 0,9 a 1,1 para 0,7 a 1,3: o teste andava junto com a
+    mutacao. Alargar a faixa para fazer um caso passar e o caminho de volta pro
+    B1, entao quebrar aqui e o ponto.
+
+    Os valores 0,9 e 1,1 sao os do codigo de hoje (`decomposicao.py:53`) e do
+    CHECK da migration 012. Nenhum numero novo foi escolhido aqui.
+    """
+    comprimento = 3000.0
+
+    def eixo_com_fator(fator: float) -> np.ndarray:
+        return np.linspace(0.0, comprimento / fator, 100)
+
+    assert fechar_no_layout(eixo_com_fator(1.09), comprimento)[2] is None
+    assert fechar_no_layout(eixo_com_fator(1.11), comprimento)[2] is not None
+    assert fechar_no_layout(eixo_com_fator(0.91), comprimento)[2] is None
+    assert fechar_no_layout(eixo_com_fator(0.89), comprimento)[2] is not None
+
+
 # --- tempo por trecho ----------------------------------------------------
 
 
