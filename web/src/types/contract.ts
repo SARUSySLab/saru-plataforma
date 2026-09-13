@@ -15,7 +15,8 @@ export type MotivoDegradacao =
   | "sem_setor"
   | "sem_contexto_pneu"
   | "sem_contexto_sessao"
-  | "sem_canal_combustivel";
+  | "sem_canal_combustivel"
+  | "somente_inventario";
 
 export type Degradado = { disponivel: false; motivo: MotivoDegradacao; texto: string };
 export type Disponivel<T> = { disponivel: true } & T;
@@ -202,12 +203,35 @@ export interface ContextoSessao {
   origem: "bateria" | "gravacao";
 }
 
+/**
+ * Bloco de captura (excecao 3e do E-UC-01, issue #2). Diz se algum arquivo do
+ * bundle chegou a virar amostra, ou se a gravacao entrou so como inventario.
+ *
+ * Existe porque `aim_gpk` e `aim_rrk` tem leitor de INVENTARIO: leem cabecalho
+ * e contagem de registros e nao decodificam canal (PIL-RN-11). A ingestao ja
+ * marcava isso com `status = 'parcial'`, e o piloto nao via em lugar nenhum: o
+ * relatorio saia sem os blocos, sem dizer por que. Bloco vazio sem motivo e a
+ * doenca do B2, e aqui ela tinha uma fonte a mais.
+ *
+ * Degradado com motivo `somente_inventario` quando NENHUM arquivo da captura
+ * materializou serie. O texto nomeia os formatos que entraram: o motivo diz a
+ * classe do problema, o texto diz qual arquivo do piloto o causou.
+ */
+export interface AmostraDaCaptura {
+  /** Arquivos do bundle, um por `arquivo_bruto` desta gravacao. */
+  arquivos_lidos: number;
+  /** Desses, quantos materializaram serie de amostra. Nunca zero neste ramo. */
+  arquivos_com_amostra: number;
+}
+
 export interface Relatorio {
   gravacao_id: string;
   piloto: string | null;
   layout: { id: string; nome: string; comprimento_m: number } | null;
   /** Como a pista foi resolvida. Nunca "default silencioso" (fix do B2). */
   resolucao_pista: "alias" | "gps" | "perguntado" | "nao_resolvida";
+  /** Se a captura virou amostra ou entrou so como inventario (excecao 3e). */
+  amostra_da_captura: Talvez<AmostraDaCaptura>;
 
   n0: { melhor_volta: MelhorVolta; perdas_top3: Talvez<{ itens: PerdaPorTrecho[] }> };
   n1: { voltas: VoltaResumo[]; consumo: ConsumoCombustivel };

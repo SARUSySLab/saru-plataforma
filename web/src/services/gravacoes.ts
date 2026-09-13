@@ -119,6 +119,14 @@ export interface EstadoDaGravacao {
   /** O que o usuario pode FAZER a respeito. Erro sem saida e erro decorativo. */
   sugestao: string | null;
   arquivos: number;
+  /**
+   * Estado da leitura dos arquivos do bundle (excecao 3e do E-UC-01, issue #2).
+   * `null` enquanto nenhum arquivo foi ingerido. `parcial` e o caso do formato
+   * que so tem leitor de inventario (`.gpk`, `.rrk`): o arquivo entrou, o
+   * cabecalho foi lido e nenhum canal foi decodificado. `motivo` e a mesma
+   * coisa em prosa, e fica `null` quando o status e `ok`.
+   */
+  ingestao: { status: "ok" | "parcial" | "falhou"; motivo: string | null } | null;
 }
 
 export const estadoDaGravacao = (gravacaoId: string) =>

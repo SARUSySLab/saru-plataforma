@@ -145,6 +145,89 @@ def _disponivel(**campos) -> dict:
     return {"disponivel": True, **campos}
 
 
+# --- captura: a gravacao chegou a virar amostra? -------------------------
+# Excecao 3e do E-UC-01, issue #2, criterio PIL-CT-52, regra PIL-RN-11.
+#
+# `aim_gpk` e `aim_rrk` tem leitor de INVENTARIO: leem cabecalho e contagem de
+# registros e nao decodificam canal. A ingestao ja sabia disso e gravava
+# `status = 'parcial'` (pipeline/ingestao.py:476), e o piloto nao via em lugar
+# nenhum: o relatorio saia sem os blocos e sem dizer por que. Bloco vazio sem
+# motivo e a mesma doenca do B2, so que vinda da leitura em vez da pista.
+
+
+def arquivos_da_captura(conn, gravacao_id: str) -> list[tuple[str, bool, int]]:
+    """Um item por arquivo do bundle: (formato, o leitor le amostra, amostras).
+
+    `ingestao` e append-only (uma linha por execucao de leitor sobre o arquivo,
+    ver migration 005), entao o estado atual de um arquivo e o MAIOR
+    `amostras_escritas` entre as linhas dele, nao a ultima: reprocessar com um
+    leitor pior nao pode apagar amostra que ja existe no Parquet.
+
+    `suporta_amostra` sai do registro de leitores, nao da contagem de amostra.
+    Sao perguntas diferentes: um `.vbo` vazio escreve zero amostra e nao e
+    inventario, e tratar os dois como a mesma coisa acusaria o formato errado.
+    """
+    from .readers import leitor_de
+
+    linhas = conn.execute(
+        """select ab.formato_id, coalesce(max(i.amostras_escritas), 0)
+             from arquivo_bruto ab
+             left join ingestao i
+               on i.arquivo_id = ab.id and i.status <> 'falhou'
+            where ab.gravacao_id = %s
+            group by ab.id, ab.formato_id
+            order by ab.formato_id""",
+        (gravacao_id,),
+    ).fetchall()
+    saida = []
+    for formato_id, amostras in linhas:
+        leitor = leitor_de(formato_id)
+        saida.append((formato_id, bool(leitor and leitor.suporta_amostra), int(amostras)))
+    return saida
+
+
+def amostra_da_captura(arquivos: list[tuple[str, bool, int]]) -> dict:
+    """Bloco `amostra_da_captura` do contrato, a partir de `arquivos_da_captura`.
+
+    Disponivel quando pelo menos um arquivo materializou serie. Degradado com
+    motivo `somente_inventario` quando nenhum materializou.
+
+    O texto do ramo degradado e montado a partir do que foi medido, nunca
+    afirmando mais do que se sabe: formato de leitor de inventario e formato que
+    suporta amostra e mesmo assim nao escreveu nenhuma saem em frases separadas,
+    porque sao causas diferentes com a mesma consequencia.
+    """
+    com_amostra = [formato for formato, _, n in arquivos if n > 0]
+    if com_amostra:
+        return _disponivel(
+            arquivos_lidos=len(arquivos), arquivos_com_amostra=len(com_amostra)
+        )
+
+    inventario = sorted({formato for formato, suporta, _ in arquivos if not suporta})
+    sem_escrever = sorted({formato for formato, suporta, _ in arquivos if suporta})
+    partes = []
+    if inventario:
+        partes.append(
+            f"{', '.join(inventario)}: o leitor le cabecalho e contagem de "
+            "registros, e nao decodifica canal"
+        )
+    if sem_escrever:
+        partes.append(
+            f"{', '.join(sem_escrever)}: o leitor suporta amostra e nao escreveu nenhuma"
+        )
+    # A frase de abertura muda com o que foi medido. "Entrou so como inventario"
+    # so e verdade quando TODO arquivo veio de leitor de inventario; com um
+    # formato que le amostra no meio, o que se sabe e menos que isso.
+    texto = (
+        "esta captura entrou so como inventario: nenhum arquivo dela entregou amostra"
+        if inventario and not sem_escrever
+        else "nenhum arquivo desta captura entregou amostra"
+    )
+    if partes:
+        texto = f"{texto} ({'; '.join(partes)})"
+    return _degradado("somente_inventario", texto)
+
+
 # --- N0: melhor volta e volta ideal --------------------------------------
 
 
@@ -992,6 +1075,9 @@ def montar(
         # `layout_origem` nulo com layout preenchido e gravacao anterior a
         # migration 016: o unico degrau que existia era o alias, entao e ele.
         "resolucao_pista": (layout_origem or "alias") if layout_id is not None else "nao_resolvida",
+        "amostra_da_captura": amostra_da_captura(
+            arquivos_da_captura(conn, gravacao_id)
+        ),
         "n0": {"melhor_volta": mv, "perdas_top3": n0_perdas},
         "n1": {
             "voltas": voltas,

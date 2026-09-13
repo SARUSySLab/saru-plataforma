@@ -276,3 +276,70 @@ def test_contexto_entra_e_volta_no_relatorio(cliente, gravacao_com_relatorio) ->
 def test_contexto_em_gravacao_inexistente_e_404(cliente) -> None:
     zero = "00000000-0000-0000-0000-000000000000"
     assert cliente.post(f"/api/gravacoes/{zero}/contexto", json={}).status_code == 404
+
+
+# --- excecao 3e do E-UC-01: captura que entrou so como inventario --------
+
+
+def _gravacao_so_de_inventario(cliente) -> str:
+    """Uma gravacao cujo bundle inteiro veio de leitor de inventario.
+
+    Sai do banco, nao de lista fixa de id: o acervo de cada maquina e outro, e
+    fixar id faria o teste falhar por motivo errado. Sem candidata, pula.
+    """
+    from saru_poc.db import connect
+    from saru_poc.readers import LEITORES
+
+    so_inventario = [f for f, leitor in LEITORES.items() if not leitor.suporta_amostra]
+    if not so_inventario:
+        pytest.skip("nenhum formato de inventario registrado")
+    with connect() as conn:
+        linha = conn.execute(
+            """select g.id from gravacao g
+                where exists (select 1 from ingestao i where i.gravacao_id = g.id)
+                  and not exists (
+                        select 1 from arquivo_bruto ab
+                         where ab.gravacao_id = g.id
+                           and ab.formato_id <> all(%s))
+                limit 1""",
+            (so_inventario,),
+        ).fetchone()
+    if linha is None:
+        pytest.skip("nenhuma gravacao so de inventario no acervo desta maquina")
+    return str(linha[0])
+
+
+def test_estado_declara_inventario(cliente) -> None:
+    """Segundo criterio da issue #2: o piloto pergunta em que pe esta a
+    gravacao e a resposta traz o status `parcial` da ingestao e o motivo, em
+    vez de culpar a pista."""
+    gravacao_id = _gravacao_so_de_inventario(cliente)
+    corpo = cliente.get(f"/api/gravacoes/{gravacao_id}/estado").json()
+    assert corpo["ingestao"] is not None
+    assert corpo["ingestao"]["status"] == "parcial"
+    assert "inventário" in corpo["ingestao"]["motivo"]
+    assert corpo["etapa"] == "ingestao"
+    assert "inventário" in corpo["motivo"]
+    assert corpo["sugestao"], "erro sem saida e erro decorativo"
+
+
+def test_estado_de_gravacao_com_amostra_nao_fala_de_inventario(
+    cliente, gravacao_com_relatorio
+) -> None:
+    """Terceiro criterio: com amostra no bundle, o aviso nao aparece."""
+    corpo = cliente.get(f"/api/gravacoes/{gravacao_com_relatorio}/estado").json()
+    assert corpo["etapa"] == "pronto"
+    motivo = (corpo["ingestao"] or {}).get("motivo") or ""
+    assert "inventário" not in motivo
+
+
+def test_relatorio_declara_se_a_captura_virou_amostra(
+    cliente, gravacao_com_relatorio
+) -> None:
+    """PIL-CT-52 no relatorio: o bloco existe sempre, e numa gravacao que rende
+    relatorio cheio ele esta disponivel com a contagem de arquivos."""
+    corpo = cliente.get(f"/api/relatorio/{gravacao_com_relatorio}").json()
+    bloco = corpo["amostra_da_captura"]
+    assert bloco["disponivel"] is True
+    assert bloco["arquivos_com_amostra"] >= 1
+    assert bloco["arquivos_lidos"] >= bloco["arquivos_com_amostra"]
