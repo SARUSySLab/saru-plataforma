@@ -15,7 +15,7 @@ implementado, validado. Coluna Tarefa fica "a abrir" até as issues existirem.
 | E-RF-06 | separar quem vê o quê | OBJ-03 | E-RN-04 | `auth.py`, regra de escopo por dono | E-UC-03 | a abrir | E-CT-06 | parcial | 1 |
 | E-RF-07 | compartilhar entre famílias | OBJ-01 | E-RN-05 | a definir na modelagem | E-UC-03 | a abrir | E-CT-07 | proposto | 1 |
 | E-RF-08 | guardar conhecimento de engenharia | OBJ-02 | E-RN-02 | `seeds/tracks.yaml`, `aliases.yaml`; veículo, pneu e modelo físico a criar (docs de física dos arquivados) | E-UC-02 | a abrir | E-CT-08 | parcial | 1 |
-| E-RF-09 | estimar o carro a partir do dado | OBJ-02, OBJ-04 | E-RN-02 | a definir; peças em `_arquivo/saru-physics-py` (QSS, LTS), `saru-physics-jl` (14 DOF), `saru-KB/20_vehicle_dynamics`, `saru-docs/docs/fisica` | E-UC-02 | a abrir: varredura dos 53 documentos de física | E-CT-10 | proposto | 1 |
+| E-RF-09 | estimar o carro a partir do dado | OBJ-02, OBJ-04 | E-RN-02 | `docs/fisica/parameters_gt3_cup.py`; modelos canônicos 991.1, 991.2, 992.1 Cup validados | E-UC-02 | a abrir | E-CT-10 | parcial | 1 |
 | E-RNF-01 | nada falha em silêncio | OBJ-03 | | pipeline inteiro; `MotivoDegradacao` no contrato | E-UC-01 | a abrir | E-CT-03 | parcial | 1 |
 | E-RNF-02 | mesmo dado, mesmo resultado | OBJ-03 | E-RN-04 | `pipeline/ingestao.py`, `storage.py` | E-UC-01, E-UC-03 | a abrir | E-CT-04 | parcial | 1 |
 | E-RNF-03 | honestidade de claim | OBJ-03 | E-RN-01 | processo de revisão; checagem automática a definir | E-UC-02 | a abrir | E-CT-09 | proposto | 1 |
@@ -52,3 +52,4 @@ Regras da empresa e quem as aprovou:
 | 2026-09-12 | todos os status | "implementado" rebaixado a "parcial" | 02, 05 | Vitor |
 | 2026-09-13 | E-RF-01, E-RN-08 | família Piloto passa a atender piloto virtual de simulador; simulador resolve pista pelo jogo, nunca por GPS | 02, 01, 05; requisitos PIL (agente Piloto avisado) | Vitor |
 | 2026-09-13 | E-RF-09 | requisito novo: estimar parâmetros do carro e simular volta parecida com modelo de piloto; nunca tinha sido escrito | 02, 05, 01; tarefa de varrer os documentos de física | Vitor |
+| 2026-09-13 | E-RF-09 | status atualizado de proposto para parcial com modelos canônicos 991.1, 991.2, 992.1 Cup em parameters_gt3_cup.py | 02, 05; PR #6 | Vitor |
