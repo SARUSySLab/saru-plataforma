@@ -9,18 +9,25 @@ construcao, o que um arquivo real nunca da.
 from __future__ import annotations
 
 import math
+from itertools import pairwise
 
 import numpy as np
 import pytest
 
 from saru_poc.pipeline.corte_voltas import (
+    ALERTA_CORTE_S,
     MIN_VOLTA_S,
     R_TERRA_M,
+    TOLERANCIA_CORTE_S,
+    Corte,
+    Volta,
     _densidade_plausivel,
+    _refinar_corte,
     passagens_de_beacons_ldx,
     passagens_de_contador,
     passagens_de_pulso,
     passagens_por_gps,
+    refinar_passagens,
     voltas_de_passagens,
 )
 
@@ -279,3 +286,152 @@ def test_voltas_gravadas_respeitam_a_janela(conn) -> None:
                or origem not in ('beacon','gps')"""
     ).fetchone()[0]
     assert ruins == 0
+
+
+# --- refino do instante contra a serie rapida (excecao 5i, PIL-CT-58) ----
+#
+# Fixture sintetica com resposta conhecida por construcao. A volta de verdade
+# dura P segundos, a serie de velocidade e de 20 Hz e o canal de volta e de
+# 1 Hz: o contador vira na primeira amostra de 1 Hz DEPOIS do cruzamento, que e
+# o que um contador de voltas faz e o que produz tempo de volta em segundo
+# inteiro nas 17 gravacoes do acervo.
+
+PERIODO_VOLTA_S = 87.3  # nao inteiro de proposito: o erro do 1 Hz fica visivel
+LARGADA_S = 3.7
+
+
+def _serie_de_velocidade(hz: float, voltas: float = 6.0):
+    """Velocidade periodica na volta, com forma assimetrica.
+
+    Tres harmonicas com fases diferentes: o sinal se repete a cada volta e tem
+    um so alinhamento possivel dentro de uma volta, que e o que o refino
+    procura. Uma senoide pura teria simetria e nao serviria de fixture.
+    """
+    n = int(voltas * PERIODO_VOLTA_S * hz)
+    t = np.arange(n + 1) / hz
+    fase = 2 * math.pi * (t - LARGADA_S) / PERIODO_VOLTA_S
+    v = (
+        40.0
+        + 30.0 * np.sin(fase)
+        + 12.0 * np.sin(2 * fase + 0.7)
+        + 5.0 * np.sin(3 * fase + 2.1)
+    )
+    return t, v
+
+
+def _passagens_verdadeiras(quantas: int = 5) -> list[float]:
+    return [LARGADA_S + k * PERIODO_VOLTA_S for k in range(quantas)]
+
+
+def _passagens_a_1hz(verdadeiras: list[float]) -> list[float]:
+    """O que o canal de volta de 1 Hz entrega: a amostra seguinte ao cruzamento."""
+    return [float(math.ceil(t)) for t in verdadeiras]
+
+
+def test_canal_de_1hz_sozinho_entrega_tempo_de_volta_inteiro() -> None:
+    """A linha de base que a issue #6 quer consertar, medida aqui pra o teste
+    seguinte ter contra o que comparar."""
+    grosseiras = _passagens_a_1hz(_passagens_verdadeiras())
+    tempos = [b - a for a, b in pairwise(grosseiras)]
+    assert all(t == int(t) for t in tempos), "o canal de 1 Hz nao deveria ter decimo"
+    assert max(abs(t - PERIODO_VOLTA_S) for t in tempos) > TOLERANCIA_CORTE_S
+
+
+def test_refino_recupera_o_instante_verdadeiro() -> None:
+    """PIL-CT-58. Com serie de velocidade a 20 Hz, o tempo de volta sai a menos
+    de `TOLERANCIA_CORTE_S` do verdadeiro, contra ate 1 s de erro sem o refino.
+
+    A ancora nao se move de proposito, entao o que o teste cobra e o TEMPO DE
+    VOLTA, que e diferenca entre instantes: o erro absoluto da ancora cancela
+    nela, e e o tempo de volta que o piloto le."""
+    t_rapido, v_rapido = _serie_de_velocidade(hz=20.0)
+    grosseiras = _passagens_a_1hz(_passagens_verdadeiras())
+
+    refinadas, erro, motivo = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
+
+    assert motivo is None
+    # O erro declarado e o passo MEDIDO da serie de apoio, nao um arredondamento
+    # dela: `arange(n)/20` acumula alguns femtossegundos, e guardar o numero que
+    # saiu da medicao vale mais do que esconder isso atras de um round().
+    assert erro == pytest.approx(TOLERANCIA_CORTE_S, abs=1e-9)
+    assert len(refinadas) == len(grosseiras), "refino nao pode criar nem sumir passagem"
+    tempos = [b - a for a, b in pairwise(refinadas)]
+    for volta_s in tempos:
+        assert volta_s == pytest.approx(PERIODO_VOLTA_S, abs=TOLERANCIA_CORTE_S)
+
+
+def test_refino_sem_serie_mais_rapida_nao_muda_nada_e_diz_por_que() -> None:
+    """Terceiro criterio da issue: sem serie de taxa maior o corte permanece
+    como esta hoje e declara que nao pode refinar."""
+    t_rapido, v_rapido = _serie_de_velocidade(hz=1.0)
+    grosseiras = _passagens_a_1hz(_passagens_verdadeiras())
+
+    refinadas, erro, motivo = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
+
+    assert refinadas == grosseiras
+    assert erro is None
+    assert motivo is not None and "mais rapida" in motivo
+
+
+def test_refino_com_uma_passagem_so_nao_tem_ancora() -> None:
+    t_rapido, v_rapido = _serie_de_velocidade(hz=20.0)
+    refinadas, erro, motivo = refinar_passagens([10.0], 1.0, t_rapido, v_rapido)
+    assert refinadas == [10.0]
+    assert erro is None
+    assert motivo is not None
+
+
+def test_refino_nao_alcanca_serie_que_acaba_logo_depois_das_passagens() -> None:
+    """Janela de comparacao menor que a propria busca nao decide nada, e a
+    resposta e dizer isso em vez de deslocar por ruido."""
+    t_rapido, v_rapido = _serie_de_velocidade(hz=20.0, voltas=4.02)
+    grosseiras = _passagens_a_1hz(_passagens_verdadeiras(quantas=5))
+    grosseiras = [grosseiras[0], grosseiras[-1]]
+    refinadas, erro, motivo = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
+    assert refinadas == grosseiras
+    assert erro is None
+    assert motivo is not None
+
+
+class BancoQueExplode:
+    """Dublê que denuncia consulta indevida: se o refino chegar ao banco quando
+    a porta deveria estar fechada, o teste quebra em vez de passar por sorte."""
+
+    def execute(self, *_a, **_k):
+        raise AssertionError("o refino nao deveria consultar o banco aqui")
+
+
+def _corte_com_voltas() -> Corte:
+    corte = Corte(gravacao_id="g")
+    corte.voltas = [
+        Volta(numero=1, t_inicio_s=0.0, t_fim_s=90.0),
+        Volta(numero=2, t_inicio_s=90.0, t_fim_s=180.0),
+    ]
+    corte.metodo_versao = "canal_pulso-1"
+    corte.fonte = "canal LAP_BEACON"
+    return corte
+
+
+def test_porta_do_refino_fecha_para_canal_de_taxa_alta() -> None:
+    """Quarto criterio da issue, o duro: gravacao que ja corta bem nao muda de
+    instante. Um canal a 100 Hz ja entrega o instante dentro da tolerancia, e o
+    refino nem chega a procurar serie de apoio."""
+    corte = _corte_com_voltas()
+    antes = list(corte.voltas)
+
+    _refinar_corte(BancoQueExplode(), "g", corte, 100.0)
+
+    assert corte.voltas == antes
+    assert corte.refinado is False
+    assert corte.metodo_versao == "canal_pulso-1"
+    assert corte.motivo_refino is not None and "tolerancia" in corte.motivo_refino
+
+
+def test_porta_do_refino_usa_a_tolerancia_ratificada_como_limiar() -> None:
+    """O limiar e `TOLERANCIA_CORTE_S`, nao um numero escrito de novo aqui. Um
+    canal exatamente a 1/TOLERANCIA Hz esta no limite e nao refina."""
+    no_limite = 1.0 / TOLERANCIA_CORTE_S
+    corte = _corte_com_voltas()
+    _refinar_corte(BancoQueExplode(), "g", corte, no_limite)
+    assert corte.refinado is False
+    assert ALERTA_CORTE_S > TOLERANCIA_CORTE_S, "alerta tem que ser pior que tolerancia"

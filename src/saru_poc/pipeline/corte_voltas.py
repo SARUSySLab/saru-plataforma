@@ -43,7 +43,7 @@ from itertools import pairwise
 
 import numpy as np
 
-from .leitura import ler_colunas, par_gps
+from .leitura import escolher_canal, ler_colunas, par_gps
 
 # Versao do algoritmo de cada caminho. Entra em `volta.metodo_versao`: trocar o
 # corte produz fronteira diferente da mesma captura, e as duas so convivem
@@ -52,6 +52,29 @@ METODO_CONTADOR = "canal_contador-1"
 METODO_PULSO = "canal_pulso-1"
 METODO_LDX = "ldx_beacon-1"
 METODO_GPS = "gate_perpendicular-1"
+# Sufixo de metodo quando o instante grosseiro foi realinhado contra uma serie
+# de maior taxa. Entra somado ao metodo de base ("canal_contador-1+refino...")
+# porque a proveniencia sao as duas coisas: quem achou a passagem e quem a
+# posicionou no tempo.
+METODO_REFINO = "refino_correlacao-1"
+
+# Erro de instante que o corte de volta pode ter, e acima do qual o corte sai
+# com alerta.
+#
+# Valor ratificado por Vitor em 2026-09-13, medicao no acervo pendente
+# (E-RN-02). Registro em `docs/requisitos/06-validacao.md`, item 7. Duas coisas
+# ficam a confirmar, e estao escritas aqui pra nao morarem so no documento:
+#
+#   1. a ratificacao nao veio com tabela de medicao, que e o que E-RN-02 pede;
+#   2. o texto ratificado fala em GPS de 1 Hz, e este modulo aplica o mesmo
+#      numero ao CANAL DE VOLTA de 1 Hz, que e outro degrau da cascata. E
+#      analogia, nao medicao.
+#
+# Coerencia que vale registrar: 0,05 s e o periodo de uma serie de 20 Hz, que e
+# a taxa da maioria das series de velocidade do acervo. A tolerancia ratificada
+# e o teto fisico do metodo coincidem. Isso e bom sinal, nao e a medicao.
+TOLERANCIA_CORTE_S = 0.05
+ALERTA_CORTE_S = 0.20
 
 # Canais que contam volta por VALOR: a volta vira quando o valor muda. "Laps
 # Left" e regressivo e serve igual, e a transicao que marca, nao o sentido.
@@ -148,6 +171,15 @@ class Corte:
     # Por onde a cascata passou antes de chegar aqui. E o que responde "por que
     # essa gravacao nao cortou" sem precisar reproduzir a execucao.
     tentativas: list[str] = field(default_factory=list)
+    # Refino do instante contra a serie de maior taxa (excecao 5i, issue #6).
+    # `erro_instante_s` e o passo da varredura, que e o periodo da serie usada
+    # como apoio: e o teto do erro que PIL-RNF-10 cobra. `motivo_refino` diz por
+    # que NAO refinou, e fica preenchido tambem quando refinou mas o erro passou
+    # de ALERTA_CORTE_S. Nao refinar e resultado, com motivo, como todo o resto
+    # desta etapa.
+    refinado: bool = False
+    erro_instante_s: float | None = None
+    motivo_refino: str | None = None
 
     @property
     def cortou(self) -> bool:
@@ -375,6 +407,97 @@ def _densidade_plausivel(instantes: list[float], duracao_s: float) -> bool:
     return len(instantes) <= teto
 
 
+def refinar_passagens(
+    instantes: list[float],
+    periodo_grosso_s: float,
+    t_rapido: np.ndarray,
+    v_rapido: np.ndarray,
+) -> tuple[list[float], float | None, str | None]:
+    """Realinha passagens grosseiras contra uma serie de maior taxa.
+
+    Excecao 5i do E-UC-01, criterio PIL-CT-58, meta PIL-RNF-10.
+
+    O problema: o canal de volta de 1 Hz marca a passagem na primeira amostra
+    DEPOIS do cruzamento, entao o instante tem ate 1 s de erro e o tempo de
+    volta sai em segundo inteiro. A linha de chegada quase sempre fica numa
+    reta, no ponto de maior velocidade, e o sinal rapido nao tem feicao local
+    que a marque: procurar um evento perto do instante grosseiro nao teria base.
+
+    O que a serie rapida sabe e outra coisa. A volta e quase periodica, e o
+    mesmo ponto da pista produz o mesmo trecho de sinal em toda volta. Alinhar
+    a volta k contra a volta ancora pelo proprio sinal mede o quanto o instante
+    grosseiro esta deslocado.
+
+    Isso tambem resolve o erro absoluto da ancora sem precisar conhece-lo. O
+    tempo de volta e diferenca entre instantes: se o instante refinado da
+    passagem k e o momento em que o carro esta no mesmo ponto de pista em que
+    estava na ancora, a diferenca e o tempo de volta verdadeiro, qualquer que
+    seja o ponto da pista em que a ancora caiu. Por isso a ancora NAO se move.
+
+    A janela de busca e `[-periodo_grosso_s, +periodo_grosso_s]`, tirada do
+    periodo do proprio canal grosseiro, e o passo da varredura e o periodo da
+    serie rapida. Nenhum dos dois e constante escolhida a mao, e o passo e o
+    erro de instante declarado no retorno.
+
+    Passagem que nao tem serie rapida suficiente depois dela (janela menor que a
+    propria busca) fica com o instante grosseiro. Devolve
+    (instantes, erro_instante_s, motivo). Com motivo preenchido nada foi
+    refinado e a lista volta como entrou: nao refinar e resultado.
+    """
+    if len(instantes) < 2:
+        return list(instantes), None, "menos de 2 passagens: nao ha ancora pra alinhar"
+    if len(t_rapido) < 2 or len(t_rapido) != len(v_rapido):
+        return list(instantes), None, "serie de apoio vazia ou desalinhada do tempo"
+    if periodo_grosso_s <= 0:
+        return list(instantes), None, "periodo do canal de volta nao declarado"
+
+    passo = float(np.median(np.diff(t_rapido)))
+    if passo <= 0:
+        return list(instantes), None, "serie de apoio sem passo de tempo utilizavel"
+    if passo >= periodo_grosso_s:
+        return list(instantes), None, (
+            f"serie de apoio a {1 / passo:.3g} Hz nao e mais rapida que o canal "
+            f"de volta a {1 / periodo_grosso_s:.3g} Hz"
+        )
+
+    # Grade de candidatos. `periodo_grosso_s` de cada lado cobre o erro do
+    # contador com folga, e o passo da serie rapida e a menor diferenca que ela
+    # consegue distinguir.
+    deslocamentos = np.arange(
+        -periodo_grosso_s, periodo_grosso_s + passo / 2, passo, dtype=float
+    )
+    fim_rapido = float(t_rapido[-1])
+    dur_ancora = instantes[1] - instantes[0]
+    piso = 2 * periodo_grosso_s  # janela menor que a busca nao decide nada
+
+    refinados = [instantes[0]]
+    alinhadas = 0
+    for t_k in instantes[1:]:
+        duracao = min(
+            dur_ancora,
+            fim_rapido - instantes[0],
+            fim_rapido - (t_k + periodo_grosso_s),
+        )
+        if duracao < piso:
+            refinados.append(t_k)
+            continue
+        u = np.arange(0.0, duracao, passo)
+        referencia = np.interp(instantes[0] + u, t_rapido, v_rapido)
+        # (candidatos, pontos): uma linha por deslocamento testado.
+        alvos = np.interp(
+            (t_k + deslocamentos)[:, None] + u[None, :], t_rapido, v_rapido
+        )
+        erro = ((alvos - referencia[None, :]) ** 2).mean(axis=1)
+        refinados.append(float(t_k + deslocamentos[int(np.argmin(erro))]))
+        alinhadas += 1
+
+    if not alinhadas:
+        return list(instantes), None, (
+            "serie de apoio curta demais depois das passagens pra alinhar volta"
+        )
+    return refinados, passo, None
+
+
 # --- leitura do que ja esta no catalogo ----------------------------------
 
 
@@ -458,8 +581,83 @@ def _por_canal(conn, gravacao_id: str, corte: Corte) -> bool:
         corte.metodo_versao = metodo
         corte.fonte = f"canal {nome}"
         corte.frequencia_hz = hz
+        _refinar_corte(conn, gravacao_id, corte, hz)
         return True
     return False
+
+
+def _refinar_corte(conn, gravacao_id: str, corte: Corte, hz_canal: float) -> None:
+    """Realinha os instantes do degrau 1 contra a serie de velocidade, se der.
+
+    Tres condicoes para o refino entrar, e as tres juntas sao o que fecha o
+    criterio 4 da issue #6 (gravacao que ja corta bem nao pode mudar de
+    instante) por construcao, e nao por promessa:
+
+      1. o corte veio do degrau 1, o canal de volta dentro da amostra. Beacon de
+         sidecar, beacon nativo do `.xrk` e GPS sao outros degraus e nao passam
+         por aqui;
+      2. o periodo do canal e PIOR que a tolerancia ratificada, ou seja, o canal
+         tem taxa abaixo de 20 Hz. `Beacon Code` a 50 Hz e `LAP_BEACON` a 100 Hz
+         reprovam aqui e saem intactos;
+      3. existe serie de velocidade com taxa estritamente maior que a do canal.
+
+    A contagem de voltas nao muda: os instantes refinados sao os MESMOS que o
+    debounce ja aprovou, deslocados de menos de um periodo do canal grosseiro, e
+    deslocamento dessa ordem nao junta nem separa passagem que dista pelo menos
+    `min_volta_s`. Por isso as voltas sao remontadas direto, sem passar pelo
+    debounce de novo: reexecutar a guarda sobre dado que ela ja aprovou so
+    criaria a chance de o numero de voltas mudar por efeito colateral.
+    """
+    if hz_canal <= 0:
+        corte.motivo_refino = "canal de volta sem taxa declarada"
+        return
+    if 1.0 / hz_canal <= TOLERANCIA_CORTE_S:
+        corte.motivo_refino = (
+            f"canal de volta a {hz_canal:g} Hz ja entrega o instante dentro da "
+            f"tolerancia de {TOLERANCIA_CORTE_S:g} s"
+        )
+        return
+
+    canal = escolher_canal(conn, gravacao_id, ("speed",))
+    if canal is None:
+        corte.motivo_refino = "sem canal de velocidade mapeado nesta gravacao"
+        return
+    if canal.frequencia_hz <= hz_canal:
+        corte.motivo_refino = (
+            f"a serie de velocidade e de {canal.frequencia_hz:g} Hz, nao e mais "
+            f"rapida que o canal de volta de {hz_canal:g} Hz"
+        )
+        return
+
+    dados = ler_colunas(canal.uri, [canal.nome_bruto])
+    if "t_s" not in dados or canal.nome_bruto not in dados:
+        corte.motivo_refino = "serie de velocidade sem as colunas esperadas"
+        return
+
+    instantes = [v.t_inicio_s for v in corte.voltas] + [corte.voltas[-1].t_fim_s]
+    refinados, erro, motivo = refinar_passagens(
+        instantes, 1.0 / hz_canal, dados["t_s"], canal.valores(dados)
+    )
+    if motivo is not None:
+        corte.motivo_refino = motivo
+        return
+
+    corte.voltas = [
+        Volta(numero=n, t_inicio_s=a, t_fim_s=b)
+        for n, (a, b) in enumerate(pairwise(refinados), start=1)
+    ]
+    corte.refinado = True
+    corte.erro_instante_s = erro
+    corte.metodo_versao = f"{corte.metodo_versao}+{METODO_REFINO}"
+    corte.fonte = (
+        f"{corte.fonte} refinado contra {canal.nome_bruto} "
+        f"a {canal.frequencia_hz:g} Hz"
+    )
+    if erro is not None and erro > ALERTA_CORTE_S:
+        corte.motivo_refino = (
+            f"refinado, e o erro de instante de {erro:.3f} s passa do alerta de "
+            f"{ALERTA_CORTE_S:g} s: a serie de apoio nao e rapida o bastante"
+        )
 
 
 def _por_ldx(conn, gravacao_id: str, corte: Corte) -> bool:
