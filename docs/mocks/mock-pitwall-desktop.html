@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pitwall Performance Engineering Suite | MFG Odawara & HH Timing Core</title>
+  <style>
+    :root {
+      --bg-base: #070a0e;
+      --bg-surface: #0e131b;
+      --bg-header: #141b26;
+      --bg-card: #111722;
+      --border: #1e2838;
+      --border-focus: #00f0ff;
+      --text-main: #f1f5f9;
+      --text-muted: #73849c;
+      --text-dim: #475569;
+      --accent-cyan: #00f0ff;
+      --accent-green: #00e5a3;
+      --accent-purple: #bd00ff;
+      --accent-amber: #ffb800;
+      --accent-red: #ff3366;
+      --accent-orange: #ff7700;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Tabular numeric data to prevent jitter */
+    .tabular-nums {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    header {
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      z-index: 100;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+    }
+
+    .brand-tag {
+      background: var(--accent-cyan);
+      color: #000;
+      font-weight: 900;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+    }
+
+    .status-ribbon {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    .status-node {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot-live {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-red);
+      animation: pulseLive 1.2s infinite ease-in-out;
+    }
+
+    @keyframes pulseLive {
+      0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 6px var(--accent-red); }
+      50% { opacity: 0.3; transform: scale(1.2); box-shadow: none; }
+    }
+
+    .quick-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-ctrl {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-ctrl:hover {
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+
+    .btn-ctrl.active {
+      background: rgba(255, 184, 0, 0.15);
+      border-color: var(--accent-amber);
+      color: var(--accent-amber);
+    }
+
+    .dashboard-grid {
+      flex: 1;
+      padding: 8px;
+      display: grid;
+      grid-template-columns: 310px 1.4fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 8px;
+    }
+
+    @media (max-width: 1280px) {
+      .dashboard-grid {
+        grid-template-columns: 290px 1fr;
+      }
+      .col-span-last {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow-y: auto;
+      }
+    }
+
+    .panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    }
+
+    .panel-head {
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .panel-head .title-highlight {
+      color: var(--text-main);
+    }
+
+    .panel-head .badge {
+      font-size: 9px;
+      font-family: var(--font-mono);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 3px;
+      color: var(--accent-cyan);
+    }
+
+    .panel-body {
+      padding: 8px;
+      flex: 1;
+      position: relative;
+    }
+
+    .tower-wrap {
+      overflow-y: auto;
+      max-height: 480px;
+    }
+
+    .tower-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    .tower-table th {
+      position: sticky;
+      top: 0;
+      background: var(--bg-header);
+      color: var(--text-muted);
+      font-size: 9px;
+      text-align: left;
+      padding: 5px 6px;
+      border-bottom: 1px solid var(--border);
+      z-index: 10;
+    }
+
+    .tower-table td {
+      padding: 5px 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+      white-space: nowrap;
+    }
+
+    .tower-row {
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .tower-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tower-row.focus-car {
+      background: rgba(0, 240, 255, 0.12);
+      border-left: 3px solid var(--accent-cyan);
+    }
+
+    .tower-row.focus-car td {
+      font-weight: 700;
+    }
+
+    .pos-num {
+      display: inline-block;
+      width: 16px;
+      font-weight: 800;
+      color: var(--text-muted);
+    }
+
+    .badge-compound {
+      font-size: 9px;
+      font-weight: 900;
+      padding: 1px 4px;
+      border-radius: 2px;
+      text-align: center;
+      display: inline-block;
+    }
+    .comp-soft { background: var(--accent-red); color: #fff; }
+    .comp-med { background: var(--accent-amber); color: #000; }
+    .comp-hard { background: #fff; color: #000; }
+
+    .sector-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-right: 2px;
+    }
+    .sec-purple { background: var(--accent-purple); box-shadow: 0 0 4px var(--accent-purple); }
+    .sec-green { background: var(--accent-green); box-shadow: 0 0 3px var(--accent-green); }
+    .sec-yellow { background: var(--accent-amber); }
+
+    .tyre-matrix-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 8px;
+      height: 100%;
+    }
+
+    .corner-card {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .corner-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 4px;
+    }
+
+    .corner-title {
+      font-size: 11px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+    }
+
+    .corner-press {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+    }
+
+    .ice-bar-container {
+      display: flex;
+      gap: 3px;
+      margin: 6px 0;
+      height: 36px;
+    }
+
+    .ice-strip {
+      flex: 1;
+      border-radius: 2px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: #000;
+      transition: background-color 0.25s ease;
+    }
+
+    .ice-strip span {
+      font-size: 8px;
+      opacity: 0.75;
+      letter-spacing: 0.4px;
+      line-height: 1;
+    }
+
+    .corner-footer {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .metrics-ribbon {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .metric-box {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .metric-num {
+      font-size: 18px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      margin-top: 2px;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .metric-sub {
+      font-size: 9px;
+      color: var(--text-muted);
+      font-weight: normal;
+    }
+
+    .metric-delta {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      margin-top: 2px;
+    }
+
+    .color-good { color: var(--accent-green); }
+    .color-warn { color: var(--accent-amber); }
+    .color-bad { color: var(--accent-red); }
+    .color-cyan { color: var(--accent-cyan); }
+
+    .track-container {
+      position: relative;
+      width: 100%;
+      height: 220px;
+      background: radial-gradient(circle at center, #131b26 0%, #080d14 100%);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .track-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .track-contour {
+      fill: none;
+      stroke: #1e2c40;
+      stroke-width: 14;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+    }
+
+    .track-racing-line {
+      fill: none;
+      stroke: #2e4363;
+      stroke-width: 2.5;
+      stroke-dasharray: 4 4;
+    }
+
+    .sector-gate {
+      fill: none;
+      stroke: #73849c;
+      stroke-width: 1.5;
+    }
+
+    .map-tag {
+      font-size: 8px;
+      font-family: var(--font-mono);
+      fill: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .telemetry-row {
+      display: grid;
+      grid-template-columns: 200px 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 1024px) {
+      .telemetry-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .gg-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px;
+    }
+
+    canvas#ggCanvas {
+      background: #090e15;
+      border-radius: 3px;
+      border: 1px solid #162233;
+    }
+
+    .driver-pedals {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 12px;
+    }
+
+    .pedal-bar-row {
+      margin-bottom: 6px;
+    }
+
+    .pedal-bar-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      font-family: var(--font-mono);
+      margin-bottom: 2px;
+    }
+
+    .bar-bg {
+      width: 100%;
+      height: 6px;
+      background: #172233;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      transition: width 0.05s ease-out;
+    }
+
+    .chart-box {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    canvas#stripChart {
+      width: 100%;
+      height: 120px;
+      background: #080c12;
+      border-radius: 3px;
+    }
+
+    .strat-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    .strat-table td {
+      padding: 6px 4px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .strat-table td:first-child {
+      color: var(--text-muted);
+      font-size: 10px;
+    }
+
+    .strat-table td:last-child {
+      text-align: right;
+      font-weight: 700;
+    }
+
+    .rejoin-callout {
+      margin-top: 10px;
+      padding: 8px;
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid var(--accent-cyan);
+      border-radius: 4px;
+      font-size: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .radio-alert {
+      padding: 6px 10px;
+      background: rgba(255, 51, 102, 0.12);
+      border-left: 3px solid var(--accent-red);
+      font-size: 10px;
+      font-family: var(--font-mono);
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand-title">
+      <span class="brand-tag">SARU SA-CORE</span>
+      <span>MFG PERFORMANCE TELEMETRY SUITE</span>
+      <span style="color: var(--text-muted); font-size: 11px; font-weight: normal;">| HH TIMING STANDARD 4.9</span>
+    </div>
+
+    <div class="status-ribbon">
+      <div class="status-node">
+        <span class="dot-live"></span>
+        <span style="color: var(--accent-red); font-weight: 800;">TELEMETRIA AO VIVO (50 Hz)</span>
+      </div>
+      <div class="status-node">
+        <span style="color: var(--text-muted);">ETAPA:</span>
+        <span style="color: var(--accent-cyan); font-weight: 700;">MFG ROUND 1 - ODAWARA PIKES PEAK</span>
+      </div>
+      <div class="status-node">
+        <span style="color: var(--text-muted);">CLIMA / PISTA:</span>
+        <span>18.4°C / 26.2°C (SECO)</span>
+      </div>
+      <div class="status-node">
+        <span style="color: var(--accent-green);">● LAN BOX: 192.168.1.104 (0.6 ms)</span>
+      </div>
+    </div>
+
+    <div class="quick-controls">
+      <a href="mock-piloto-n0-desktop.html" class="btn-ctrl" style="text-decoration: none; border-color: var(--border-focus); color: var(--border-focus);">⮜ VISÃO PILOTO (N0)</a>
+      <button class="btn-ctrl" id="btnScToggle" onclick="toggleSafetyCar()">FLAG: BANDEIRA VERDE</button>
+      <button class="btn-ctrl" id="btnSimPause" onclick="toggleSimulation()">PAUSAR</button>
+      <button class="btn-ctrl" onclick="triggerPitstopCall()">BOX NESTA VOLTA</button>
+    </div>
+  </header>
+
+  <main class="dashboard-grid">
+
+    <!-- COLUNA 1: TORRE DE CRONOMETRAGEM HH TIMING -->
+    <section class="panel">
+      <div class="panel-head">
+        <span><span class="title-highlight">TORRE DE CORRIDA</span> (HH STANDARD)</span>
+        <span class="badge">GAP vs INTERVAL</span>
+      </div>
+      <div class="panel-body tower-wrap">
+        <table class="tower-table">
+          <thead>
+            <tr>
+              <th>P</th>
+              <th>#</th>
+              <th>PILOTO</th>
+              <th>GAP</th>
+              <th>INT</th>
+              <th>PNEU</th>
+              <th>SEC</th>
+              <th>ÚLTIMA</th>
+            </tr>
+          </thead>
+          <tbody id="towerTableBody">
+            <!-- Renderizado via JavaScript dinamicamente -->
+          </tbody>
+        </table>
+
+        <div class="radio-alert" id="radioAlert">
+          <span><strong>ENGENHEIRO (RÁDIO):</strong> <span id="radioMsg">Pneu RR acima de 102°C. Ajuste balanço de freio (+1% F).</span></span>
+          <span style="font-size: 9px; color: var(--text-muted);">CAN 04</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLUNA 2: DINÂMICA VEICULAR, MAPA VETORIAL E TELEMETRIA DO CARRO FOCO -->
+    <section class="panel">
+      <div class="panel-head">
+        <span><span class="title-highlight">CHASSIS & TELEMETRIA TRANSIENTE</span> (#86 KANATA RIVINGTON - GR86 SPEC)</span>
+        <span class="badge" id="badgeDelta">DELTA: -0.428s</span>
+      </div>
+      <div class="panel-body">
+        
+        <!-- Faixa de KPIs Rápidos do Carro -->
+        <div class="metrics-ribbon">
+          <div class="metric-box">
+            <span class="metric-label">VELOCIDADE GPS</span>
+            <div class="metric-num"><span id="valSpeed">242</span> <span class="metric-sub">km/h</span></div>
+            <span class="metric-delta color-good" id="valSpeedDelta">▲ +4 km/h vs Ref</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">ACEL. LATERAL (Ay)</span>
+            <div class="metric-num"><span id="valAy">1.82</span> <span class="metric-sub">G</span></div>
+            <span class="metric-delta color-cyan">Envelope: 94%</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">BALANÇO GUINADA (Δα)</span>
+            <div class="metric-num" id="valYawBalance" style="color: var(--accent-green);">+0.12°</div>
+            <span class="metric-delta color-good" id="valYawDesc">Neutro / Subesterço Leve</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">RAKE AERODINÂMICO</span>
+            <div class="metric-num"><span id="valRake">1.18</span><span class="metric-sub">deg</span></div>
+            <span class="metric-delta" style="color: var(--text-muted);">F:24mm / R:52mm</span>
+          </div>
+        </div>
+
+        <div class="track-container">
+          <svg class="track-svg" viewBox="0 0 650 300" id="trackSvg">
+            <!-- Traçado da Rodovia Odawara Pikes Peak (MFG R1) -->
+            <path class="track-contour" d="M 50,150 C 40,60 140,40 240,60 C 340,80 430,30 520,60 C 600,90 610,180 540,220 C 470,250 420,180 340,210 C 260,240 210,270 120,260 C 60,250 60,210 50,150 Z" />
+            <path class="track-racing-line" d="M 50,150 C 40,60 140,40 240,60 C 340,80 430,30 520,60 C 600,90 610,180 540,220 C 470,250 420,180 340,210 C 260,240 210,270 120,260 C 60,250 60,210 50,150 Z" />
+
+            <!-- Marcadores de Micro-Setores de Odawara -->
+            <line class="sector-gate" x1="240" y1="45" x2="240" y2="75" />
+            <text class="map-tag" x="245" y="55">ST1 - KAMABOKO STR.</text>
+
+            <line class="sector-gate" x1="535" y1="45" x2="515" y2="75" />
+            <text class="map-tag" x="525" y="45">ST2 - TOLL GATE</text>
+
+            <line class="sector-gate" x1="340" y1="195" x2="340" y2="225" />
+            <text class="map-tag" x="345" y="235">ST3 - GHOST HILL</text>
+
+            <line class="sector-gate" x1="50" y1="135" x2="50" y2="165" stroke="var(--accent-red)" stroke-width="2" />
+            <text class="map-tag" x="60" y="145" fill="var(--accent-red)">META / PITLANE</text>
+
+            <!-- Projeção da DROP ZONE na pista (onde o carro cai ao sair do box) -->
+            <circle id="dropZoneMarker" cx="0" cy="0" r="11" fill="none" stroke="var(--accent-amber)" stroke-width="2" stroke-dasharray="3 3" />
+            <text id="dropZoneText" x="0" y="0" class="map-tag" fill="var(--accent-amber)">DROP ZONE (P5)</text>
+
+            <!-- Satélites dos Carros Concorrentes -->
+            <circle id="beaconP1" cx="0" cy="0" r="5.5" fill="#ffffff" />
+            <circle id="beaconP3" cx="0" cy="0" r="5" fill="var(--accent-amber)" />
+            <circle id="beaconP4" cx="0" cy="0" r="5" fill="var(--accent-red)" />
+
+            <!-- Satélite Carro Foco (#86 Kanata) -->
+            <circle id="beaconFocus" cx="0" cy="0" r="8" fill="var(--accent-cyan)" stroke="#ffffff" stroke-width="2.5" />
+          </svg>
+        </div>
+
+        <div class="telemetry-row">
+          
+          <!-- Diagrama G-G (Círculo de Kamm) -->
+          <div class="gg-wrap">
+            <canvas id="ggCanvas" width="180" height="160"></canvas>
+            <div style="font-size: 9px; font-family: var(--font-mono); color: var(--text-muted); margin-top: 4px;">
+              CÍRCULO DE KAMM (±2.0 G)
+            </div>
+          </div>
+
+          <!-- Modulação de Comandos do Piloto e Balanço -->
+          <div class="driver-pedals">
+            <div class="pedal-bar-row">
+              <div class="pedal-bar-head">
+                <span>ACELERADOR (TPS)</span>
+                <span id="txtTps" class="color-good">100%</span>
+              </div>
+              <div class="bar-bg"><div id="barTps" class="bar-fill" style="width: 100%; background: var(--accent-green);"></div></div>
+            </div>
+
+            <div class="pedal-bar-row">
+              <div class="pedal-bar-head">
+                <span>PRESSÃO DE FREIO</span>
+                <span id="txtBrk" class="color-bad">0 BAR</span>
+              </div>
+              <div class="bar-bg"><div id="barBrk" class="bar-fill" style="width: 0%; background: var(--accent-red);"></div></div>
+            </div>
+
+            <div class="pedal-bar-row">
+              <div class="pedal-bar-head">
+                <span>ESTERÇO VOLANTE</span>
+                <span id="txtSteer">-18.4°</span>
+              </div>
+              <div class="bar-bg"><div id="barSteer" class="bar-fill" style="width: 45%; background: var(--accent-cyan);"></div></div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; font-size: 9px; font-family: var(--font-mono); color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 4px;">
+              <span>TLLTD (CARGA DIANT.): <strong class="color-cyan" id="txtTlltd">54.2%</strong></span>
+              <span>TRAIL BRAKE IDX: <strong class="color-good" id="txtTrail">88/100</strong></span>
+            </div>
+          </div>
+
+          <!-- Osciloscópio Temporal de Sinais Críticos -->
+          <div class="chart-box">
+            <div style="display: flex; justify-content: space-between; font-size: 9px; font-family: var(--font-mono); color: var(--text-muted); margin-bottom: 3px;">
+              <span>SÉRIE TEMPORAL CONTÍNUA (50 Hz)</span>
+              <span style="color: var(--accent-green);">TPS</span> / <span style="color: var(--accent-red);">BRK</span> / <span style="color: var(--accent-cyan);">VEL</span>
+            </div>
+            <canvas id="stripChart" width="280" height="110"></canvas>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- COLUNA 3: MATRIZ TÉRMICA DE PNEUS (I-C-E) E ESTRATÉGIA HH -->
+    <section class="panel col-span-last">
+      <div class="panel-head">
+        <span><span class="title-highlight">MATRIZ TÉRMICA I-C-E & BAROMÉTRICA</span></span>
+        <span class="badge">TPMS 433MHz + IR 16-CH</span>
+      </div>
+      <div class="panel-body">
+        
+        <!-- Grade dos 4 Pneus com Leitura I-C-E -->
+        <div class="tyre-matrix-grid">
+          
+          <!-- Dianteiro Esquerdo (FL) -->
+          <div class="corner-card" id="cardFL">
+            <div class="corner-header">
+              <span class="corner-title">FL (DIANT. ESQ)</span>
+              <span class="corner-press" id="pressFL">2.01 <span style="font-size: 9px; color: var(--text-muted);">bar</span></span>
+            </div>
+            <div class="ice-bar-container">
+              <div class="ice-strip" id="fl-in"><span>I</span>89°</div>
+              <div class="ice-strip" id="fl-mid"><span>C</span>84°</div>
+              <div class="ice-strip" id="fl-out"><span>E</span>81°</div>
+            </div>
+            <div class="corner-footer">
+              <span>ΔCAMB: <strong id="fl-dcamb">+8°C</strong></span>
+              <span>DESGASTE: <strong id="fl-wear">14%</strong></span>
+            </div>
+          </div>
+
+          <!-- Dianteiro Direito (FR) -->
+          <div class="corner-card" id="cardFR">
+            <div class="corner-header">
+              <span class="corner-title">FR (DIANT. DIR)</span>
+              <span class="corner-press" id="pressFR">2.04 <span style="font-size: 9px; color: var(--text-muted);">bar</span></span>
+            </div>
+            <div class="ice-bar-container">
+              <div class="ice-strip" id="fr-in"><span>I</span>96°</div>
+              <div class="ice-strip" id="fr-mid"><span>C</span>91°</div>
+              <div class="ice-strip" id="fr-out"><span>E</span>86°</div>
+            </div>
+            <div class="corner-footer">
+              <span>ΔCAMB: <strong id="fr-dcamb">+10°C</strong></span>
+              <span>DESGASTE: <strong id="fr-wear">19%</strong></span>
+            </div>
+          </div>
+
+          <!-- Traseiro Esquerdo (RL) -->
+          <div class="corner-card" id="cardRL">
+            <div class="corner-header">
+              <span class="corner-title">RL (TRAS. ESQ)</span>
+              <span class="corner-press" id="pressRL">1.98 <span style="font-size: 9px; color: var(--text-muted);">bar</span></span>
+            </div>
+            <div class="ice-bar-container">
+              <div class="ice-strip" id="rl-in"><span>I</span>92°</div>
+              <div class="ice-strip" id="rl-mid"><span>C</span>88°</div>
+              <div class="ice-strip" id="rl-out"><span>E</span>84°</div>
+            </div>
+            <div class="corner-footer">
+              <span>ΔCAMB: <strong id="rl-dcamb">+8°C</strong></span>
+              <span>DESGASTE: <strong id="rl-wear">12%</strong></span>
+            </div>
+          </div>
+
+          <!-- Traseiro Direito (RR) - Sobrecarga Térmica -->
+          <div class="corner-card" id="cardRR">
+            <div class="corner-header">
+              <span class="corner-title" style="color: var(--accent-amber);">RR (TRAS. DIR)</span>
+              <span class="corner-press color-warn" id="pressRR">2.09 <span style="font-size: 9px; color: var(--text-muted);">bar</span></span>
+            </div>
+            <div class="ice-bar-container">
+              <div class="ice-strip" id="rr-in"><span>I</span>104°</div>
+              <div class="ice-strip" id="rr-mid"><span>C</span>99°</div>
+              <div class="ice-strip" id="rr-out"><span>E</span>94°</div>
+            </div>
+            <div class="corner-footer">
+              <span style="color: var(--accent-amber);">ΔCAMB: <strong id="rr-dcamb">+10°C</strong></span>
+              <span style="color: var(--accent-amber);">DESGASTE: <strong id="rr-wear">26%</strong></span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PAINEL DE ESTRATÉGIA PREDITIVA E JANELA DE PARADA (HH TIMING INTEGRADO) -->
+    <section class="panel" style="grid-column: 1 / -1;">
+      <div class="panel-head">
+        <span><span class="title-highlight">SOLUCIONADOR DE ESTRATÉGIA PREDITIVA</span> (UNDERCUT / OVERCUT / DROP ZONE)</span>
+        <span class="badge" style="background: rgba(189,0,255,0.15); border-color: var(--accent-purple); color: #fff;">ESTRATÉGIA PLANO A-PRIME</span>
+      </div>
+      <div class="panel-body" style="display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 12px; align-items: center;">
+        
+        <!-- Matriz de Tempos e Pit Loss -->
+        <div>
+          <table class="strat-table">
+            <tr>
+              <td>JANELA DE BOX PROJETADA:</td>
+              <td style="color: var(--accent-cyan);" id="txtPitWindow">VOLTAS 15 A 18 (VOLTA ATUAL: 15)</td>
+            </tr>
+            <tr>
+              <td>PIT LOSS TIME (PERDA REAL):</td>
+              <td id="txtPitLoss">22.4 s (SOB BANDEIRA VERDE)</td>
+            </tr>
+            <tr>
+              <td>DELTA UNDERCUT vs P1:</td>
+              <td class="color-good" id="txtUndercutDelta">-1.84 s (FAVORÁVEL / SAÍDA LIMPA)</td>
+            </tr>
+            <tr>
+              <td>COMPOSTO SEGUINTE PREPARADO:</td>
+              <td>HARD NOVO (PRESSÃO FRIA 1.48 BAR)</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Alerta de Drop Zone Dinâmica -->
+        <div class="rejoin-callout">
+          <div style="font-weight: 800; color: var(--accent-cyan); display: flex; justify-content: space-between;">
+            <span>RETORNO DE PISTA (DROP ZONE)</span>
+            <span id="badgeDropPos">PROJEÇÃO: P4</span>
+          </div>
+          <p style="color: var(--text-main); font-size: 10px; line-height: 1.3;" id="dropZoneDesc">
+            Janela sem tráfego imediato. Retorno estimado 3.4s à frente do carro #2 (Akaba). Ar limpo preservado.
+          </p>
+        </div>
+
+        <!-- Consumo e Degradação do Stint -->
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); margin-bottom: 4px;">
+            <span>ESTADO DA BORRACHA DO STINT</span>
+            <span class="color-warn" id="txtStintDeg">78% DEGRADADO</span>
+          </div>
+          <div class="bar-bg" style="height: 8px;">
+            <div id="barStintDeg" class="bar-fill" style="width: 78%; background: var(--accent-amber);"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 9px; font-family: var(--font-mono); color: var(--text-muted); margin-top: 4px;">
+            <span>COMBUSTÍVEL: <strong>28.4 L (9 VOLTAS)</strong></span>
+            <span>CLYFF ESTIMADO: <strong>+2 VOLTAS</strong></span>
+          </div>
+        </div>
+
+        <!-- Ações Táticas Rápidas -->
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <button class="btn-ctrl" style="text-align: center; background: rgba(0, 240, 255, 0.1); border-color: var(--accent-cyan); color: var(--accent-cyan);" onclick="executeUndercutSim()">
+            SIMULAR OUT-LAP DE UNDERCUT
+          </button>
+          <button class="btn-ctrl" style="text-align: center;" onclick="switchNextCompound()">
+            ALTERAR PRÓXIMO COMPOSTO: <strong id="btnCompoundLabel">HARD</strong>
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    const fleetData = [
+      { pos: 1, no: "1", driver: "M. BEISSENHIERZ", car: "Porsche 911 GT3", gap: "LÍDER", int: "LÍDER", tyre: "M", tyreAge: 15, s1: "p", s2: "g", s3: "g", lapTime: "2:04.112", delta: "+0.000", isFocus: false, progress: 0.52 },
+      { pos: 2, no: "86", driver: "K. RIVINGTON", car: "Toyota GR86 Spec", gap: "+1.180", int: "+1.180", tyre: "S", tyreAge: 15, s1: "p", s2: "p", s3: "g", lapTime: "2:03.684", delta: "-0.428", isFocus: true, progress: 0.49 },
+      { pos: 3, no: "9", driver: "S. ISHIGAMI", car: "Porsche Cayman GT4", gap: "+4.920", int: "+3.740", tyre: "M", tyreAge: 14, s1: "y", s2: "g", s3: "y", lapTime: "2:04.550", delta: "+0.438", isFocus: false, progress: 0.43 },
+      { pos: 4, no: "2", driver: "Y. AKABA", car: "Ferrari 488 GTB", gap: "+7.340", int: "+2.420", tyre: "H", tyreAge: 16, s1: "g", s2: "y", s3: "g", lapTime: "2:04.890", delta: "+0.778", isFocus: false, progress: 0.38 },
+      { pos: 5, no: "12", driver: "T. SAKAMOTO", car: "Audi R8 V10", gap: "+12.100", int: "+4.760", tyre: "M", tyreAge: 12, s1: "y", s2: "y", s3: "y", lapTime: "2:05.120", delta: "+1.008", isFocus: false, progress: 0.31 },
+      { pos: 6, no: "4", driver: "D. MAEZONO", car: "Honda NSX Type S", gap: "+18.400", int: "+6.300", tyre: "H", tyreAge: 18, s1: "y", s2: "y", s3: "y", lapTime: "2:05.900", delta: "+1.788", isFocus: false, progress: 0.22 }
+    ];
+
+    let isSimulationRunning = true;
+    let isSafetyCarActive = false;
+    let nextCompound = "HARD";
+    let simTick = 0;
+
+    // Histórico de pontos G-G para renderizar nuvem de atrito
+    const ggHistory = [];
+    const maxGgPoints = 35;
+
+    // Buffer de dados da série temporal contínua
+    const stripSpeed = new Array(50).fill(220);
+    const stripThrottle = new Array(50).fill(80);
+    const stripBrake = new Array(50).fill(0);
+
+    function renderTower() {
+      const tbody = document.getElementById("towerTableBody");
+      tbody.innerHTML = fleetData.map(car => {
+        const compClass = car.tyre === 'S' ? 'comp-soft' : (car.tyre === 'M' ? 'comp-med' : 'comp-hard');
+        const s1Class = car.s1 === 'p' ? 'sec-purple' : (car.s1 === 'g' ? 'sec-green' : 'sec-yellow');
+        const s2Class = car.s2 === 'p' ? 'sec-purple' : (car.s2 === 'g' ? 'sec-green' : 'sec-yellow');
+        const s3Class = car.s3 === 'p' ? 'sec-purple' : (car.s3 === 'g' ? 'sec-green' : 'sec-yellow');
+        const deltaColor = car.delta.startsWith('-') ? 'var(--accent-green)' : (car.delta === '+0.000' ? 'var(--text-main)' : 'var(--accent-red)');
+
+        return `
+          <tr class="tower-row ${car.isFocus ? 'focus-car' : ''}" onclick="selectCarFocus('${car.no}')">
+            <td><span class="pos-num">${car.pos}</span></td>
+            <td style="font-weight: 800; color: ${car.isFocus ? 'var(--accent-cyan)' : 'var(--text-main)'};">${car.no}</td>
+            <td style="max-width: 95px; overflow: hidden; text-overflow: ellipsis;">${car.driver}</td>
+            <td style="color: var(--text-muted);">${car.gap}</td>
+            <td style="color: ${car.int.startsWith('+') ? 'var(--accent-amber)' : 'var(--text-muted)'}; font-weight: 700;">${car.int}</td>
+            <td><span class="badge-compound ${compClass}">${car.tyre} <span style="font-size:8px; opacity:0.8;">(${car.tyreAge})</span></span></td>
+            <td>
+              <span class="sector-dot ${s1Class}"></span>
+              <span class="sector-dot ${s2Class}"></span>
+              <span class="sector-dot ${s3Class}"></span>
+            </td>
+            <td style="color: ${deltaColor}; font-weight: 700;">${car.lapTime}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function selectCarFocus(carNumber) {
+      fleetData.forEach(c => c.isFocus = (c.no === carNumber));
+      renderTower();
+    }
+
+    const ggCanvas = document.getElementById("ggCanvas");
+    const ggCtx = ggCanvas.getContext("2d");
+
+    const stripCanvas = document.getElementById("stripChart");
+    const stripCtx = stripCanvas.getContext("2d");
+
+    function drawKammCircle(currentAx, currentAy) {
+      const w = ggCanvas.width;
+      const h = ggCanvas.height;
+      const centerX = w / 2;
+      const centerY = h / 2;
+      const scale = 36; // 36 px por 1.0 G (escala total ±2.0G)
+
+      ggCtx.clearRect(0, 0, w, h);
+
+      // Eixos Centrais
+      ggCtx.strokeStyle = "#162233";
+      ggCtx.lineWidth = 1;
+      ggCtx.beginPath();
+      ggCtx.moveTo(centerX, 0); ggCtx.lineTo(centerX, h);
+      ggCtx.moveTo(0, centerY); ggCtx.lineTo(w, centerY);
+      ggCtx.stroke();
+
+      // Círculos concêntricos de referência (1.0G, 1.5G, 2.0G)
+      [1.0, 1.5, 2.0].forEach((gRadius, idx) => {
+        ggCtx.strokeStyle = idx === 1 ? "#20334d" : "#121b29";
+        ggCtx.beginPath();
+        ggCtx.arc(centerX, centerY, gRadius * scale, 0, 2 * Math.PI);
+        ggCtx.stroke();
+      });
+
+      // Rótulos dos eixos
+      ggCtx.fillStyle = "#475569";
+      ggCtx.font = "8px monospace";
+      ggCtx.fillText("+2G", centerX + 2, 10);
+      ggCtx.fillText("-2G", centerX + 2, h - 4);
+      ggCtx.fillText("LAT -2G", 4, centerY - 4);
+      ggCtx.fillText("+2G", w - 24, centerY - 4);
+
+      // Renderizar nuvem de transição dos últimos pontos (Trail-braking trace)
+      ggHistory.forEach((pt, i) => {
+        const alpha = (i + 1) / ggHistory.length;
+        ggCtx.fillStyle = `rgba(0, 240, 255, ${alpha * 0.35})`;
+        const px = centerX + pt.ay * scale;
+        const py = centerY - pt.ax * scale;
+        ggCtx.beginPath();
+        ggCtx.arc(px, py, 2.2, 0, 2 * Math.PI);
+        ggCtx.fill();
+      });
+
+      // Vetor instantâneo de aceleração
+      const curX = centerX + currentAy * scale;
+      const curY = centerY - currentAx * scale;
+
+      ggCtx.strokeStyle = "rgba(0, 240, 255, 0.4)";
+      ggCtx.lineWidth = 1.5;
+      ggCtx.beginPath();
+      ggCtx.moveTo(centerX, centerY);
+      ggCtx.lineTo(curX, curY);
+      ggCtx.stroke();
+
+      // Ponto dinâmico atual
+      ggCtx.fillStyle = "#00f0ff";
+      ggCtx.strokeStyle = "#ffffff";
+      ggCtx.lineWidth = 2;
+      ggCtx.beginPath();
+      ggCtx.arc(curX, curY, 5, 0, 2 * Math.PI);
+      ggCtx.fill();
+      ggCtx.stroke();
+    }
+
+    function drawStripChart() {
+      const w = stripCanvas.width;
+      const h = stripCanvas.height;
+      stripCtx.clearRect(0, 0, w, h);
+
+      // Grelha de fundo
+      stripCtx.strokeStyle = "#101824";
+      stripCtx.lineWidth = 1;
+      for (let y = 0; y <= h; y += 25) {
+        stripCtx.beginPath();
+        stripCtx.moveTo(0, y); stripCtx.lineTo(w, y);
+        stripCtx.stroke();
+      }
+
+      const step = w / (stripSpeed.length - 1);
+
+      // Traçado do Acelerador (Verde)
+      stripCtx.strokeStyle = "#00e5a3";
+      stripCtx.lineWidth = 1.5;
+      stripCtx.beginPath();
+      stripThrottle.forEach((val, i) => {
+        const y = h - (val / 100) * (h * 0.85);
+        if (i === 0) stripCtx.moveTo(0, y);
+        else stripCtx.lineTo(i * step, y);
+      });
+      stripCtx.stroke();
+
+      // Traçado de Freio (Vermelho)
+      stripCtx.strokeStyle = "#ff3366";
+      stripCtx.lineWidth = 1.5;
+      stripCtx.beginPath();
+      stripBrake.forEach((val, i) => {
+        const y = h - (val / 100) * (h * 0.85);
+        if (i === 0) stripCtx.moveTo(0, y);
+        else stripCtx.lineTo(i * step, y);
+      });
+      stripCtx.stroke();
+
+      // Traçado de Velocidade (Ciano, normalizado 0-280 km/h)
+      stripCtx.strokeStyle = "#00f0ff";
+      stripCtx.lineWidth = 2;
+      stripCtx.beginPath();
+      stripSpeed.forEach((val, i) => {
+        const y = h - ((val - 60) / 220) * (h * 0.85);
+        if (i === 0) stripCtx.moveTo(0, y);
+        else stripCtx.lineTo(i * step, y);
+      });
+      stripCtx.stroke();
+    }
+
+    function getTempColor(t) {
+      if (t < 75) return "#00c4ff";      // Frio
+      if (t <= 94) return "#00e5a3";     // Faixa Ótima
+      if (t <= 101) return "#ffb800";    // Limiar Superior
+      return "#ff3366";                  // Superaquecimento
+    }
+
+    function updateTyreDisplay(fl, fr, rl, rr) {
+      // FL
+      document.getElementById("pressFL").innerHTML = `${fl.p.toFixed(2)} <span style="font-size:9px; color:var(--text-muted);">bar</span>`;
+      document.getElementById("fl-in").innerText = `${Math.round(fl.i)}°`;
+      document.getElementById("fl-in").style.backgroundColor = getTempColor(fl.i);
+      document.getElementById("fl-mid").innerText = `${Math.round(fl.c)}°`;
+      document.getElementById("fl-mid").style.backgroundColor = getTempColor(fl.c);
+      document.getElementById("fl-out").innerText = `${Math.round(fl.o)}°`;
+      document.getElementById("fl-out").style.backgroundColor = getTempColor(fl.o);
+      document.getElementById("fl-dcamb").innerText = `+${Math.round(fl.i - fl.o)}°C`;
+      document.getElementById("fl-wear").innerText = `${fl.wear}%`;
+
+      // FR
+      document.getElementById("pressFR").innerHTML = `${fr.p.toFixed(2)} <span style="font-size:9px; color:var(--text-muted);">bar</span>`;
+      document.getElementById("fr-in").innerText = `${Math.round(fr.i)}°`;
+      document.getElementById("fr-in").style.backgroundColor = getTempColor(fr.i);
+      document.getElementById("fr-mid").innerText = `${Math.round(fr.c)}°`;
+      document.getElementById("fr-mid").style.backgroundColor = getTempColor(fr.c);
+      document.getElementById("fr-out").innerText = `${Math.round(fr.o)}°`;
+      document.getElementById("fr-out").style.backgroundColor = getTempColor(fr.o);
+      document.getElementById("fr-dcamb").innerText = `+${Math.round(fr.i - fr.o)}°C`;
+      document.getElementById("fr-wear").innerText = `${fr.wear}%`;
+
+      // RL
+      document.getElementById("pressRL").innerHTML = `${rl.p.toFixed(2)} <span style="font-size:9px; color:var(--text-muted);">bar</span>`;
+      document.getElementById("rl-in").innerText = `${Math.round(rl.i)}°`;
+      document.getElementById("rl-in").style.backgroundColor = getTempColor(rl.i);
+      document.getElementById("rl-mid").innerText = `${Math.round(rl.c)}°`;
+      document.getElementById("rl-mid").style.backgroundColor = getTempColor(rl.c);
+      document.getElementById("rl-out").innerText = `${Math.round(rl.o)}°`;
+      document.getElementById("rl-out").style.backgroundColor = getTempColor(rl.o);
+      document.getElementById("rl-dcamb").innerText = `+${Math.round(rl.i - rl.o)}°C`;
+      document.getElementById("rl-wear").innerText = `${rl.wear}%`;
+
+      // RR
+      document.getElementById("pressRR").innerHTML = `${rr.p.toFixed(2)} <span style="font-size:9px; color:var(--text-muted);">bar</span>`;
+      document.getElementById("rr-in").innerText = `${Math.round(rr.i)}°`;
+      document.getElementById("rr-in").style.backgroundColor = getTempColor(rr.i);
+      document.getElementById("rr-mid").innerText = `${Math.round(rr.c)}°`;
+      document.getElementById("rr-mid").style.backgroundColor = getTempColor(rr.c);
+      document.getElementById("rr-out").innerText = `${Math.round(rr.o)}°`;
+      document.getElementById("rr-out").style.backgroundColor = getTempColor(rr.o);
+      document.getElementById("rr-dcamb").innerText = `+${Math.round(rr.i - rr.o)}°C`;
+      document.getElementById("rr-wear").innerText = `${rr.wear}%`;
+    }
+
+    let trackProgress = 0.49; // Progresso do carro foco na pista
+    let tireWearBase = 14;
+
+    function physicsLoop() {
+      if (!isSimulationRunning) return;
+
+      simTick++;
+      trackProgress = (trackProgress + 0.0022) % 1.0;
+
+      // Movimentação dos satélites no circuito fechado SVG (coordenadas paramétricas de Odawara)
+      function getTrackCoords(p) {
+        const theta = p * 2 * Math.PI;
+        const x = 320 + 220 * Math.sin(theta) + 40 * Math.cos(2 * theta);
+        const y = 140 + 85 * Math.cos(theta) - 35 * Math.sin(3 * theta);
+        return { x, y };
+      }
+
+      // Atualiza Carro Foco
+      const posFocus = getTrackCoords(trackProgress);
+      document.getElementById("beaconFocus").setAttribute("cx", posFocus.x);
+      document.getElementById("beaconFocus").setAttribute("cy", posFocus.y);
+
+      // Atualiza Concorrentes
+      const posP1 = getTrackCoords((trackProgress + 0.025) % 1.0);
+      document.getElementById("beaconP1").setAttribute("cx", posP1.x);
+      document.getElementById("beaconP1").setAttribute("cy", posP1.y);
+
+      const posP3 = getTrackCoords((trackProgress - 0.055 + 1.0) % 1.0);
+      document.getElementById("beaconP3").setAttribute("cx", posP3.x);
+      document.getElementById("beaconP3").setAttribute("cy", posP3.y);
+
+      const posP4 = getTrackCoords((trackProgress - 0.11 + 1.0) % 1.0);
+      document.getElementById("beaconP4").setAttribute("cx", posP4.x);
+      document.getElementById("beaconP4").setAttribute("cy", posP4.y);
+
+      // DROP ZONE na Pista (posição aproximada de rejoin após 22s de pitstop)
+      const dropProgress = (trackProgress - (isSafetyCarActive ? 0.08 : 0.15) + 1.0) % 1.0;
+      const posDrop = getTrackCoords(dropProgress);
+      document.getElementById("dropZoneMarker").setAttribute("cx", posDrop.x);
+      document.getElementById("dropZoneMarker").setAttribute("cy", posDrop.y);
+      document.getElementById("dropZoneText").setAttribute("x", posDrop.x + 12);
+      document.getElementById("dropZoneText").setAttribute("y", posDrop.y + 4);
+
+      // Dinâmica de Aceleração e Inércia do Carro Foco
+      const theta = trackProgress * 2 * Math.PI;
+      const currentAy = 1.85 * Math.sin(theta * 2);
+      const currentAx = -1.4 * Math.cos(theta);
+      const currentSpeed = Math.round(195 + 55 * Math.sin(theta) + 10 * Math.cos(2 * theta));
+
+      // Atualizar G-G History
+      ggHistory.push({ ax: currentAx, ay: currentAy });
+      if (ggHistory.length > maxGgPoints) ggHistory.shift();
+
+      // Atualizar Buffer Temporal
+      stripSpeed.push(currentSpeed);
+      stripSpeed.shift();
+
+      let tps = 0;
+      let brk = 0;
+      if (currentAx < -0.2) {
+        brk = Math.min(100, Math.round(Math.abs(currentAx) * 60));
+        tps = 0;
+      } else {
+        brk = 0;
+        tps = Math.min(100, Math.round(Math.max(0, currentAx + 1.3) * 50));
+      }
+
+      stripThrottle.push(tps);
+      stripThrottle.shift();
+      stripBrake.push(brk);
+      stripBrake.shift();
+
+      // Métricas de Chassis
+      document.getElementById("valSpeed").innerText = currentSpeed;
+      document.getElementById("valAy").innerText = Math.abs(currentAy).toFixed(2);
+
+      const steerDeg = (-currentAy * 18.2).toFixed(1);
+      document.getElementById("txtSteer").innerText = `${steerDeg}°`;
+      document.getElementById("barSteer").style.width = `${Math.min(100, Math.max(0, 50 + steerDeg * 1.5))}%`;
+
+      document.getElementById("txtTps").innerText = `${tps}%`;
+      document.getElementById("barTps").style.width = `${tps}%`;
+
+      document.getElementById("txtBrk").innerText = `${brk} BAR`;
+      document.getElementById("barBrk").style.width = `${brk}%`;
+
+      // Balanço de Guinada Dinâmico
+      const yawGrad = (currentAy * 0.08).toFixed(2);
+      const valYawBalance = document.getElementById("valYawBalance");
+      if (Math.abs(yawGrad) < 0.1) {
+        valYawBalance.innerText = "0.00°";
+        valYawBalance.style.color = "var(--accent-green)";
+        document.getElementById("valYawDesc").innerText = "Neutro / Balanço Ótimo";
+      } else if (yawGrad > 0) {
+        valYawBalance.innerText = `+${yawGrad}°`;
+        valYawBalance.style.color = "var(--accent-cyan)";
+        document.getElementById("valYawDesc").innerText = "Subesterço Leve (Front Push)";
+      } else {
+        valYawBalance.innerText = `${yawGrad}°`;
+        valYawBalance.style.color = "var(--accent-amber)";
+        document.getElementById("valYawDesc").innerText = "Sobresterço Transiente";
+      }
+
+      // Rake Dinâmico sob frenagem (mergulho)
+      const dynamicRake = (1.18 + currentAx * 0.22).toFixed(2);
+      document.getElementById("valRake").innerText = dynamicRake;
+
+      // Simulação Térmica dos Pneus (aquecimento por aceleração lateral e longitudinal)
+      const latLoadR = Math.max(0, currentAy);
+      const latLoadL = Math.max(0, -currentAy);
+
+      const fl = {
+        p: 2.00 + (latLoadL * 0.04),
+        i: 88 + latLoadL * 5 + (brk > 30 ? 4 : 0),
+        c: 83 + latLoadL * 4,
+        o: 80 + latLoadL * 3,
+        wear: 14
+      };
+
+      const fr = {
+        p: 2.03 + (latLoadR * 0.05),
+        i: 94 + latLoadR * 6 + (brk > 30 ? 5 : 0),
+        c: 89 + latLoadR * 5,
+        o: 85 + latLoadR * 4,
+        wear: 19
+      };
+
+      const rl = {
+        p: 1.98 + (latLoadL * 0.03),
+        i: 91 + latLoadL * 4 + (tps > 80 ? 4 : 0),
+        c: 87 + latLoadL * 3,
+        o: 83 + latLoadL * 2,
+        wear: 12
+      };
+
+      // Pneu RR (sobrecarregado em saídas de curva à esquerda)
+      const rrTempBoost = latLoadR * 8 + (tps > 80 ? 6 : 0);
+      const rr = {
+        p: 2.08 + (rrTempBoost * 0.008),
+        i: 103 + rrTempBoost,
+        c: 98 + rrTempBoost * 0.8,
+        o: 93 + rrTempBoost * 0.7,
+        wear: 26
+      };
+
+      updateTyreDisplay(fl, fr, rl, rr);
+
+      // Renderizar Gráficos em Canvas
+      drawKammCircle(currentAx, currentAy);
+      drawStripChart();
+    }
+
+    function toggleSafetyCar() {
+      isSafetyCarActive = !isSafetyCarActive;
+      const btn = document.getElementById("btnScToggle");
+      const pitLossTxt = document.getElementById("txtPitLoss");
+      const dropPosBadge = document.getElementById("badgeDropPos");
+      const dropDesc = document.getElementById("dropZoneDesc");
+
+      if (isSafetyCarActive) {
+        btn.classList.add("active");
+        btn.innerText = "FLAG: SAFETY CAR ATIVO (FCY)";
+        pitLossTxt.innerHTML = `<span style="color:var(--accent-green); font-weight:bold;">12.8 s</span> (CHEAP PIT UNDER SC)`;
+        dropPosBadge.innerText = "PROJEÇÃO: P2 (VANTAGEM SC)";
+        dropPosBadge.style.color = "var(--accent-green)";
+        dropDesc.innerText = "Delta favorável de parada barata! Regresso garantido em P2 à frente do bloco perseguidor.";
+        document.getElementById("radioMsg").innerText = "BOX NESTA VOLTA! Vantagem de Safety Car confirmada.";
+      } else {
+        btn.classList.remove("active");
+        btn.innerText = "FLAG: BANDEIRA VERDE";
+        pitLossTxt.innerText = "22.4 s (SOB BANDEIRA VERDE)";
+        dropPosBadge.innerText = "PROJEÇÃO: P4";
+        dropPosBadge.style.color = "var(--accent-cyan)";
+        dropDesc.innerText = "Janela sem tráfego imediato. Retorno estimado 3.4s à frente do carro #2 (Akaba). Ar limpo preservado.";
+        document.getElementById("radioMsg").innerText = "Pneu RR acima de 102°C. Ajuste balanço de freio (+1% F).";
+      }
+    }
+
+    function toggleSimulation() {
+      isSimulationRunning = !isSimulationRunning;
+      const btn = document.getElementById("btnSimPause");
+      btn.innerText = isSimulationRunning ? "PAUSAR" : "RETOMAR";
+      btn.classList.toggle("active", !isSimulationRunning);
+    }
+
+    function triggerPitstopCall() {
+      const radio = document.getElementById("radioMsg");
+      radio.innerText = "BOX, BOX, BOX! Troca para pneus " + nextCompound + ". Cuidado com linha branca de saída!";
+      radio.style.color = "var(--accent-cyan)";
+      document.getElementById("txtPitWindow").innerHTML = `<span style="color:var(--accent-green); font-weight:bold;">PARADA ATIVA (ENTRADA DE BOX)</span>`;
+    }
+
+    function executeUndercutSim() {
+      const uTxt = document.getElementById("txtUndercutDelta");
+      uTxt.innerHTML = `<span style="color:var(--accent-purple); font-weight:bold;">-2.14 s vs P1</span> (OUT-LAP NOVA ESTIMADA EM 2:01.8)`;
+      document.getElementById("radioMsg").innerText = "Ritmo de ataque liberado na out-lap para consolidar undercut!";
+    }
+
+    function switchNextCompound() {
+      if (nextCompound === "HARD") nextCompound = "MEDIUM";
+      else if (nextCompound === "MEDIUM") nextCompound = "SOFT";
+      else nextCompound = "HARD";
+      document.getElementById("btnCompoundLabel").innerText = nextCompound;
+    }
+
+    // Inicialização do dashboard
+    renderTower();
+    setInterval(physicsLoop, 40); // 25 FPS para o loop visual fluido
+  </script>
+</body>
+</html>
