@@ -624,4 +624,4 @@ def get_gt3_cup_preset(generation: Generation | str) -> PorscheCupVehicle:
         return porsche_911_gt3_cup_991_2()
     if "992" in gen_str:
         return porsche_911_gt3_cup_992_1()
-    raise ValueError(f"Geracao de Porsche GT3 Cup desconhecida: {generation}")
+    raise ValueError(f"Geração de Porsche GT3 Cup desconhecida: {generation}")
