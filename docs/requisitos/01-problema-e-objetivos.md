@@ -48,7 +48,7 @@ Cada família terá os seus próprios `docs/requisitos/`. Decisão de Vitor em 2
 
 | Família | Nicho | Quem compra | Exemplo do que entrega |
 |---|---|---|---|
-| Piloto | Piloto amador de track day e sim racer | P2, P3 | Relatório interpretado: onde perdi tempo, o que treinar |
+| Piloto | Piloto amador de track day e piloto virtual de simulador (iRacing principalmente, ACC, Assetto Corsa, GT7) | P2, P3 | Relatório interpretado: onde perdi tempo, o que treinar; mesma tela para volta real e volta de simulador |
 | Engenheiro | Engenheiro de pista e consultor | Engenheiro de performance | Análise multi-formato, comparação, simulação, ferramentas de box |
 | Equipe | Chefe de equipe nacional | P1 | Setup, operação do evento, histórico de carro e piloto |
 | Campeonato | Organizador de evento e campeonato | Organizador | Comparativo do dia, cronometragem, pit wall ao vivo |
@@ -93,6 +93,7 @@ Cada família terá os seus próprios `docs/requisitos/`. Decisão de Vitor em 2
 | Necessidade | Loggers amadores não têm pedal; todos têm acelerômetro | F4 | família piloto |
 | Necessidade | Pit wall sem vídeo, dado por distância, local-first, gap e interval separados | F5 | família campeonato |
 | Necessidade | Manter os modelos de simulação com engenharia reversa de parâmetros: analisar o arquivo e o carro, simular uma volta parecida com modelo de piloto e achar comandos e comportamentos possíveis. Nunca tinha sido escrito como requisito | F1, 2026-09-13 | E-RF-09 |
+| Necessidade | A família Piloto atende também o piloto virtual de simulador (iRacing, ACC, AC, GT7), com o mesmo relatório | F1, 2026-09-13 | E-RF-01, E-RN-08, família Piloto |
 | Desejo | Cobrir tudo o que o Garmin Catalyst 2 faz, no software primeiro | F1, F9 | tabela de referência abaixo |
 | Desejo | Ter hardware próprio de aquisição; pré-condição: software consolidado e parceria com a DashAuto | F1, F10 | linha Hardware (futuro) |
 

@@ -37,8 +37,7 @@ O que muda conforme a situação:
   não cria outra.
 - 2a. Formato desconhecido: recusa com motivo e abre o caminho raro do formato novo (E-UC-04).
   Pouquíssimos formatos novos vão entrar; o comum é o arquivo já ser compatível.
-- 5a. O arquivo declara a pista: resolve por alias. Não declara mas tem GPS: resolve por
-  posição. Nenhum dos dois: pergunta ao usuário uma vez e guarda a resposta.
+- 5a. Em gravação de simulador (E-RN-08), resolve a pista exclusivamente pelo nome e layout declarados pelo jogo e ignora GPS. Em logger real, se o arquivo declara a pista: resolve por alias; se não declara mas tem GPS: resolve por posição; se nenhum dos dois: pergunta ao usuário uma vez e guarda a resposta.
 - 5b. O logger já marca as voltas (canal ou beacon): usa. Não marca (log contínuo de ECU):
   corta por GPS na linha de chegada.
 - 7a. A família de destino ainda não existe (hoje só Piloto tem tela): o resultado fica
@@ -54,8 +53,7 @@ fechar antes do lançamento da família que a sofre):
   hoje não cortam; tarefa aberta.
 - 5f. Comprimento da pista no catálogo não bate com o percorrido (Curitiba, 67 voltas, razão
   1,164): decisão de domínio pendente, provavelmente catálogo errado ou outro layout.
-- 5g. GPS do arquivo aponta outra pista (3 gravações GT7 com coordenada de Donington): corte
-  por GPS e traçado recusam com o tamanho do erro.
+- 5g. Em logger real, se o GPS do arquivo aponta pista diferente do alias declarado: corte por GPS e traçado recusam com o tamanho do erro. Em gravação de simulador (E-RN-08), o GPS é desconsiderado e a pista declarada pelo jogo é preservada sem recusa.
 - 5h. Canal de volta com valores que não são contagem (de 28 a 2572): guarda de densidade
   rejeita e o corte tenta o próximo método.
 - 5i. Corte só por canal a 1 Hz: tempo de volta em segundos inteiros; refinar contra a série

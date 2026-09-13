@@ -7,9 +7,9 @@ implementado, validado. Coluna Tarefa fica "a abrir" até as issues existirem.
 
 | Requisito | Tipo | Objetivo | Regra (RN) | Onde vive hoje ou vai viver | Caso de uso | Tarefa | Critério | Status | Versão |
 |---|---|---|---|---|---|---|---|---|---|
-| E-RF-01 | ler qualquer logger | OBJ-02, OBJ-03 | E-RN-04 | `saru-poc-trackday/src/saru_poc/readers/` (12 leitores) | E-UC-01, E-UC-04 | a abrir | E-CT-01 | parcial | 1 |
+| E-RF-01 | ler qualquer logger ou simulador | OBJ-02, OBJ-03 | E-RN-04, E-RN-08 | `saru-poc-trackday/src/saru_poc/readers/` (12 leitores) | E-UC-01, E-UC-04 | a abrir | E-CT-01, E-CT-11 | parcial | 1 |
 | E-RF-02 | falar uma língua só | OBJ-02 | RN-10 da PoC | `pipeline/leitura.py`, `seeds/aliases.yaml`; contrato de canal do `saru-app` a portar | E-UC-01 | a abrir | E-CT-02 | parcial | 1 |
-| E-RF-03 | saber onde e quando | OBJ-04 | RN-01, RN-06, RN-07 da PoC | `pipeline/resolucao_pista.py`, `corte_voltas.py` | E-UC-01 | a abrir: 9 exceções listadas no E-UC-01 | E-CT-03 | parcial | 1 |
+| E-RF-03 | saber onde e quando | OBJ-04 | RN-01, RN-06, RN-07 da PoC, E-RN-08 | `pipeline/resolucao_pista.py`, `corte_voltas.py` | E-UC-01 | a abrir: 9 exceções listadas no E-UC-01 | E-CT-03, E-CT-11 | parcial | 1 |
 | E-RF-04 | rastrear cada número | OBJ-03 | E-RN-04 | tabela `ingestao`, `serie_amostral`; origem na tela a criar | E-UC-01, E-UC-03 | a abrir | E-CT-04 | parcial | 1 |
 | E-RF-05 | traduzir para o nicho | OBJ-04 | E-RN-01 | `relatorio.py` (N0); textos do `saru-app` a portar | E-UC-01 passo 7 | a abrir | E-CT-05 | parcial | 1 |
 | E-RF-06 | separar quem vê o quê | OBJ-03 | E-RN-04 | `auth.py`, regra de escopo por dono | E-UC-03 | a abrir | E-CT-06 | parcial | 1 |
@@ -38,6 +38,7 @@ Regras da empresa e quem as aprovou:
 | E-RN-05 núcleo com dono único | chat | Vitor | 2026-09-12 |
 | E-RN-06 decisão antes de código; semana de modelagem; poucos ADR | chat | Vitor | 2026-09-12 |
 | E-RN-07 ordem de leitura de quem entra | pesquisa de padrão GitHub | ordem a confirmar | |
+| E-RN-08 simulador resolve pista pelo jogo, nunca por GPS | chat; caso GT7 medido | Vitor | 2026-09-13 |
 
 ## Impacto de mudança
 
@@ -49,4 +50,5 @@ Regras da empresa e quem as aprovou:
 | 2026-09-12 | E-RN-02 | validação passa a ser conjunta contra o acervo | E-UC-02, DoR item 8 | Vitor |
 | 2026-09-12 | E-RN-06 | "modelo antes do código" sai do DoR e entra na regra | 03 DoR | Vitor |
 | 2026-09-12 | todos os status | "implementado" rebaixado a "parcial" | 02, 05 | Vitor |
+| 2026-09-13 | E-RF-01, E-RN-08 | família Piloto passa a atender piloto virtual de simulador; simulador resolve pista pelo jogo, nunca por GPS | 02, 01, 05; requisitos PIL (agente Piloto avisado) | Vitor |
 | 2026-09-13 | E-RF-09 | requisito novo: estimar parâmetros do carro e simular volta parecida com modelo de piloto; nunca tinha sido escrito | 02, 05, 01; tarefa de varrer os documentos de física | Vitor |
