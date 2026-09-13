@@ -39,7 +39,7 @@ Status: proposto, aprovado, em andamento, implementado, validado, descartado.
 | PIL-RNF-07 | segurança | PIL-OBJ-06 | E-RNF-07 | | `auth.py`, tabela usuario | ADR-002 | | PIL-CT-22, PIL-CT-23, PIL-CT-38 | implementado |
 | PIL-RNF-08 | usabilidade | PIL-OBJ-01 | E-RNF-06 | | `web/src/blocos/`, `web/src/gavetas/` | ADR-007 | a abrir: revisão de rótulos e ordem | PIL-CT-39 | parcial |
 | PIL-RNF-09 | restrição de design | PIL-OBJ-02 | E-RNF-04 | PIL-RN-10 | `pipeline/leitura.py`, front `format` | ADR-003 | a abrir: pressão em psi | PIL-CT-07, PIL-CT-40 | implementado para velocidade |
-| PIL-RNF-10 | confiabilidade | PIL-OBJ-01 | própria | | `pipeline/corte_voltas.py::refinar_passagens`, constantes `TOLERANCIA_CORTE_S` e `ALERTA_CORTE_S` | ADR-007 | #6 | PIL-CT-41, PIL-CT-58 | parcial: corte refinado e testado; erro declarado no relatório a fazer |
+| PIL-RNF-10 | confiabilidade | PIL-OBJ-01 | própria | | `pipeline/corte_voltas.py::refinar_passagens`, constantes `TOLERANCIA_CORTE_S`, `ALERTA_CORTE_S`, `JANELA_ALINHAMENTO_S` e `RESIDUO_MAXIMO_ALINHAMENTO` | ADR-007 | #6 | PIL-CT-41, PIL-CT-58 | parcial: o refino melhora o corte e nunca o piora, e o erro de instante continua sem medição (só resolução) |
 | PIL-RNF-11 | restrição de implantação | | própria | | `Dockerfile`, `railway.json`, `docs/deploy-railway.md` | | | PIL-CT-42 | implementado |
 | PIL-RNF-12 | restrição de implementação | | E-RNF-10 | | repositório inteiro | | | PIL-CT-43 | implementado |
 

@@ -381,6 +381,9 @@ def test_refino_recupera_o_instante_verdadeiro() -> None:
     assert refino.alinhadas == len(duracoes)
     assert len(refino.instantes) == len(grosseiras), "refino nao cria nem some passagem"
     assert _erro_maximo(refino.instantes, duracoes) <= TOLERANCIA_CORTE_S
+    # `resolucao_s` e o passo da grade, e o teste cobra isso E NAO CONFUNDE com
+    # erro: o erro real e medido acima, contra a duracao verdadeira da fixture.
+    assert refino.resolucao_s == pytest.approx(0.05, abs=1e-9)
 
 
 def test_refino_aguenta_voltas_de_duracao_diferente() -> None:
@@ -442,7 +445,7 @@ def test_refino_sem_serie_mais_rapida_nao_muda_nada_e_diz_por_que() -> None:
     refino = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
 
     assert refino.instantes == grosseiras
-    assert refino.erro_instante_s is None
+    assert refino.resolucao_s is None
     assert refino.alinhadas == 0
     assert refino.motivo is not None and "mais rapida" in refino.motivo
 
@@ -451,7 +454,7 @@ def test_refino_com_uma_passagem_so_nao_tem_ancora() -> None:
     _v, t_rapido, v_rapido = _sessao([PERIODO_VOLTA_S] * 4)
     refino = refinar_passagens([10.0], 1.0, t_rapido, v_rapido)
     assert refino.instantes == [10.0]
-    assert refino.erro_instante_s is None
+    assert refino.resolucao_s is None
     assert refino.motivo is not None
 
 
@@ -522,3 +525,25 @@ def test_porta_do_refino_usa_a_tolerancia_ratificada_como_limiar() -> None:
     _refinar_corte(BancoQueExplode(), "g", corte, no_limite)
     assert corte.refinado is False
     assert ALERTA_CORTE_S > TOLERANCIA_CORTE_S, "alerta tem que ser pior que tolerancia"
+
+
+def test_resolucao_nao_e_o_erro_do_instante() -> None:
+    """A grade de 0,05 s nao prova erro de 0,05 s, e o contrato desta funcao nao
+    pode deixar PIL-CT-58 passar por construcao.
+
+    Mesma serie de apoio, mesma resolucao, erros reais muito diferentes: no caso
+    periodico o refino acerta na mosca, no caso com parada no meio sobra 0,3 s.
+    Se `resolucao_s` fosse lido como erro, os dois se declarariam conformes."""
+    periodicas = [PERIODO_VOLTA_S] * 4
+    com_parada = [87.3, 132.0, 87.6, 87.4]
+
+    refinos = []
+    for duracoes in (periodicas, com_parada):
+        verdadeiras, t_rapido, v_rapido = _sessao(duracoes)
+        refino = refinar_passagens(_a_1hz(verdadeiras), 1.0, t_rapido, v_rapido)
+        refinos.append((refino, _erro_maximo(refino.instantes, duracoes)))
+
+    (a, erro_a), (b, erro_b) = refinos
+    assert a.resolucao_s == pytest.approx(b.resolucao_s, abs=1e-9)
+    assert erro_b > erro_a + 0.2, "os dois casos tinham que ter erro real distinto"
+    assert erro_b > (b.resolucao_s or 0.0), "resolucao subestima o erro real aqui"

@@ -166,7 +166,7 @@ diz "demonstração" ou "a escrever".
 | PIL-CT-38 | PIL-RNF-07 | um cookie de sessão ausente, inválido ou adulterado | uma rota protegida é chamada | devolve 401 | `tests/test_auth.py::test_rota_protegida_sem_cookie_devolve_401`, `::test_token_adulterado_devolve_401` |
 | PIL-CT-39 | PIL-RNF-08 | a tela N0 de uma gravação | é aberta | há três números, três frases e nenhum controle; nenhum rótulo abreviado | demonstração e revisão de rótulos |
 | PIL-CT-40 | PIL-RNF-09 | um canal de pressão em bar | é exibido | aparece em psi com o fator único da borda | a escrever nesta família (implementado no `saru-app`, F9 ADR-0042) |
-| PIL-CT-41 | PIL-RNF-10 | uma gravação com canal de volta a 1 Hz e série de velocidade a 20 Hz | é cortada | o instante do corte tem erro menor ou igual ao período da série rápida | `tests/test_corte_voltas.py::test_refino_recupera_o_instante_verdadeiro`, com fixture sintética de resposta conhecida |
+| PIL-CT-41 | PIL-RNF-10 | uma gravação com canal de volta a 1 Hz e série de velocidade a 20 Hz | é cortada | o instante do corte tem erro menor ou igual ao período da série rápida | a escrever: o refino entrega resolução de 0,05 s, e resolução não é erro de instante. `tests/test_corte_voltas.py::test_resolucao_nao_e_o_erro_do_instante` mostra que o erro real varia de 0,000 a 0,300 s na mesma resolução |
 | PIL-CT-42 | PIL-RNF-11 | um projeto Railway vazio | o runbook é seguido | API, front e volume sobem e uma amostra sobrevive a um redeploy | demonstração |
 | PIL-CT-43 | PIL-RNF-12 | um PR | é revisado | nenhum identificador, mensagem ou documento em inglês ou com travessão | revisão de PR |
 

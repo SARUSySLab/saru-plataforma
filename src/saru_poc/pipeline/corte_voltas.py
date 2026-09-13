@@ -201,13 +201,19 @@ class Corte:
     # essa gravacao nao cortou" sem precisar reproduzir a execucao.
     tentativas: list[str] = field(default_factory=list)
     # Refino do instante contra a serie de maior taxa (excecao 5i, issue #6).
-    # `erro_instante_s` e o passo da varredura, que e o periodo da serie usada
-    # como apoio: e o teto do erro que PIL-RNF-10 cobra. `motivo_refino` diz por
-    # que NAO refinou, e fica preenchido tambem quando refinou mas o erro passou
-    # de ALERTA_CORTE_S. Nao refinar e resultado, com motivo, como todo o resto
+    #
+    # `resolucao_s` e o passo da varredura, que e o periodo da serie usada como
+    # apoio. E RESOLUCAO, nao erro: diz a menor diferenca que o alinhamento
+    # consegue distinguir, e nao quanto o instante ainda esta errado. Enquanto o
+    # alinhamento for por janela, o erro de instante que PIL-RNF-10 cobra NAO e
+    # medido, e chamar a resolucao de erro faria o criterio passar por
+    # construcao. Ver a docstring de `refinar_passagens`.
+    #
+    # `motivo_refino` diz por que NAO refinou, ou o que ficou de fora quando
+    # refinou em parte. Nao refinar e resultado, com motivo, como todo o resto
     # desta etapa.
     refinado: bool = False
-    erro_instante_s: float | None = None
+    resolucao_s: float | None = None
     motivo_refino: str | None = None
 
     @property
@@ -446,7 +452,8 @@ class Refino:
     """
 
     instantes: list[float]
-    erro_instante_s: float | None
+    # Passo da varredura, nao erro do instante. Ver o comentario de `Corte`.
+    resolucao_s: float | None
     motivo: str | None
     alinhadas: int = 0
     recusadas: int = 0
@@ -489,6 +496,15 @@ def refinar_passagens(
     A janela de busca e `[-periodo_grosso_s, +periodo_grosso_s]`, tirada do
     periodo do proprio canal grosseiro, e o passo da varredura e o periodo da
     serie rapida. Nenhum dos dois e constante escolhida a mao.
+
+    `resolucao_s` devolve esse passo, e e RESOLUCAO, nao erro de instante. A
+    primeira versao devolvia o mesmo numero chamando-o de `erro_instante_s`, e
+    isso faria PIL-CT-58 e PIL-RNF-10 passarem por construcao: a grade de 0,05 s
+    nao prova erro de 0,05 s. Medido no contraexemplo sintetico, com a grade em
+    0,050 s o erro real de tempo de volta vai de 0,000 s no caso periodico a
+    0,300 s no caso com parada no meio. O erro de instante deste metodo NAO esta
+    medido, e por isso nao sai numero nenhum se dizendo erro: o que existe e a
+    resolucao e o motivo.
 
     Passagem cujo melhor encaixe deixa residuo acima de
     `RESIDUO_MAXIMO_ALINHAMENTO` fica com o instante grosseiro e entra em
@@ -750,7 +766,7 @@ def _refinar_corte(conn, gravacao_id: str, corte: Corte, hz_canal: float) -> Non
         for n, (a, b) in enumerate(pairwise(refino.instantes), start=1)
     ]
     corte.refinado = True
-    corte.erro_instante_s = refino.erro_instante_s
+    corte.resolucao_s = refino.resolucao_s
     corte.metodo_versao = f"{corte.metodo_versao}+{METODO_REFINO}"
     corte.fonte = (
         f"{corte.fonte} refinado contra {canal.nome_bruto} "
@@ -759,6 +775,19 @@ def _refinar_corte(conn, gravacao_id: str, corte: Corte, hz_canal: float) -> Non
     # Refino parcial nao e silencio: as passagens que ficaram para tras saem
     # declaradas, com o instante grosseiro que ja tinham.
     corte.motivo_refino = refino.motivo
+    if refino.resolucao_s is not None and refino.resolucao_s > ALERTA_CORTE_S:
+        # O alerta cai sobre a RESOLUCAO, que e o que se mede. Se a propria
+        # grade ja e mais grossa que o alerta, o alinhamento nao tem como
+        # distinguir uma divergencia desse tamanho, e isso o piloto precisa
+        # saber antes de comparar duas voltas parecidas.
+        aviso = (
+            f"a serie de apoio tem passo de {refino.resolucao_s:.3f} s, acima do "
+            f"alerta de {ALERTA_CORTE_S:g} s: o alinhamento nao distingue "
+            "divergencia menor que isso"
+        )
+        corte.motivo_refino = (
+            f"{corte.motivo_refino}; {aviso}" if corte.motivo_refino else aviso
+        )
 
 
 def _por_ldx(conn, gravacao_id: str, corte: Corte) -> bool:

@@ -53,6 +53,11 @@ refinar_passagens(instantes, periodo_grosso_s, t_rapido, v_rapido)
 5. Sem série rápida, com menos de duas passagens, com sinal constante na janela
    ou com janela que não cabe na série, a função devolve os instantes intactos e
    um motivo. Não refinar é resultado, como em todo o resto desta etapa.
+6. O número que sai é `resolucao_s`, o passo da grade, e não o erro do instante.
+   A grade de 0,05 s não prova erro de 0,05 s: na mesma série de apoio, o erro
+   real vai de 0,000 s no caso periódico a 0,300 s no caso com parada no meio.
+   Enquanto o alinhamento for por janela, o erro de instante que PIL-RNF-10
+   cobra não está medido, e nenhum número sai se dizendo erro.
 
 ### Por que a janela é curta, e não a volta inteira
 
