@@ -130,6 +130,15 @@ A divisão fica assim, e é ela que o código implementa:
 Fazer `montar` emitir relatório sem volta cortada seria mudança de
 comportamento, não campo novo, e não cabe nesta issue.
 
+Por isso o PR #18 diz `Ref #2` e não `Closes #2`: o critério 1 continua
+inalcançável e a verificação em banco continua pendente. A exceção 3e fica
+parcial na matriz, não fechada.
+
+Nota para quem for fazer o merge: o commit 8ea80a6, anterior a esta correção,
+carrega `Closes #2` no corpo. Reescrever esse commit exigiria force push, que
+está proibido. Ao integrar, use squash com a mensagem do PR, ou reabra a issue
+se ela fechar sozinha.
+
 ## Critérios e como o teste prova
 
 | Critério da issue | Teste | Precisa de banco |
