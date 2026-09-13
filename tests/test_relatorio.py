@@ -186,3 +186,40 @@ def test_velocidade_sai_em_km_por_hora() -> None:
 
 def test_grade_bate_com_a_que_o_front_espera() -> None:
     assert GRADE_PONTOS == 900
+
+
+def test_classificar_volta_identifica_categorias_corretas() -> None:
+    from saru_poc.relatorio import classificar_volta
+
+    mediana = 100.0
+    teto = 115.0
+    total = 5
+
+    # 1. Volta rapida competitiva -> NORMAL
+    c, v, m = classificar_volta(3, total, 98.0, mediana, teto)
+    assert (c, v, m) == ("NORMAL", True, None)
+
+    # 2. Primeira volta lenta -> OUT_LAP
+    c, v, m = classificar_volta(1, total, 130.0, mediana, teto)
+    assert c == "OUT_LAP"
+    assert v is False
+    assert "out-lap" in m
+
+    # 3. Ultima volta lenta -> IN_LAP
+    c, v, m = classificar_volta(5, total, 135.0, mediana, teto)
+    assert c == "IN_LAP"
+    assert v is False
+    assert "in-lap" in m
+
+    # 4. Segunda volta lenta apos out-lap -> AQUECIMENTO
+    c, v, m = classificar_volta(2, total, 122.0, mediana, teto)
+    assert c == "AQUECIMENTO"
+    assert v is False
+    assert "aquecimento" in m
+
+    # 5. Volta intermediaria lenta -> TRAFEGO
+    c, v, m = classificar_volta(4, total, 125.0, mediana, teto)
+    assert c == "TRAFEGO"
+    assert v is False
+    assert "trafego" in m
+

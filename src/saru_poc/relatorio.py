@@ -355,6 +355,35 @@ def _eixos_por_volta(conn, gravacao_id: str, voltas: list[dict]) -> dict[int, tu
     return eixos
 
 
+def classificar_volta(
+    numero: int,
+    total_voltas: int,
+    lap_time: float,
+    mediana: float,
+    teto: float,
+) -> tuple[str, bool, str | None]:
+    """Classifica a volta segundo as regras ratificadas em 2026-09-13 (Decisao 2 e PIL-RN-12).
+
+    Retorna tupla (classificacao, valida, motivo):
+      - NORMAL: ritmo competitivo (lap_time <= teto).
+      - OUT_LAP: primeira volta cortada quando lap_time > teto.
+      - IN_LAP: ultima volta cortada quando lap_time > teto.
+      - AQUECIMENTO: volta logo apos out-lap (numero == 2) quando lap_time > teto.
+      - TRAFEGO: volta intermediaria quando lap_time > teto.
+    """
+    if lap_time <= teto:
+        return "NORMAL", True, None
+
+    razao = lap_time / mediana if mediana > 0 else 1.0
+    if numero == 1:
+        return "OUT_LAP", False, f"out-lap: saida dos boxes ({razao:.2f}x a mediana)"
+    if numero == total_voltas and total_voltas > 1:
+        return "IN_LAP", False, f"in-lap: retorno aos boxes ({razao:.2f}x a mediana)"
+    if numero == 2 and total_voltas > 2:
+        return "AQUECIMENTO", False, f"aquecimento de pneus ({razao:.2f}x a mediana)"
+    return "TRAFEGO", False, f"trafego ou bandeira ({razao:.2f}x a mediana)"
+
+
 def _voltas_e_setores(conn, gravacao_id: str) -> tuple[list[dict], dict[int, list]]:
     """VoltaResumo de cada volta mais os tempos de setor por volta."""
     import numpy as np
@@ -380,6 +409,7 @@ def _voltas_e_setores(conn, gravacao_id: str) -> tuple[list[dict], dict[int, lis
 
     voltas: list[dict] = []
     setores_por_volta: dict[int, list] = {}
+    total_linhas = len(linhas)
     for vid, numero, lap_time, t_ini, t_fim in linhas:
         setores = [
             float(x[0])
@@ -411,6 +441,14 @@ def _voltas_e_setores(conn, gravacao_id: str) -> tuple[list[dict], dict[int, lis
                 escala = 100.0 if float(valores.max()) > 1.5 else 1.0
                 pleno = float((valores / escala >= ACELERADOR_PLENO).mean() * 100.0)
 
+        _classe, valida, motivo = classificar_volta(
+            int(numero),
+            total_linhas,
+            float(lap_time),
+            mediana,
+            teto,
+        )
+
         voltas.append(
             {
                 "n": int(numero),
@@ -418,12 +456,8 @@ def _voltas_e_setores(conn, gravacao_id: str) -> tuple[list[dict], dict[int, lis
                 "setores_s": setores or [],
                 "v_max_kmh": v_max,
                 "delta_referencia_s": 0.0,  # preenchido depois, contra a referencia
-                "valida": float(lap_time) <= teto,
-                "motivo_invalida": (
-                    None
-                    if float(lap_time) <= teto
-                    else f"tempo {float(lap_time) / mediana:.2f}x a mediana da sessao"
-                ),
+                "valida": valida,
+                "motivo_invalida": motivo,
                 # Sem canal de combustivel no vocabulario canonico (medido: o
                 # catalogo de 62 canais nao tem nenhum de nivel nem de vazao).
                 "litros": None,

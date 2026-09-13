@@ -238,3 +238,49 @@ def test_serie_curta_nao_produz_trecho() -> None:
         )
         == {}
     )
+
+
+# --- testes de frenagem e trail-braking (PIL-RN-13) -----------------------
+
+
+def test_detectar_pontos_frenagem_g_com_limiar_3_5_sustentado_10m() -> None:
+    from saru_poc.pipeline.decomposicao import detectar_pontos_frenagem_g
+
+    dist = np.linspace(0.0, 200.0, 201)  # 1 metro por ponto
+    # Frenagem valida de 50 m a 90 m (40 m de extensao, -6.0 m/s2)
+    # Frenagem curta espuria de 120 m a 125 m (5 m de extensao, -4.0 m/s2)
+    acc = np.zeros(201)
+    acc[50:91] = -6.0
+    acc[120:126] = -4.0
+
+    zonas = detectar_pontos_frenagem_g(dist, acc, limiar_ms2=-3.5, distancia_min_m=10.0)
+    assert len(zonas) == 1, "frenagem menor que 10 m deve ser filtrada"
+    s_ini, s_fim, pico = zonas[0]
+    assert s_ini == 50.0
+    assert s_fim == 90.0
+    assert pico == -6.0
+
+
+def test_calcular_indice_trail_braking_distingue_reta_de_curva() -> None:
+    from saru_poc.pipeline.decomposicao import calcular_indice_trail_braking
+
+    dist = np.linspace(0.0, 100.0, 101)
+
+    # Caso 1: frenagem em linha reta pura (acc_lat = 0) -> indice zero
+    acc_long_reta = np.where((dist >= 20.0) & (dist <= 60.0), -5.0, 0.0)
+    acc_lat_reta = np.zeros(101)
+    indice_reta = calcular_indice_trail_braking(dist, acc_long_reta, acc_lat_reta)
+    assert indice_reta == 0.0
+
+    # Caso 2: trail braking com sobreposicao entre frenagem e entrada de curva
+    # Freia de 20 m a 60 m; curva comeca em 40 m e vai ate 80 m
+    acc_long_trail = np.where((dist >= 20.0) & (dist <= 60.0), -4.0, 0.0)
+    acc_lat_trail = np.where((dist >= 40.0) & (dist <= 80.0), 8.0, 0.0)
+    volante = np.where((dist >= 40.0) & (dist <= 80.0), 30.0, 0.0)
+
+    indice_trail = calcular_indice_trail_braking(
+        dist, acc_long_trail, acc_lat_trail, volante_graus=volante
+    )
+    assert 0.0 < indice_trail <= 1.0
+    assert indice_trail > 0.3
+

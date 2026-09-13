@@ -374,3 +374,96 @@ def _familia(motivo: str) -> str:
         if chave in motivo:
             return familia
     return motivo[:70] or "motivo nao classificado"
+
+
+# --- frenagem e trail-braking (PIL-RN-13) --------------------------------
+
+
+def detectar_pontos_frenagem_g(
+    distancia_m: np.ndarray,
+    acc_long_ms2: np.ndarray,
+    limiar_ms2: float = -3.5,
+    distancia_min_m: float = 10.0,
+) -> list[tuple[float, float, float]]:
+    """Detecta zonas de frenagem por desaceleracao longitudinal (PIL-RN-13).
+
+    Retorna lista de tuplas (s_inicio_m, s_fim_m, pico_desaceleracao_ms2) onde a
+    desaceleracao longitudinal fica abaixo do limiar (padrao -3,5 m/s2) sustentada
+    por pelo menos distancia_min_m (padrao 10 m).
+    """
+    if len(distancia_m) < 2 or len(acc_long_ms2) < 2:
+        return []
+
+    zonas = []
+    em_zona = False
+    s_ini = 0.0
+    s_ultimo = 0.0
+    pico = 0.0
+
+    for s, ax in zip(distancia_m, acc_long_ms2):
+        if ax <= limiar_ms2:
+            if not em_zona:
+                em_zona = True
+                s_ini = float(s)
+                pico = float(ax)
+            else:
+                if ax < pico:
+                    pico = float(ax)
+            s_ultimo = float(s)
+        else:
+            if em_zona:
+                em_zona = False
+                s_fim = s_ultimo
+                if (s_fim - s_ini) >= distancia_min_m:
+                    zonas.append((s_ini, s_fim, pico))
+
+    if em_zona:
+        s_fim = s_ultimo
+        if (s_fim - s_ini) >= distancia_min_m:
+            zonas.append((s_ini, s_fim, pico))
+
+    return zonas
+
+
+def calcular_indice_trail_braking(
+    distancia_m: np.ndarray,
+    acc_long_ms2: np.ndarray,
+    acc_lat_ms2: np.ndarray,
+    volante_graus: np.ndarray | None = None,
+    velocidade_ms: np.ndarray | None = None,
+    delta_s: np.ndarray | None = None,
+) -> float:
+    """Calcula o indice de trail-braking (0.0 a 1.0) conforme PIL-RN-13.
+
+    Combina desaceleracao longitudinal, aceleracao lateral, angulo de esterco,
+    velocidade e delta instantaneo. Mede a transicao fisica na elipse de atrito
+    onde o piloto alivia o pedal de freio enquanto insere o carro na curva.
+    """
+    if len(distancia_m) < 2 or len(acc_long_ms2) < 2 or len(acc_lat_ms2) < 2:
+        return 0.0
+
+    frenagem = acc_long_ms2 < -1.0
+    curva = np.abs(acc_lat_ms2) > 1.5
+
+    if volante_graus is not None and len(volante_graus) == len(distancia_m):
+        curva = curva | (np.abs(volante_graus) > 5.0)
+
+    sobreposicao = frenagem & curva
+    if not sobreposicao.any():
+        return 0.0
+
+    g = 9.80665
+    intensidade = np.sqrt((acc_long_ms2 / g) ** 2 + (acc_lat_ms2 / g) ** 2)
+    pico_combinado = float(np.max(intensidade[sobreposicao]))
+
+    dist_diff = np.diff(distancia_m)
+    dist_frenagem = np.sum(dist_diff[frenagem[:-1]])
+    dist_sobreposta = np.sum(dist_diff[sobreposicao[:-1]])
+
+    if dist_frenagem <= 0:
+        return 0.0
+
+    razao = min(1.0, float(dist_sobreposta / dist_frenagem))
+    indice = 0.6 * razao + 0.4 * min(1.0, pico_combinado / 1.5)
+    return float(np.clip(indice, 0.0, 1.0))
+

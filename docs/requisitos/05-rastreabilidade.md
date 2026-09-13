@@ -4,45 +4,44 @@ Este arquivo liga cada requisito ao objetivo que ele serve, à capacidade do nú
 usa, ao código que o implementa, à issue que o move e ao teste que o prova. É o que se
 consulta antes de mudar qualquer linha do sistema.
 
-Versão 1, 2026-09-13. Atualizada a cada mudança em requisito, modelo, tarefa ou teste.
-Status: proposto, aprovado, em andamento, implementado, validado, descartado. O repositório
-ainda não tem `docs/adr/`; a coluna Decisão cita o ADR de origem no `saru-app` que a regra
-herda.
+Versão 1.1, 2026-09-13. Atualizada com a documentação de arquitetura e decisões
+registradas em `docs/arquitetura/adr/`.
+Status: proposto, aprovado, em andamento, implementado, validado, descartado.
 
 ## Requisitos
 
 | Requisito | Tipo | Objetivo | Núcleo | Regra | Componente | Decisão | Issue | Teste | Status |
 |---|---|---|---|---|---|---|---|---|---|
-| PIL-RF-01 | funcional | PIL-OBJ-06 | E-RF-01 | PIL-RN-05 | `pipeline/recepcao.py`, tabelas gravacao e arquivo_bruto | | | PIL-CT-01, PIL-CT-02, PIL-CT-51 | implementado |
-| PIL-RF-02 | funcional | PIL-OBJ-03 | E-RF-01 | PIL-RN-11 | `readers/formatos.py` | | | PIL-CT-03 | implementado |
-| PIL-RF-03 | funcional | PIL-OBJ-03 | E-RF-01 | PIL-RN-11 | `readers/` (12 leitores) | | #2 | PIL-CT-04, PIL-CT-52 | implementado, exceção 3e aberta |
-| PIL-RF-04 | funcional | PIL-OBJ-06 | E-RF-04 | PIL-RN-04 | `pipeline/ingestao.py`, tabela ingestao | | | PIL-CT-05, PIL-CT-06 | implementado |
-| PIL-RF-05 | funcional | PIL-OBJ-06 | E-RF-02 | PIL-RN-10 | `pipeline/leitura.py`, `acervo.py`, `seeds/aliases.yaml` | saru-app ADR-0049 | #3 | PIL-CT-07, PIL-CT-53 | implementado, exceção 4e aberta |
-| PIL-RF-06 | funcional | PIL-OBJ-06 | E-RF-04 | PIL-RN-04 | `storage.py`, tabela serie_amostral | | | PIL-CT-08 | implementado |
-| PIL-RF-07 | funcional | PIL-OBJ-01, PIL-OBJ-02 | E-RF-03 | PIL-RN-01, PIL-RN-06, PIL-RN-16, PIL-RN-17 | `pipeline/resolucao_pista.py`, `pista.py`, `seeds/tracks.yaml` | saru-app ADR-0048 | #10 | PIL-CT-09, PIL-CT-10, PIL-CT-11, PIL-CT-56 | implementado, com teste próprio desde 2026-09-13; sem guarda de coerência entre venue e GPS |
-| PIL-RF-08 | funcional | PIL-OBJ-01 | E-RF-03 | PIL-RN-08, PIL-RN-15 | `pipeline/corte_voltas.py`, `corte_incremental.py`, tabela volta | saru-app ADR-0033 | #4, #6 | PIL-CT-12, PIL-CT-54, PIL-CT-57, PIL-CT-58 | implementado, exceções 5e e 5i abertas |
-| PIL-RF-09 | funcional | PIL-OBJ-01 | E-RF-03 | PIL-RN-03, PIL-RN-07 | `pipeline/decomposicao.py`, `tracado.py`, tabelas tempo_trecho, tracado, subtracado | | #5 | PIL-CT-13, PIL-CT-14, PIL-CT-55 | implementado, exceção 5f aberta |
-| PIL-RF-10 | funcional | PIL-OBJ-01, PIL-OBJ-02 | E-RF-05 | PIL-RN-02, PIL-RN-03, PIL-RN-12 | `relatorio.py`, `contract.ts` | | | PIL-CT-15, PIL-CT-16, PIL-CT-59 | implementado |
-| PIL-RF-11 | funcional | PIL-OBJ-01 | E-RF-05, E-RF-07 | PIL-RN-14 | `relatorio.py`, `api.py` rota relatorio | | | PIL-CT-17 | implementado |
-| PIL-RF-12 | funcional | PIL-OBJ-01 | E-RF-05 | | `api.py` rota amostras, `pipeline/leitura.py` | | | PIL-CT-18 | implementado |
-| PIL-RF-13 | funcional | PIL-OBJ-02 | E-RF-05 | PIL-RN-01 | `contract.ts` `MotivoDegradacao`, `relatorio.py` | | #7 | PIL-CT-19, PIL-CT-60 | implementado, exceção 7e aberta |
-| PIL-RF-16 | funcional | PIL-OBJ-06 | E-RF-06 | | `auth.py`, `rotas/auth.py`, tabela usuario | | | PIL-CT-22, PIL-CT-23 | implementado |
-| PIL-RF-23 | funcional | PIL-OBJ-05 | E-RF-05 | PIL-RN-13 | a definir | | a abrir após PIL-RN-13 | PIL-CT-30 | proposto, bloqueado |
-| PIL-RF-24 | funcional | PIL-OBJ-03 | E-RF-01 | PIL-RN-11 | a definir: `readers/fueltech_csv.py`, `readers/protune_csv.py` | | a abrir após amostra | PIL-CT-31 | proposto, bloqueado |
+| PIL-RF-01 | funcional | PIL-OBJ-06 | E-RF-01 | PIL-RN-05 | `pipeline/recepcao.py`, tabelas gravacao e arquivo_bruto | ADR-001, ADR-005 | | PIL-CT-01, PIL-CT-02, PIL-CT-51 | implementado |
+| PIL-RF-02 | funcional | PIL-OBJ-03 | E-RF-01 | PIL-RN-11 | `readers/formatos.py` | ADR-001 | | PIL-CT-03 | implementado |
+| PIL-RF-03 | funcional | PIL-OBJ-03 | E-RF-01 | PIL-RN-11 | `readers/` (12 leitores) | ADR-001 | #2 | PIL-CT-04, PIL-CT-52 | implementado, exceção 3e aberta |
+| PIL-RF-04 | funcional | PIL-OBJ-06 | E-RF-04 | PIL-RN-04 | `pipeline/ingestao.py`, tabela ingestao | ADR-001 | | PIL-CT-05, PIL-CT-06 | implementado |
+| PIL-RF-05 | funcional | PIL-OBJ-06 | E-RF-02 | PIL-RN-10 | `pipeline/leitura.py`, `acervo.py`, `seeds/aliases.yaml` | ADR-003 | #3 | PIL-CT-07, PIL-CT-53 | implementado, exceção 4e aberta |
+| PIL-RF-06 | funcional | PIL-OBJ-06 | E-RF-04 | PIL-RN-04 | `storage.py`, tabela serie_amostral | ADR-002 | | PIL-CT-08 | implementado |
+| PIL-RF-07 | funcional | PIL-OBJ-01, PIL-OBJ-02 | E-RF-03 | PIL-RN-01, PIL-RN-06, PIL-RN-16, PIL-RN-17 | `pipeline/resolucao_pista.py`, `pista.py`, `seeds/tracks.yaml` | ADR-006 | #10 | PIL-CT-09, PIL-CT-10, PIL-CT-11, PIL-CT-56 | implementado, com teste próprio desde 2026-09-13 |
+| PIL-RF-08 | funcional | PIL-OBJ-01 | E-RF-03 | PIL-RN-08, PIL-RN-15 | `pipeline/corte_voltas.py`, `corte_incremental.py`, tabela volta | ADR-007 | #4, #6 | PIL-CT-12, PIL-CT-54, PIL-CT-57, PIL-CT-58 | implementado, exceções 5e e 5i abertas |
+| PIL-RF-09 | funcional | PIL-OBJ-01 | E-RF-03 | PIL-RN-03, PIL-RN-07 | `pipeline/decomposicao.py`, `tracado.py`, tabelas tempo_trecho, tracado, subtracado | ADR-004 | #5 | PIL-CT-13, PIL-CT-14, PIL-CT-55 | implementado |
+| PIL-RF-10 | funcional | PIL-OBJ-01, PIL-OBJ-02 | E-RF-05 | PIL-RN-02, PIL-RN-03, PIL-RN-12 | `relatorio.py`, `contract.ts` | ADR-007 | | PIL-CT-15, PIL-CT-16, PIL-CT-59 | implementado |
+| PIL-RF-11 | funcional | PIL-OBJ-01 | E-RF-05, E-RF-07 | PIL-RN-14 | `relatorio.py`, `api.py` rota relatorio | ADR-001 | | PIL-CT-17 | implementado |
+| PIL-RF-12 | funcional | PIL-OBJ-01 | E-RF-05 | | `api.py` rota amostras, `pipeline/leitura.py` | ADR-002 | | PIL-CT-18 | implementado |
+| PIL-RF-13 | funcional | PIL-OBJ-02 | E-RF-05 | PIL-RN-01 | `contract.ts` `MotivoDegradacao`, `relatorio.py` | ADR-005 | #7 | PIL-CT-19, PIL-CT-60 | implementado |
+| PIL-RF-16 | funcional | PIL-OBJ-06 | E-RF-06 | | `auth.py`, `rotas/auth.py`, tabela usuario | ADR-002 | | PIL-CT-22, PIL-CT-23 | implementado |
+| PIL-RF-23 | funcional | PIL-OBJ-05 | E-RF-05 | PIL-RN-13 | `pipeline/decomposicao.py` | ADR-004 | | PIL-CT-30 | em andamento |
+| PIL-RF-24 | funcional | PIL-OBJ-03 | E-RF-01 | PIL-RN-11 | a definir: `readers/fueltech_csv.py`, `readers/protune_csv.py` | ADR-001 | a abrir após amostra | PIL-CT-31 | proposto, bloqueado |
 | PIL-RF-26 | funcional | PIL-OBJ-01 | E-RF-05 | | a definir | | a abrir | PIL-CT-33 | proposto |
-| PIL-RF-27 | funcional | PIL-OBJ-01, PIL-OBJ-03 | E-RF-01 | PIL-RN-17 | `readers/ld.py` e perfis `acc` e `gt7_ld` em `acervo.py:85`; iRacing e Assetto Corsa a definir | decisão de Vitor 2026-09-13 | #10 para a parte da regra | PIL-CT-44, PIL-CT-45 | parcial: ACC e GT7 leem, iRacing e Assetto Corsa sem leitor |
-| PIL-RNF-01 | confiabilidade | PIL-OBJ-02 | E-RNF-01 | PIL-RN-01, PIL-RN-04 | pipeline inteiro | | | PIL-CT-05, PIL-CT-11, PIL-CT-19 | implementado |
-| PIL-RNF-02 | confiabilidade | PIL-OBJ-06 | E-RNF-02 | PIL-RN-04 | `pipeline/ingestao.py`, `storage.py` | | | PIL-CT-06, PIL-CT-08 | implementado |
-| PIL-RNF-03 | desempenho | PIL-OBJ-01 | própria | | `api.py` upload em segundo plano | | a abrir: medir tempo por gravação | PIL-CT-34 | implementado, meta pendente |
-| PIL-RNF-04 | suportabilidade | PIL-OBJ-06 | própria | | `config.py` `SARU_DATA_ROOT`, `storage.py` | | | PIL-CT-35 | a verificar |
-| PIL-RNF-05 | suportabilidade | PIL-OBJ-03 | E-RNF-09 | PIL-RN-11 | `tests/fixtures/`, `docs/*-medicao.md` | | a abrir: medição dos 9 leitores sem doc | PIL-CT-36 | parcial |
-| PIL-RNF-06 | confiabilidade | PIL-OBJ-02 | E-RNF-01 | | `contrato.py` | | | PIL-CT-37 | implementado |
-| PIL-RNF-07 | segurança | PIL-OBJ-06 | E-RNF-07 | | `auth.py`, tabela usuario | | | PIL-CT-22, PIL-CT-23, PIL-CT-38 | implementado |
-| PIL-RNF-08 | usabilidade | PIL-OBJ-01 | E-RNF-06 | | `web/src/blocos/`, `web/src/gavetas/` | | a abrir: revisão de rótulos e ordem | PIL-CT-39 | parcial |
-| PIL-RNF-09 | restrição de design | PIL-OBJ-02 | E-RNF-04 | PIL-RN-10 | `pipeline/leitura.py`, front `format` | saru-app ADR-0042 | a abrir: pressão em psi | PIL-CT-07, PIL-CT-40 | implementado para velocidade |
-| PIL-RNF-10 | confiabilidade | PIL-OBJ-01 | própria | | `pipeline/corte_voltas.py` | | #6 | PIL-CT-41, PIL-CT-58 | proposto |
+| PIL-RF-27 | funcional | PIL-OBJ-01, PIL-OBJ-03 | E-RF-01 | PIL-RN-17 | `readers/ld.py` e perfis `acc` e `gt7_ld` em `acervo.py:85`; iRacing e Assetto Corsa a definir | ADR-006 | #10 | PIL-CT-44, PIL-CT-45 | parcial: ACC e GT7 leem, iRacing e Assetto Corsa sem leitor |
+| PIL-RNF-01 | confiabilidade | PIL-OBJ-02 | E-RNF-01 | PIL-RN-01, PIL-RN-04 | pipeline inteiro | ADR-001, ADR-005 | | PIL-CT-05, PIL-CT-11, PIL-CT-19 | implementado |
+| PIL-RNF-02 | confiabilidade | PIL-OBJ-06 | E-RNF-02 | PIL-RN-04 | `pipeline/ingestao.py`, `storage.py` | ADR-001, ADR-002 | | PIL-CT-06, PIL-CT-08 | implementado |
+| PIL-RNF-03 | desempenho | PIL-OBJ-01 | própria | | `api.py` upload em segundo plano | ADR-005 | a abrir: medir tempo por gravação | PIL-CT-34 | implementado, meta pendente |
+| PIL-RNF-04 | suportabilidade | PIL-OBJ-06 | própria | | `config.py` `SARU_DATA_ROOT`, `storage.py` | ADR-002 | | PIL-CT-35 | a verificar |
+| PIL-RNF-05 | suportabilidade | PIL-OBJ-03 | E-RNF-09 | PIL-RN-11 | `tests/fixtures/`, `docs/*-medicao.md` | ADR-001 | a abrir: medição dos 9 leitores sem doc | PIL-CT-36 | parcial |
+| PIL-RNF-06 | confiabilidade | PIL-OBJ-02 | E-RNF-01 | | `contrato.py` | ADR-005 | | PIL-CT-37 | implementado |
+| PIL-RNF-07 | segurança | PIL-OBJ-06 | E-RNF-07 | | `auth.py`, tabela usuario | ADR-002 | | PIL-CT-22, PIL-CT-23, PIL-CT-38 | implementado |
+| PIL-RNF-08 | usabilidade | PIL-OBJ-01 | E-RNF-06 | | `web/src/blocos/`, `web/src/gavetas/` | ADR-007 | a abrir: revisão de rótulos e ordem | PIL-CT-39 | parcial |
+| PIL-RNF-09 | restrição de design | PIL-OBJ-02 | E-RNF-04 | PIL-RN-10 | `pipeline/leitura.py`, front `format` | ADR-003 | a abrir: pressão em psi | PIL-CT-07, PIL-CT-40 | implementado para velocidade |
+| PIL-RNF-10 | confiabilidade | PIL-OBJ-01 | própria | | `pipeline/corte_voltas.py` | ADR-007 | #6 | PIL-CT-41, PIL-CT-58 | proposto |
 | PIL-RNF-11 | restrição de implantação | | própria | | `Dockerfile`, `railway.json`, `docs/deploy-railway.md` | | | PIL-CT-42 | implementado |
-| PIL-RNF-12 | restrição de implementação | | E-RNF-10 | | repositório inteiro | decisão da organização 2026-09-12 | | PIL-CT-43 | implementado |
+| PIL-RNF-12 | restrição de implementação | | E-RNF-10 | | repositório inteiro | | | PIL-CT-43 | implementado |
 
 ## Exceções do E-UC-01
 
