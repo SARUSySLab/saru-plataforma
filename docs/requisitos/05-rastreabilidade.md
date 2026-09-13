@@ -19,7 +19,7 @@ Status: proposto, aprovado, em andamento, implementado, validado, descartado.
 | PIL-RF-05 | funcional | PIL-OBJ-06 | E-RF-02 | PIL-RN-10 | `pipeline/leitura.py`, `acervo.py`, `seeds/aliases.yaml` | ADR-003 | #3 | PIL-CT-07, PIL-CT-53 | implementado, exceção 4e aberta |
 | PIL-RF-06 | funcional | PIL-OBJ-06 | E-RF-04 | PIL-RN-04 | `storage.py`, tabela serie_amostral | ADR-002 | | PIL-CT-08 | implementado |
 | PIL-RF-07 | funcional | PIL-OBJ-01, PIL-OBJ-02 | E-RF-03 | PIL-RN-01, PIL-RN-06, PIL-RN-16, PIL-RN-17 | `pipeline/resolucao_pista.py`, `pista.py`, `seeds/tracks.yaml` | ADR-006 | #10 | PIL-CT-09, PIL-CT-10, PIL-CT-11, PIL-CT-56 | implementado, com teste próprio desde 2026-09-13 |
-| PIL-RF-08 | funcional | PIL-OBJ-01 | E-RF-03 | PIL-RN-08, PIL-RN-15 | `pipeline/corte_voltas.py`, `corte_incremental.py`, tabela volta | ADR-007 | #4, #6 | PIL-CT-12, PIL-CT-54, PIL-CT-57, PIL-CT-58 | implementado, exceções 5e e 5i abertas |
+| PIL-RF-08 | funcional | PIL-OBJ-01 | E-RF-03 | PIL-RN-08, PIL-RN-15 | `pipeline/corte_voltas.py` (com `refinar_passagens`), `corte_incremental.py`, tabela volta | ADR-007 | #4, #6 | PIL-CT-12, PIL-CT-54, PIL-CT-57, PIL-CT-58 | implementado, exceção 5e aberta e 5i parcial |
 | PIL-RF-09 | funcional | PIL-OBJ-01 | E-RF-03 | PIL-RN-03, PIL-RN-07 | `pipeline/decomposicao.py`, `tracado.py`, tabelas tempo_trecho, tracado, subtracado | ADR-004 | #5 | PIL-CT-13, PIL-CT-14, PIL-CT-55 | implementado |
 | PIL-RF-10 | funcional | PIL-OBJ-01, PIL-OBJ-02 | E-RF-05 | PIL-RN-02, PIL-RN-03, PIL-RN-12 | `relatorio.py`, `contract.ts` | ADR-007 | | PIL-CT-15, PIL-CT-16, PIL-CT-59 | implementado |
 | PIL-RF-11 | funcional | PIL-OBJ-01 | E-RF-05, E-RF-07 | PIL-RN-14 | `relatorio.py`, `api.py` rota relatorio | ADR-001 | | PIL-CT-17 | implementado |
@@ -39,7 +39,7 @@ Status: proposto, aprovado, em andamento, implementado, validado, descartado.
 | PIL-RNF-07 | segurança | PIL-OBJ-06 | E-RNF-07 | | `auth.py`, tabela usuario | ADR-002 | | PIL-CT-22, PIL-CT-23, PIL-CT-38 | implementado |
 | PIL-RNF-08 | usabilidade | PIL-OBJ-01 | E-RNF-06 | | `web/src/blocos/`, `web/src/gavetas/` | ADR-007 | a abrir: revisão de rótulos e ordem | PIL-CT-39 | parcial |
 | PIL-RNF-09 | restrição de design | PIL-OBJ-02 | E-RNF-04 | PIL-RN-10 | `pipeline/leitura.py`, front `format` | ADR-003 | a abrir: pressão em psi | PIL-CT-07, PIL-CT-40 | implementado para velocidade |
-| PIL-RNF-10 | confiabilidade | PIL-OBJ-01 | própria | | `pipeline/corte_voltas.py` | ADR-007 | #6 | PIL-CT-41, PIL-CT-58 | proposto |
+| PIL-RNF-10 | confiabilidade | PIL-OBJ-01 | própria | | `pipeline/corte_voltas.py::refinar_passagens`, constantes `TOLERANCIA_CORTE_S` e `ALERTA_CORTE_S` | ADR-007 | #6 | PIL-CT-41, PIL-CT-58 | parcial: corte refinado e testado; erro declarado no relatório a fazer |
 | PIL-RNF-11 | restrição de implantação | | própria | | `Dockerfile`, `railway.json`, `docs/deploy-railway.md` | | | PIL-CT-42 | implementado |
 | PIL-RNF-12 | restrição de implementação | | E-RNF-10 | | repositório inteiro | | | PIL-CT-43 | implementado |
 
@@ -57,7 +57,7 @@ Uma linha por exceção do caso de uso da empresa, com o estado medido em 2026-0
 | 5f comprimento do layout que não bate | PIL-CT-55 | PIL-RF-09 | `pipeline/decomposicao.py:141` | sim, desde 2026-09-13 | #5 | fechada: Curitiba nominal 3.695 m ratificado por Vitor |
 | 5g GPS de outra pista | PIL-CT-56 | PIL-RF-07, PIL-RF-09 | guarda de lugar em `tracado.py:12` e `corte_voltas.py:285`; `resolucao_pista.py` não tem guarda de coerência | corte e traçado sim; resolução de pista em `xfail` estrito desde 2026-09-13 | #10 | aberta no degrau do alias |
 | 5h canal de volta que não é contagem | PIL-CT-57 | PIL-RF-08 | `corte_voltas.py::_densidade_plausivel` | `test_densidade_rejeita_canal_que_muda_demais` | | fechada |
-| 5i corte só por canal a 1 Hz | PIL-CT-58 | PIL-RF-08 | nenhum | não | #6 | aberta |
+| 5i corte só por canal a 1 Hz | PIL-CT-58 | PIL-RF-08 | `corte_voltas.py::refinar_passagens` e `_refinar_corte` | sim, fixture sintética em `tests/test_corte_voltas.py` | #6 | parcial: critérios 1 e 4 fechados, 2 e 3 abertos (ver `docs/modelos/issue-6-refino-corte.md`) |
 | 6e setor sem dado | PIL-CT-59 | PIL-RF-10 | `relatorio.py` | `test_ideal_e_suprimida_com_setor_sem_dado` | | fechada |
 | 7e bloco sem dado | PIL-CT-60 | PIL-RF-13 | `relatorio.py`, `contract.ts` | 1 dos 7 motivos | #7 | parcial |
 
@@ -112,4 +112,5 @@ Ao mudar uma linha, listar aqui o que precisa ser revisto.
 | 2026-09-13 | PIL-RF-27, PIL-RN-17 | mudança de núcleo: Vitor ampliou E-RF-01 para logger real ou simulador e criou E-RN-08. A família Piloto passa a atender o piloto virtual, com o mesmo relatório | `01-problema-e-objetivos.md` público e fonte F14; `02-catalogos.md` PIL-RF-27, PIL-RN-17, PIL-CT-44, PIL-CT-45; `03-backlog.md` PIL-US-30 no MVP; issue #10 | Vitor, 2026-09-13 |
 | 2026-09-13 | PIL-RN-06 | amadurecimento: a regra de ambiguidade sai de PIL-RN-06 e vira PIL-RN-16, porque o raio de 5,0 km tem aprovação de Vitor e a ambiguidade só tem um ADR proposto | `02-catalogos.md`, tabela de regras; tabela de aprovação desta matriz; `06-validacao.md` pergunta 6 e lição 5 | pendente: Vitor ratificar PIL-RN-16 |
 | 2026-09-13 | PIL-RF-05, PIL-RF-07, PIL-RF-08, PIL-RF-09, PIL-RNF-08 | criação dos mocks Desktop PC N0 (piloto trackday) e N1 (pitwall e engenharia) em `docs/mocks/` e especificação de UI em `docs/arquitetura/visao-mocks-ui.md` | `docs/mocks/`, `docs/arquitetura/visao-mocks-ui.md` | Vitor, 2026-09-13 |
+| 2026-09-13 | PIL-RF-08, PIL-RNF-10, PIL-CT-41, PIL-CT-58 | o corte por canal de volta de taxa baixa passa a ser realinhado contra a série de velocidade. Tolerância de 0,05 s e alerta de 0,20 s entram como constante nomeada, com a pendência de medição declarada na docstring | `src/saru_poc/pipeline/corte_voltas.py`, `docs/modelos/issue-6-refino-corte.md`; issue #6 | pendente: Vitor, medição no acervo (E-RN-02) e se a tolerância de GPS vale para o canal de volta |
 
