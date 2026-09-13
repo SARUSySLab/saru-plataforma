@@ -92,3 +92,4 @@ Armazena as medições contínuas de sensores (taxas de 10 Hz a 1000 Hz). Cada v
 
 3. Armazenamento de Arquivos Brutos:
 Mantém o binário original recebido do piloto, identificado pelo hash SHA-256 em diretório particionado pelos dois primeiros caracteres do hash. Permite reprocessamento futuro com versões atualizadas dos algoritmos sem perda da fonte primária.
+

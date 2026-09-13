@@ -25,3 +25,4 @@ Precisa monitorar a criação de aliases automáticos para impedir que coordenad
 - `src/saru_poc/pipeline/resolucao_pista.py`
 - `src/saru_poc/acervo.py`
 - `src/saru_poc/seeds/tracks.yaml`
+

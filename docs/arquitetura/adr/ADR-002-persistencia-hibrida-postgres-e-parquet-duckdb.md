@@ -26,3 +26,4 @@ Precisa monitorar a política de expurgo e caminhos relativos na variável `SARU
 - `src/saru_poc/db.py`
 - `src/saru_poc/storage.py`
 - `src/saru_poc/pipeline/ingestao.py`
+

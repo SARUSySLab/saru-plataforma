@@ -56,3 +56,10 @@ Decisões estruturais registradas individualmente:
 1. Latência na reconstrução do traçado quando o arquivo possui mais de duas horas contínuas de pista.
 2. Variações bruscas de amostragem em receptores GPS de 1 Hz em trechos sinuosos sem canal de odômetro de roda.
 3. Necessidade de sincronização futura com a família Equipe caso surja demanda por telemetria ao vivo sem conectividade de internet no box.
+
+## 7. O que ainda não foi decidido
+
+1. Protocolo de sincronização bidirecional entre o modo local de box e a nuvem corporativa (E-RNF-05).
+2. Modelo analítico para estimativa de desgaste térmico de freios quando o canal de temperatura física está ausente.
+3. Biblioteca final de componentes visuais do frontend para a renderização de mapas de calor no traçado.
+

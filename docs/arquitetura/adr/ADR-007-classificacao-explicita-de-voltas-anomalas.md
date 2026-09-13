@@ -8,7 +8,7 @@ Requisitos motivadores: PIL-RF-08, PIL-RN-07, PIL-RN-08, PIL-RN-12
 Em track days, sessões contêm voltas de saída dos boxes (out-lap), voltas de retorno (in-lap), voltas de aquecimento de pneus e voltas prejudicadas por tráfego ou bandeiras amarelas. O descarte silencioso dessas voltas gera perplexidade no piloto, que não vê todas as voltas completadas no painel.
 
 ## Decisão
-Substituir o descarte binário por uma máquina de estados de classificação explícita que rotula cada volta em uma de cinco categorias tipadas: `NORMAL`, `IN_LAP`, `OUT_LAP`, `AQUECIMENTO` ou `TRAFEGO`, exibindo todas no resumo da sessão e excluindo apenas as anômalas do cálculo da melhor volta e volta ideal.
+Substituir o descarte binário por uma máquina de estados de classificação explícita. O sistema rotula cada volta como `NORMAL`, `IN_LAP`, `OUT_LAP`, `AQUECIMENTO` ou `TRAFEGO`. O painel exibe todas as voltas e exclui as anômalas da volta ideal.
 
 ## Alternativas descartadas
 | Alternativa | Por que não |
@@ -25,3 +25,4 @@ Precisa monitorar a sensibilidade dos limiares de velocidade média (piso de 20 
 - `src/saru_poc/pipeline/corte_voltas.py`
 - `src/saru_poc/pipeline/decomposicao.py`
 - `src/saru_poc/relatorio.py`
+

@@ -25,3 +25,4 @@ Precisa monitorar a tolerância do fator de fechamento da distância (restrito �
 - `src/saru_poc/pipeline/decomposicao.py`
 - `src/saru_poc/pipeline/tracado.py`
 - `src/saru_poc/relatorio.py`
+

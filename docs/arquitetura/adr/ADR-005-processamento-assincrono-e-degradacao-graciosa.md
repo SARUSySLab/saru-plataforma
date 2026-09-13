@@ -25,3 +25,4 @@ Precisa monitorar a fila de processamento e a correta transição de status no b
 - `src/saru_poc/api.py`
 - `src/saru_poc/pipeline/ingestao.py`
 - `src/saru_poc/relatorio.py`
+

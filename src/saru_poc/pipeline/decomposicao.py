@@ -430,14 +430,12 @@ def calcular_indice_trail_braking(
     acc_long_ms2: np.ndarray,
     acc_lat_ms2: np.ndarray,
     volante_graus: np.ndarray | None = None,
-    velocidade_ms: np.ndarray | None = None,
-    delta_s: np.ndarray | None = None,
 ) -> float:
     """Calcula o indice de trail-braking (0.0 a 1.0) conforme PIL-RN-13.
 
-    Combina desaceleracao longitudinal, aceleracao lateral, angulo de esterco,
-    velocidade e delta instantaneo. Mede a transicao fisica na elipse de atrito
-    onde o piloto alivia o pedal de freio enquanto insere o carro na curva.
+    Combina desaceleracao longitudinal, aceleracao lateral e angulo de esterco.
+    Mede a transicao fisica na elipse de atrito onde o piloto alivia o freio
+    enquanto insere o carro na curva.
     """
     if len(distancia_m) < 2 or len(acc_long_ms2) < 2 or len(acc_lat_ms2) < 2:
         return 0.0

@@ -18,3 +18,4 @@ Restrições derivadas diretamente dos requisitos não funcionais e regras de ne
 | ARQ-10 | PIL-RN-06, PIL-RN-16, PIL-RN-17 | Resolução de autódromo em pipeline de três estágios com desempate por layout e bypass para simuladores | Dependência exclusiva de geolocalização por GPS ou coordenadas simuladas falsas |
 | ARQ-11 | PIL-RN-07, PIL-RN-12 | Máquina de estados para corte e classificação explícita de voltas anômalas (in-lap, out-lap, aquecimento, tráfego) | Descarte cego de voltas fora do padrão sem categorização no relatório final |
 | ARQ-12 | PIL-RN-13 | Módulo desacoplado de decomposição de frenagem e trail-braking via cinemática veicular | Mistura de heurísticas de pilotagem dentro dos parsers de arquivo binário |
+

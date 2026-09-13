@@ -56,3 +56,4 @@ Exibir apenas três números e três recomendações no box permite leitura em c
 
 3. Normalização canônica no Sistema Internacional (SI):
 A conversão prévia de todos os canais para metros por segundo, radianos e pascals elimina divergências entre loggers diferentes (impacto ++ em Confiabilidade e Suportabilidade). Aumenta o custo computacional no estágio de ingestão (impacto neutro mitigado pela escrita vetorial em Parquet).
+

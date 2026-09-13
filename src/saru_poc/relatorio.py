@@ -13,13 +13,13 @@ Tres perguntas, na ordem do plano:
 
 Duas coisas que este modulo NAO faz, de proposito:
 
-- **Nao guarda volta ideal no banco.** E calculo entre voltas, nao propriedade
+- Nao guarda volta ideal no banco. E calculo entre voltas, nao propriedade
   de uma volta, e o proprio catalogo marca isso. Sai so no relatorio.
-- **Nao emite numero sintetico.** A nota do piloto de 0 a 100 saiu do contrato
+- Nao emite numero sintetico. A nota do piloto de 0 a 100 saiu do contrato
   (decisao 12) por estar quebrada por construcao, e as quatro componentes que a
   alimentavam voltam EM UNIDADE, com a referencia ao lado (`AtributosPilotagem`).
 
-A guarda do B1 vive aqui: **volta ideal nunca pode passar a melhor volta.** Se a
+A guarda do B1 vive aqui: volta ideal nunca pode passar a melhor volta. Se a
 soma dos melhores setores violar isso (setor faltando, escala misturada), a
 ideal e SUPRIMIDA com `ideal_suprimida: true`, em vez de sair um "potencial de
 -188,7 s" como o saru-app mostrava.

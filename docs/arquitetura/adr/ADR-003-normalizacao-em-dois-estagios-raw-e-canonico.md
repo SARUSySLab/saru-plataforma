@@ -25,3 +25,4 @@ Precisa monitorar canais sem unidade comprovada para aplicação de testes de pl
 - `src/saru_poc/readers/base.py`
 - `src/saru_poc/pipeline/leitura.py`
 - `src/saru_poc/seeds/aliases.yaml`
+

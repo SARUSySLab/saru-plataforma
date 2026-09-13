@@ -8,7 +8,7 @@ Requisitos motivadores: PIL-RNF-01, PIL-RNF-02, PIL-RNF-05, E-RNF-01
 O processamento de telemetria envolve etapas sequenciais independentes: leitura binária, normalização para unidades do Sistema Internacional, identificação de traçado, corte de voltas, decomposição cinemática e síntese de relatório. Algoritmos monolíticos dificultam testes isolados e impedem substituição modular de etapas com falhas parciais.
 
 ## Decisão
-Estruturar o processamento no estilo arquitetural Pipes and Filters orquestrado por `ingestao.py`, onde cada estágio opera como um filtro puro que recebe dados tipados e entrega o resultado para o próximo filtro, acoplado a um Repositório de dados para persistência intermediária.
+Estruturar o processamento no estilo arquitetural Pipes and Filters orquestrado por `ingestao.py`. Cada estágio opera como um filtro puro que recebe dados tipados e repassa o resultado. A persistência intermediária utiliza o padrão Repositório.
 
 ## Alternativas descartadas
 | Alternativa | Por que não |
@@ -29,3 +29,4 @@ Precisa monitorar a passagem de parâmetros e o consumo de memória durante a tr
 - `src/saru_poc/pipeline/corte_voltas.py`
 - `src/saru_poc/pipeline/decomposicao.py`
 - `src/saru_poc/relatorio.py`
+

@@ -64,3 +64,4 @@ flowchart TD
 7. `decomposicao.py` e `tracado.py`: interpola séries no eixo de distância, detecta zonas de frenagem, calcula trail-braking e métricas de curva.
 8. `relatorio.py`: sintetiza deltas de tempo, consistência de pilotagem e orientações em linguagem natural direta para o nível N0.
 9. `storage.py` e `db.py`: implementam o padrão Repositório, isolando o mecanismo físico de armazenamento do restante da lógica.
+

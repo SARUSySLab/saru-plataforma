@@ -63,3 +63,4 @@ sequenceDiagram
 2. Imutabilidade no passo 4: o arquivo original é gravado em disco ou bucket antes de qualquer transformação numérica.
 3. Resiliência no passo 12: se a volta apresentar extensão anômala, o pipeline categoriza o tipo da volta sem interromper a execução das demais voltas.
 4. Consulta sem processamento no passo 20: leituras posteriores do relatório consomem dados já agregados, garantindo resposta em poucos milissegundos.
+

@@ -42,3 +42,4 @@ flowchart TD
 3. Chefe de Equipe e Coach: consome relatórios consolidados para orientar o piloto entre as sessões.
 4. Loggers e Simuladores: sistemas proprietários que geram arquivos binários com taxas de aquisição entre 1 Hz e 1000 Hz.
 5. API Open-Meteo: fornece dados meteorológicos para correlacionar desempenho com temperatura e condição de pista.
+
