@@ -35,7 +35,9 @@ módulo e uma frase por preset dizendo "especificação homologada".
 
 Consequência prática: a coluna "proveniência declarada" abaixo não pôde ser lida do código
 valor a valor. Ela foi reconstruída a partir de qual das seis fontes cobre aquele assunto.
-Enquanto `ParameterValue` não for usado, nenhum valor deste módulo é rastreável sozinho.
+Enquanto `ParameterValue` não for usado, nenhum valor deste módulo é rastreável sozinho. A decisão
+entre usar as duas definições ou removê-las está na issue #19 da PoC, ligada a PIL-RF-29 e ao
+critério PIL-CT-47.
 
 ## 991.1, motor 3.8 L, 2013 a 2016
 
