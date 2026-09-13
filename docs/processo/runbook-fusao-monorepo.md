@@ -12,7 +12,7 @@ Finalidade: instrução executável passo a passo para unificar o repositório i
    ```
 3. Confirmar que os 8 testes de parâmetros físicos do GT3 Cup estão passando em verde:
    ```bash
-   cd /home/vitor/Desktop/Motorsport/SARU/saru && python3 -m pytest docs/fisica/test_gt3_cup.py
+   /home/vitor/Desktop/Motorsport/SARU/saru-poc-trackday/.venv/bin/pytest /home/vitor/Desktop/Motorsport/SARU/saru/docs/fisica/test_parameters_gt3_cup.py
    ```
 4. Confirmar que o remoto canônico definitivo existe na organização: `git@github.com:SARUSySLab/saru.git`. Se ainda estiver como `vitormtt/saru`, transferir para a organização `SARUSySLab` via GitHub UI ou CLI.
 
@@ -61,7 +61,7 @@ git subtree add --prefix apps/poc-trackday poc-local main -m "feat(monorepo): im
 ```bash
 mkdir -p packages/physics/tests
 git mv docs/fisica/parameters_gt3_cup.py packages/physics/
-git mv docs/fisica/test_gt3_cup.py packages/physics/tests/
+git mv docs/fisica/test_parameters_gt3_cup.py packages/physics/tests/
 ```
 
 ### Passo 4: Sincronizar documentos de arquitetura e requisitos
