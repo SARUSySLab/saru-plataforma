@@ -15,7 +15,9 @@ import pytest
 from saru_poc.relatorio import (
     APRESENTACAO,
     GRADE_PONTOS,
+    ArquivoDaCaptura,
     amostra_da_captura,
+    captura_so_de_inventario,
     melhor_volta,
     micro_setores,
     perdas_por_trecho,
@@ -227,24 +229,32 @@ def test_classificar_volta_identifica_categorias_corretas() -> None:
 
 
 # --- captura so de inventario (excecao 3e, PIL-CT-52) --------------------
-# `amostra_da_captura` recebe (formato, o leitor le amostra, amostras escritas)
-# por arquivo do bundle, que e o que `arquivos_da_captura` tira do banco. A
-# decisao e pura, entao o teste nao precisa de Postgres nem do acervo.
+# A decisao e pura: recebe um item por arquivo do bundle e devolve o bloco do
+# contrato. Nao precisa de Postgres nem do acervo.
+
+
+def _arq(formato: str, suporta: bool, amostras: int, ingerido: bool = True):
+    return ArquivoDaCaptura(
+        formato_id=formato,
+        suporta_amostra=suporta,
+        amostras_escritas=amostras,
+        ingerido=ingerido,
+    )
 
 
 def test_captura_so_de_inventario_degrada_com_motivo() -> None:
     """PIL-CT-52. Um bundle AiM cujo unico arquivo lido e um `.gpk`: o leitor le
     cabecalho e contagem e nao decodifica canal (PIL-RN-11). O relatorio tem que
     DIZER isso, nao sair sem o bloco."""
-    bloco = amostra_da_captura([("aim_gpk", False, 0)])
+    bloco = amostra_da_captura([_arq("aim_gpk", False, 0)])
     assert bloco["disponivel"] is False
     assert bloco["motivo"] == "somente_inventario"
-    assert "inventario" in bloco["texto"]
+    assert "inventário" in bloco["texto"]
     assert "aim_gpk" in bloco["texto"], "o texto tem que nomear o formato do piloto"
 
 
 def test_captura_so_de_inventario_nomeia_os_dois_formatos() -> None:
-    bloco = amostra_da_captura([("aim_gpk", False, 0), ("aim_rrk", False, 0)])
+    bloco = amostra_da_captura([_arq("aim_gpk", False, 0), _arq("aim_rrk", False, 0)])
     assert bloco["motivo"] == "somente_inventario"
     assert "aim_gpk" in bloco["texto"] and "aim_rrk" in bloco["texto"]
 
@@ -252,7 +262,9 @@ def test_captura_so_de_inventario_nomeia_os_dois_formatos() -> None:
 def test_captura_com_amostra_nao_mostra_aviso_de_inventario() -> None:
     """Terceiro criterio da issue #2: com um `.xrk` no bundle o aviso some, ainda
     que o `.gpk` irmao continue entrando so como inventario."""
-    bloco = amostra_da_captura([("aim_xrk", True, 1_200_000), ("aim_gpk", False, 0)])
+    bloco = amostra_da_captura(
+        [_arq("aim_xrk", True, 1_200_000), _arq("aim_gpk", False, 0)]
+    )
     assert bloco["disponivel"] is True
     assert bloco["arquivos_lidos"] == 2
     assert bloco["arquivos_com_amostra"] == 1
@@ -263,11 +275,49 @@ def test_formato_que_le_amostra_e_escreveu_zero_nao_e_chamado_de_inventario() ->
     """Um `.vbo` vazio escreve zero amostra e NAO e inventario. Deduzir
     inventario da contagem acusaria o formato errado, que e o tipo de erro que
     PIL-RN-11 existe pra impedir."""
-    bloco = amostra_da_captura([("vbox_vbo", True, 0)])
+    bloco = amostra_da_captura([_arq("vbox_vbo", True, 0)])
     assert bloco["disponivel"] is False
     assert bloco["motivo"] == "somente_inventario"
-    assert "entrou so como inventario" not in bloco["texto"]
-    assert "nao escreveu nenhuma" in bloco["texto"]
+    assert "entrou só como inventário" not in bloco["texto"]
+    assert "não escreveu nenhuma" in bloco["texto"]
+
+
+# --- a leitura ainda em curso nao e inventario ---------------------------
+# A recepcao ingere arquivo a arquivo, com commit entre eles. Entre o `.gpk`
+# entrar e o `.xrk` entrar existe um estado em que nenhum arquivo tem amostra e
+# o bundle esta CERTO. Declarar inventario ali manda o piloto reenviar o arquivo
+# que ele ja mandou e que esta na fila.
+
+
+def test_bundle_com_arquivo_ainda_nao_lido_nao_e_inventario() -> None:
+    """O caso do revisor: `.gpk` ja ingerido, `.xrk` ainda na fila."""
+    arquivos = [_arq("aim_gpk", False, 0), _arq("aim_xrk", True, 0, ingerido=False)]
+    assert captura_so_de_inventario(arquivos) is False
+
+
+def test_bloco_de_leitura_em_curso_diz_que_ainda_nao_terminou() -> None:
+    arquivos = [_arq("aim_gpk", False, 0), _arq("aim_xrk", True, 0, ingerido=False)]
+    bloco = amostra_da_captura(arquivos)
+    assert bloco["disponivel"] is False
+    assert "ainda não terminou" in bloco["texto"]
+    assert "1 de 2" in bloco["texto"]
+    assert "entrou só como inventário" not in bloco["texto"]
+
+
+def test_bundle_inteiro_lido_sem_amostra_e_inventario() -> None:
+    arquivos = [_arq("aim_gpk", False, 0), _arq("aim_rrk", False, 0)]
+    assert captura_so_de_inventario(arquivos) is True
+
+
+def test_bundle_com_amostra_nunca_e_inventario() -> None:
+    arquivos = [_arq("aim_gpk", False, 0), _arq("aim_xrk", True, 1_200_000)]
+    assert captura_so_de_inventario(arquivos) is False
+
+
+def test_bundle_vazio_nao_afirma_inventario() -> None:
+    """Sem arquivo nao ha evidencia de nada, e afirmar assim mesmo seria o
+    default silencioso ao contrario."""
+    assert captura_so_de_inventario([]) is False
 
 
 def test_motivo_novo_esta_no_contrato() -> None:

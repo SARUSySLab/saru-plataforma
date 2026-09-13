@@ -301,6 +301,16 @@ def _gravacao_so_de_inventario(cliente) -> str:
                         select 1 from arquivo_bruto ab
                          where ab.gravacao_id = g.id
                            and ab.formato_id <> all(%s))
+                  -- Todo arquivo do bundle tem que ter sido lido: bundle com
+                  -- arquivo ainda na fila NAO e inventario, e desde a correcao
+                  -- do achado 2 a rota nao o declara como tal.
+                  and not exists (
+                        select 1 from arquivo_bruto ab2
+                         where ab2.gravacao_id = g.id
+                           and not exists (
+                                 select 1 from ingestao i2
+                                  where i2.arquivo_id = ab2.id
+                                    and i2.status <> 'falhou'))
                 limit 1""",
             (so_inventario,),
         ).fetchone()
@@ -343,3 +353,36 @@ def test_relatorio_declara_se_a_captura_virou_amostra(
     assert bloco["disponivel"] is True
     assert bloco["arquivos_com_amostra"] >= 1
     assert bloco["arquivos_lidos"] >= bloco["arquivos_com_amostra"]
+
+
+def test_estado_de_bundle_com_arquivo_na_fila_nao_manda_reenviar(cliente) -> None:
+    """Achado 2 da revisao. A recepcao ingere arquivo a arquivo, com commit
+    entre eles, entao um bundle CERTO passa por um estado em que so o `.gpk`
+    entrou. Declarar inventario ali mandava o piloto reenviar o arquivo que ele
+    ja tinha enviado e que estava na fila.
+
+    O teste varre o catalogo atras de uma gravacao nesse estado; onde nao houver
+    nenhuma, a garantia fica com os testes puros de `tests/test_relatorio.py`."""
+    from saru_poc.db import connect
+
+    with connect() as conn:
+        linha = conn.execute(
+            """select g.id from gravacao g
+                where exists (select 1 from ingestao i where i.gravacao_id = g.id)
+                  and exists (
+                        select 1 from arquivo_bruto ab
+                         where ab.gravacao_id = g.id
+                           and not exists (
+                                 select 1 from ingestao i2
+                                  where i2.arquivo_id = ab.id
+                                    and i2.status <> 'falhou'))
+                limit 1""",
+        ).fetchone()
+    if linha is None:
+        pytest.skip("nenhuma gravacao com arquivo por ingerir no acervo desta maquina")
+
+    corpo = cliente.get(f"/api/gravacoes/{linha[0]}/estado").json()
+    motivo = corpo.get("motivo") or ""
+    sugestao = corpo.get("sugestao") or ""
+    assert "só como inventário" not in motivo
+    assert "envie também o arquivo principal" not in sugestao

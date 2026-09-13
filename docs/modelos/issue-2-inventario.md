@@ -77,12 +77,22 @@ amostra_da_captura(arquivos)           -> dict do contrato, disponível ou degra
 
 `arquivos_da_captura` faz uma consulta por gravação, uma linha por arquivo do
 bundle, com o maior `amostras_escritas` entre as ingestões daquele arquivo
-(a tabela é append-only). O `suporta_amostra` sai do registro de leitores
-(`readers.leitor_de`), não de contagem de amostra: um arquivo vazio de um
-formato que suporta amostra escreveria zero e não é inventário.
+(a tabela é append-only) e um sinalizador `ingerido`. O `suporta_amostra` sai do
+registro de leitores (`readers.leitor_de`), não de contagem de amostra: um
+arquivo vazio de um formato que suporta amostra escreveria zero e não é
+inventário.
 
-`amostra_da_captura` é pura, recebe a lista e devolve o bloco. É ela que o teste
-exercita, sem banco.
+`captura_so_de_inventario` é a decisão, e exige que TODO arquivo do bundle já
+tenha linha de ingestão. A exigência é o ponto: a recepção ingere arquivo a
+arquivo, com commit entre eles, então um bundle correto de `.gpk` mais `.xrk`
+passa por um estado em que só o `.gpk` entrou. Sem a exigência, esse estado
+intermediário respondia ao piloto "envie o arquivo principal do logger", que é
+justamente o arquivo que ele já tinha enviado e que estava na fila.
+
+`amostra_da_captura` é pura, recebe a lista e devolve o bloco. São três
+situações com a mesma consequência, e o texto separa as três: leitura ainda em
+curso, formato de leitor de inventário, e formato que suporta amostra e mesmo
+assim não escreveu nenhuma. É ela que o teste exercita, sem banco.
 
 ### 5. Como chega ao front
 

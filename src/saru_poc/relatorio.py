@@ -28,6 +28,7 @@ ideal e SUPRIMIDA com `ideal_suprimida: true`, em vez de sair um "potencial de
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 # Comprimento do micro-setor do N2. Micro-setor NAO e entidade do banco: e
 # recorte de analise por distancia, calculado aqui, e por isso nao polui o
@@ -155,8 +156,25 @@ def _disponivel(**campos) -> dict:
 # motivo e a mesma doenca do B2, so que vinda da leitura em vez da pista.
 
 
-def arquivos_da_captura(conn, gravacao_id: str) -> list[tuple[str, bool, int]]:
-    """Um item por arquivo do bundle: (formato, o leitor le amostra, amostras).
+@dataclass(frozen=True)
+class ArquivoDaCaptura:
+    """Um arquivo do bundle, do ponto de vista da leitura.
+
+    `ingerido` e falso enquanto nenhum leitor rodou sobre o arquivo. E a
+    diferenca entre "foi lido e nao tinha amostra" e "ainda nao foi lido", e
+    confundir as duas e o defeito que este tipo existe pra impedir: a recepcao
+    ingere arquivo a arquivo, com commit entre eles, entao um bundle correto
+    passa por um estado em que o `.gpk` ja entrou e o `.xrk` ainda nao.
+    """
+
+    formato_id: str
+    suporta_amostra: bool
+    amostras_escritas: int
+    ingerido: bool
+
+
+def arquivos_da_captura(conn, gravacao_id: str) -> list[ArquivoDaCaptura]:
+    """Um item por arquivo do bundle desta gravacao.
 
     `ingestao` e append-only (uma linha por execucao de leitor sobre o arquivo,
     ver migration 005), entao o estado atual de um arquivo e o MAIOR
@@ -170,7 +188,9 @@ def arquivos_da_captura(conn, gravacao_id: str) -> list[tuple[str, bool, int]]:
     from .readers import leitor_de
 
     linhas = conn.execute(
-        """select ab.formato_id, coalesce(max(i.amostras_escritas), 0)
+        """select ab.formato_id,
+                  coalesce(max(i.amostras_escritas), 0),
+                  count(i.id) > 0
              from arquivo_bruto ab
              left join ingestao i
                on i.arquivo_id = ab.id and i.status <> 'falhou'
@@ -180,46 +200,83 @@ def arquivos_da_captura(conn, gravacao_id: str) -> list[tuple[str, bool, int]]:
         (gravacao_id,),
     ).fetchall()
     saida = []
-    for formato_id, amostras in linhas:
+    for formato_id, amostras, ingerido in linhas:
         leitor = leitor_de(formato_id)
-        saida.append((formato_id, bool(leitor and leitor.suporta_amostra), int(amostras)))
+        saida.append(
+            ArquivoDaCaptura(
+                formato_id=formato_id,
+                suporta_amostra=bool(leitor and leitor.suporta_amostra),
+                amostras_escritas=int(amostras),
+                ingerido=bool(ingerido),
+            )
+        )
     return saida
 
 
-def amostra_da_captura(arquivos: list[tuple[str, bool, int]]) -> dict:
+def captura_so_de_inventario(arquivos: list[ArquivoDaCaptura]) -> bool:
+    """A captura inteira foi lida e nenhum arquivo dela virou amostra.
+
+    Exige que TODO arquivo do bundle ja tenha linha de ingestao, e essa exigencia
+    e o ponto. A recepcao ingere arquivo a arquivo, com commit entre eles, entao
+    um bundle correto de `.gpk` mais `.xrk` passa por um estado em que so o
+    `.gpk` entrou. Sem a exigencia, esse estado intermediario respondia ao piloto
+    "envie o arquivo principal do logger", que e justamente o arquivo que ele ja
+    tinha enviado e que estava na fila.
+
+    Bundle vazio nao e inventario: nao ha evidencia de nada.
+    """
+    if not arquivos:
+        return False
+    if not all(a.ingerido for a in arquivos):
+        return False
+    return not any(a.amostras_escritas > 0 for a in arquivos)
+
+
+def amostra_da_captura(arquivos: list[ArquivoDaCaptura]) -> dict:
     """Bloco `amostra_da_captura` do contrato, a partir de `arquivos_da_captura`.
 
     Disponivel quando pelo menos um arquivo materializou serie. Degradado com
     motivo `somente_inventario` quando nenhum materializou.
 
     O texto do ramo degradado e montado a partir do que foi medido, nunca
-    afirmando mais do que se sabe: formato de leitor de inventario e formato que
-    suporta amostra e mesmo assim nao escreveu nenhuma saem em frases separadas,
-    porque sao causas diferentes com a mesma consequencia.
+    afirmando mais do que se sabe. Sao tres situacoes diferentes com a mesma
+    consequencia, e o texto separa as tres: leitura ainda em curso, formato de
+    leitor de inventario, e formato que suporta amostra e mesmo assim nao
+    escreveu nenhuma.
     """
-    com_amostra = [formato for formato, _, n in arquivos if n > 0]
+    com_amostra = [a for a in arquivos if a.amostras_escritas > 0]
     if com_amostra:
         return _disponivel(
             arquivos_lidos=len(arquivos), arquivos_com_amostra=len(com_amostra)
         )
 
-    inventario = sorted({formato for formato, suporta, _ in arquivos if not suporta})
-    sem_escrever = sorted({formato for formato, suporta, _ in arquivos if suporta})
+    lidos = [a for a in arquivos if a.ingerido]
+    if arquivos and len(lidos) < len(arquivos):
+        # Leitura em curso. Dizer "entrou só como inventário" aqui seria afirmar
+        # sobre arquivo que ninguém abriu ainda.
+        return _degradado(
+            "somente_inventario",
+            f"a leitura desta captura ainda não terminou: {len(lidos)} de "
+            f"{len(arquivos)} arquivos lidos, nenhum com amostra até agora",
+        )
+
+    inventario = sorted({a.formato_id for a in arquivos if not a.suporta_amostra})
+    sem_escrever = sorted({a.formato_id for a in arquivos if a.suporta_amostra})
     partes = []
     if inventario:
         partes.append(
-            f"{', '.join(inventario)}: o leitor le cabecalho e contagem de "
-            "registros, e nao decodifica canal"
+            f"{', '.join(inventario)}: o leitor lê o cabeçalho e conta os "
+            "registros, e não decodifica canal"
         )
     if sem_escrever:
         partes.append(
-            f"{', '.join(sem_escrever)}: o leitor suporta amostra e nao escreveu nenhuma"
+            f"{', '.join(sem_escrever)}: o leitor suporta amostra e não escreveu nenhuma"
         )
-    # A frase de abertura muda com o que foi medido. "Entrou so como inventario"
-    # so e verdade quando TODO arquivo veio de leitor de inventario; com um
-    # formato que le amostra no meio, o que se sabe e menos que isso.
+    # A frase de abertura muda com o que foi medido. "Entrou só como inventário"
+    # só é verdade quando TODO arquivo veio de leitor de inventário; com um
+    # formato que lê amostra no meio, o que se sabe é menos que isso.
     texto = (
-        "esta captura entrou so como inventario: nenhum arquivo dela entregou amostra"
+        "esta captura entrou só como inventário: nenhum arquivo dela entregou amostra"
         if inventario and not sem_escrever
         else "nenhum arquivo desta captura entregou amostra"
     )

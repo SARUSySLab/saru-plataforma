@@ -44,7 +44,13 @@ from .auth import Dono
 from .config import CONFIG
 from .contrato import carregar, validar
 from .db import connect
-from .relatorio import ReferenciaDePistaDiferente, amostras, arquivos_da_captura, montar
+from .relatorio import (
+    ReferenciaDePistaDiferente,
+    amostras,
+    arquivos_da_captura,
+    captura_so_de_inventario,
+    montar,
+)
 from .rotas import auth as rotas_auth
 from .rotas import campeonato as rotas_campeonato
 from .rotas import clima as rotas_clima
@@ -337,18 +343,18 @@ def estado_da_gravacao(gravacao_id: str, dono: Dono) -> dict:
         arquivos_cap = arquivos_da_captura(conn, gravacao_id)
     layout, arquivos, voltas, trechos, falhas, ingestoes, erro, parciais = linha
 
-    # Excecao 3e do E-UC-01 (issue #2, PIL-CT-52): a captura foi lida inteira e
-    # NENHUM arquivo dela virou amostra. E o caso do `.gpk` e do `.rrk`, cujo
+    # Excecao 3e do E-UC-01 (issue #2, PIL-CT-52): a captura foi lida INTEIRA e
+    # nenhum arquivo dela virou amostra. E o caso do `.gpk` e do `.rrk`, cujo
     # leitor so faz inventario (PIL-RN-11). Sem esta pergunta, a cascata abaixo
     # culpava a pista, que e verdade menor: a pista nao resolve porque nao ha
     # nada decodificado onde procurar o venue.
-    so_inventario = (
-        not falhas
-        and bool(arquivos_cap)
-        and not any(n > 0 for _, _, n in arquivos_cap)
-    )
+    #
+    # "Inteira" e exigencia, nao detalhe: a recepcao ingere arquivo a arquivo,
+    # com commit entre eles, e sem ela um bundle correto respondia "envie o
+    # arquivo principal" no intervalo entre o `.gpk` entrar e o `.xrk` entrar.
+    so_inventario = not falhas and captura_so_de_inventario(arquivos_cap)
     formatos_inventario = ", ".join(
-        sorted({f for f, suporta, _ in arquivos_cap if not suporta})
+        sorted({a.formato_id for a in arquivos_cap if not a.suporta_amostra})
     ) or "deste arquivo"
     if ingestoes == 0:
         ingestao = None
