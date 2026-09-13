@@ -61,7 +61,7 @@ O que reaproveitar de imediato: o QSS em Python e o catálogo Pacejka MF 5.2/6.2
 | Massa total | 1330 | kg | `saru-physics-py/parameters.py`, `porsche_911_gt3_r_992()`, docstring cita Porsche Motorsport technical data MY2023, FIA WEC, Endurance Brasil | não. Docstring já registra faixa "~1250 dry, ~1330 race-ready" |
 | Massa total | 1330, piloto 80 | kg | `saru-physics-jl/reference/vehicle_992_gt3_r.yaml` | não |
 | Massa | 1310 | kg | `saru-KB/20_vehicle_dynamics/modules/10_8_par_metros_can_nicos_veiculares_e_pista.md` | não, sem fonte citada no próprio documento |
-| Massa base | 1250 a 1265 | kg | `saru-KB/20_vehicle_dynamics/research/Parâmetros Dinâmicos – Porsche 911 GT3 R (992, 2023).md`, chamado aqui de doc S1 | parcial, o próprio documento marca como faixa dependente de classificação BoP |
+| Massa base | 1250 a 1265 | kg | `saru-KB/20_vehicle_dynamics/research/Parâmetros Dinâmicos, Porsche 911 GT3 R (992, 2023).md`, chamado aqui de doc S1 | parcial, o próprio documento marca como faixa dependente de classificação BoP |
 | Massa em trim de corrida | ≈1345 (1265 base + 80 piloto) | kg | mesmo doc S1 | não |
 | Massa, homologação pública | 1250 | kg | `saru-KB/20_vehicle_dynamics/research/gt3_factcheck_report.md` | sim, ficha técnica oficial pública, sem distribuição por eixo |
 | Massa, BoP LMGT3 em 2025-04-11 | 1336 | kg | `saru-KB/20_vehicle_dynamics/research/relatorio_14dof_notas.md` | sim, fonte é o próprio boletim de BoP |
@@ -150,7 +150,7 @@ Ordem de leitura sugerida, do índice para o detalhe. Lista prioriza o que serve
 | 8 | `saru-KB/20_vehicle_dynamics/modules/02_2_modelos_de_pneu_pacejka_mf.md` | Especifica MF 5.2 e MF 6.2 nos dois solvers, com combined-slip e relaxamento transiente |
 | 9 | `saru-KB/20_vehicle_dynamics/modules/10_8_par_metros_can_nicos_veiculares_e_pista.md` | Parâmetros canônicos de veículo GT3, revisar antes de portar porque tem número sem fonte |
 | 10 | `saru-KB/20_vehicle_dynamics/research/gt3_factcheck_report.md` | Fact-check do 992 GT3 R, separa o que tem fonte primária do que é estimativa |
-| 11 | `saru-KB/20_vehicle_dynamics/research/Parâmetros Dinâmicos – Porsche 911 GT3 R (992, 2023).md` | Relatório de parâmetros do 992 GT3 R com faixas por classificação BoP |
+| 11 | `saru-KB/20_vehicle_dynamics/research/Parâmetros Dinâmicos, Porsche 911 GT3 R (992, 2023).md` | Relatório de parâmetros do 992 GT3 R com faixas por classificação BoP |
 | 12 | `saru-KB/20_vehicle_dynamics/research/relatorio_14dof_notas.md` | Notas fechando lacunas do 14-DOF: combined-slip, momentos de inércia, envelope g-g-v |
 | 13 | `saru-KB/20_vehicle_dynamics/research/Load sensitivity de pneus slick GT3...md` | Pesquisa do coeficiente k de sensibilidade de carga, cruzando Milliken, Pacejka, TTC e FSAE |
 | 14 | `saru-KB/20_vehicle_dynamics/modules/04_2_6_modelo_t_rmico_de_freios_lumped_mass.md` | Modelo térmico lumped-mass de freio GT3, sem código associado encontrado |
