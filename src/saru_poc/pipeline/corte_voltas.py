@@ -76,6 +76,35 @@ METODO_REFINO = "refino_correlacao-1"
 TOLERANCIA_CORTE_S = 0.05
 ALERTA_CORTE_S = 0.20
 
+# Janela de alinhamento: quanto sinal, depois da passagem, entra na comparacao
+# entre a volta k e a volta ancora. A MEDIR NO ACERVO.
+#
+# A primeira versao comparava a VOLTA INTEIRA, e isso so vale quando todas as
+# voltas duram o mesmo, que era a hipotese escondida na fixture. Com duracoes de
+# 87,3 / 88,9 / 86,4 / 87,9 s o erro maximo subia de 0,60 s (o 1 Hz cru) para
+# 1,35 s: a volta mais lenta percorre a mesma pista em mais tempo, o sinal fica
+# esticado, e comparar uma volta inteira contra outra de duracao diferente
+# alinha o ERRO DE RITMO em vez da posicao na pista. Quanto mais longe da
+# passagem, mais estica; por isso a janela e curta e ancorada na passagem.
+#
+# 2 s medidos no contraexemplo sintetico: com a guarda de residuo abaixo,
+# qualquer janela de 1 a 4 s deixa de piorar o 1 Hz em todos os quatro cenarios,
+# e 1 a 2 s dao o menor erro. O numero definitivo sai da medicao no acervo.
+JANELA_ALINHAMENTO_S = 2.0
+
+# Residuo maximo que ainda conta como alinhamento. A MEDIR NO ACERVO.
+#
+# Raiz do erro quadratico do melhor encaixe, dividida pelo desvio padrao do
+# proprio sinal de referencia, entao e adimensional e nao depende da unidade do
+# canal. Acima disso as duas janelas nao descrevem o mesmo pedaco de pista, e a
+# passagem fica com o instante grosseiro em vez de ser deslocada por um encaixe
+# que nao encaixa.
+#
+# No contraexemplo sintetico as passagens que convergem ficam em 0,000 a 0,089 e
+# a unica que diverge (a volta com parada no meio) da 0,338. 0,15 fica entre as
+# duas com folga dos dois lados. O numero definitivo sai da medicao no acervo.
+RESIDUO_MAXIMO_ALINHAMENTO = 0.15
+
 # Canais que contam volta por VALOR: a volta vira quando o valor muda. "Laps
 # Left" e regressivo e serve igual, e a transicao que marca, nao o sentido.
 CANAIS_CONTADOR = ("Lap Number", "lap_number", "LapNumber")
@@ -407,12 +436,28 @@ def _densidade_plausivel(instantes: list[float], duracao_s: float) -> bool:
     return len(instantes) <= teto
 
 
+@dataclass(frozen=True)
+class Refino:
+    """O que o alinhamento conseguiu fazer com as passagens grosseiras.
+
+    `alinhadas` e `recusadas` contam passagens depois da ancora. Passagem
+    recusada fica com o instante grosseiro: o refino nunca pode entregar algo
+    pior do que o canal de 1 Hz ja entregava.
+    """
+
+    instantes: list[float]
+    erro_instante_s: float | None
+    motivo: str | None
+    alinhadas: int = 0
+    recusadas: int = 0
+
+
 def refinar_passagens(
     instantes: list[float],
     periodo_grosso_s: float,
     t_rapido: np.ndarray,
     v_rapido: np.ndarray,
-) -> tuple[list[float], float | None, str | None]:
+) -> Refino:
     """Realinha passagens grosseiras contra uma serie de maior taxa.
 
     Excecao 5i do E-UC-01, criterio PIL-CT-58, meta PIL-RNF-10.
@@ -434,68 +479,124 @@ def refinar_passagens(
     estava na ancora, a diferenca e o tempo de volta verdadeiro, qualquer que
     seja o ponto da pista em que a ancora caiu. Por isso a ancora NAO se move.
 
+    A comparacao usa uma janela CURTA ancorada na passagem
+    (`JANELA_ALINHAMENTO_S`), nao a volta inteira. Comparar volta inteira contra
+    volta inteira supoe que as duas duram o mesmo, e essa hipotese e falsa em
+    sessao real: volta mais lenta estica o sinal, o erro de ritmo entra no
+    alinhamento e o refino piora o que o 1 Hz ja entregava. A constante tem a
+    medicao pendente, e o que ela vale esta escrito na propria constante.
+
     A janela de busca e `[-periodo_grosso_s, +periodo_grosso_s]`, tirada do
     periodo do proprio canal grosseiro, e o passo da varredura e o periodo da
-    serie rapida. Nenhum dos dois e constante escolhida a mao, e o passo e o
-    erro de instante declarado no retorno.
+    serie rapida. Nenhum dos dois e constante escolhida a mao.
 
-    Passagem que nao tem serie rapida suficiente depois dela (janela menor que a
-    propria busca) fica com o instante grosseiro. Devolve
-    (instantes, erro_instante_s, motivo). Com motivo preenchido nada foi
-    refinado e a lista volta como entrou: nao refinar e resultado.
+    Passagem cujo melhor encaixe deixa residuo acima de
+    `RESIDUO_MAXIMO_ALINHAMENTO` fica com o instante grosseiro e entra em
+    `recusadas`: as duas janelas nao descrevem o mesmo pedaco de pista (volta
+    com parada no meio, por exemplo), e deslocar por um encaixe que nao encaixa
+    seria trocar erro conhecido por erro inventado.
+
+    Nada refinado devolve os instantes como entraram, com motivo. Refinado em
+    parte devolve a lista com o que deu, e o motivo conta quantas ficaram para
+    tras: nao refinar e resultado, e refinar pela metade tambem.
     """
     if len(instantes) < 2:
-        return list(instantes), None, "menos de 2 passagens: nao ha ancora pra alinhar"
+        return Refino(
+            list(instantes), None, "menos de 2 passagens: nao ha ancora pra alinhar"
+        )
     if len(t_rapido) < 2 or len(t_rapido) != len(v_rapido):
-        return list(instantes), None, "serie de apoio vazia ou desalinhada do tempo"
+        return Refino(
+            list(instantes), None, "serie de apoio vazia ou desalinhada do tempo"
+        )
     if periodo_grosso_s <= 0:
-        return list(instantes), None, "periodo do canal de volta nao declarado"
+        return Refino(list(instantes), None, "periodo do canal de volta nao declarado")
 
     passo = float(np.median(np.diff(t_rapido)))
     if passo <= 0:
-        return list(instantes), None, "serie de apoio sem passo de tempo utilizavel"
+        return Refino(
+            list(instantes), None, "serie de apoio sem passo de tempo utilizavel"
+        )
     if passo >= periodo_grosso_s:
-        return list(instantes), None, (
+        return Refino(
+            list(instantes),
+            None,
             f"serie de apoio a {1 / passo:.3g} Hz nao e mais rapida que o canal "
-            f"de volta a {1 / periodo_grosso_s:.3g} Hz"
+            f"de volta a {1 / periodo_grosso_s:.3g} Hz",
+        )
+
+    inicio_rapido, fim_rapido = float(t_rapido[0]), float(t_rapido[-1])
+    janela = min(JANELA_ALINHAMENTO_S, instantes[1] - instantes[0])
+    if janela < passo * 2:
+        return Refino(
+            list(instantes), None, "volta curta demais pra caber janela de alinhamento"
+        )
+    if instantes[0] + janela > fim_rapido or instantes[0] < inicio_rapido:
+        return Refino(
+            list(instantes), None, "serie de apoio nao cobre a janela da ancora"
+        )
+
+    u = np.arange(0.0, janela, passo)
+    referencia = np.interp(instantes[0] + u, t_rapido, v_rapido)
+    escala = float(referencia.std())
+    if escala <= 0:
+        # Sinal constante na janela (carro parado, canal travado): todo encaixe
+        # da residuo zero e o alinhamento aceitaria qualquer deslocamento.
+        return Refino(
+            list(instantes),
+            None,
+            "sinal de apoio constante na janela da ancora: nao ha o que alinhar",
         )
 
     # Grade de candidatos. `periodo_grosso_s` de cada lado cobre o erro do
-    # contador com folga, e o passo da serie rapida e a menor diferenca que ela
-    # consegue distinguir.
+    # contador com folga (a ancora tambem esta deslocada, entao a diferenca
+    # entre os dois vieses cabe no intervalo aberto de um periodo para cada
+    # lado), e o passo da serie rapida e a menor diferenca que ela distingue.
     deslocamentos = np.arange(
         -periodo_grosso_s, periodo_grosso_s + passo / 2, passo, dtype=float
     )
-    fim_rapido = float(t_rapido[-1])
-    dur_ancora = instantes[1] - instantes[0]
-    piso = 2 * periodo_grosso_s  # janela menor que a busca nao decide nada
 
     refinados = [instantes[0]]
     alinhadas = 0
+    recusadas = 0
     for t_k in instantes[1:]:
-        duracao = min(
-            dur_ancora,
-            fim_rapido - instantes[0],
-            fim_rapido - (t_k + periodo_grosso_s),
+        cabe = (
+            t_k - periodo_grosso_s >= inicio_rapido
+            and t_k + periodo_grosso_s + janela <= fim_rapido
         )
-        if duracao < piso:
+        if not cabe:
             refinados.append(t_k)
+            recusadas += 1
             continue
-        u = np.arange(0.0, duracao, passo)
-        referencia = np.interp(instantes[0] + u, t_rapido, v_rapido)
-        # (candidatos, pontos): uma linha por deslocamento testado.
         alvos = np.interp(
             (t_k + deslocamentos)[:, None] + u[None, :], t_rapido, v_rapido
         )
         erro = ((alvos - referencia[None, :]) ** 2).mean(axis=1)
-        refinados.append(float(t_k + deslocamentos[int(np.argmin(erro))]))
+        melhor = int(np.argmin(erro))
+        residuo = math.sqrt(float(erro[melhor])) / escala
+        if residuo > RESIDUO_MAXIMO_ALINHAMENTO:
+            refinados.append(t_k)
+            recusadas += 1
+            continue
+        refinados.append(float(t_k + deslocamentos[melhor]))
         alinhadas += 1
 
     if not alinhadas:
-        return list(instantes), None, (
-            "serie de apoio curta demais depois das passagens pra alinhar volta"
+        return Refino(
+            list(instantes),
+            None,
+            f"nenhuma das {len(instantes) - 1} passagens encaixou na janela da "
+            "ancora: serie de apoio curta demais ou voltas sem sinal em comum",
+            0,
+            recusadas,
         )
-    return refinados, passo, None
+    motivo = None
+    if recusadas:
+        motivo = (
+            f"{recusadas} de {len(instantes) - 1} passagens ficaram com o "
+            "instante grosseiro: o encaixe contra a volta ancora nao convergiu "
+            "(volta com parada no meio ou ritmo muito diferente)"
+        )
+    return Refino(refinados, passo, motivo, alinhadas, recusadas)
 
 
 # --- leitura do que ja esta no catalogo ----------------------------------
@@ -635,29 +736,29 @@ def _refinar_corte(conn, gravacao_id: str, corte: Corte, hz_canal: float) -> Non
         return
 
     instantes = [v.t_inicio_s for v in corte.voltas] + [corte.voltas[-1].t_fim_s]
-    refinados, erro, motivo = refinar_passagens(
+    refino = refinar_passagens(
         instantes, 1.0 / hz_canal, dados["t_s"], canal.valores(dados)
     )
-    if motivo is not None:
-        corte.motivo_refino = motivo
+    if not refino.alinhadas:
+        # Nenhuma passagem se moveu: o corte fica exatamente como estava, que e
+        # o que o criterio 3 da issue #6 pede.
+        corte.motivo_refino = refino.motivo
         return
 
     corte.voltas = [
         Volta(numero=n, t_inicio_s=a, t_fim_s=b)
-        for n, (a, b) in enumerate(pairwise(refinados), start=1)
+        for n, (a, b) in enumerate(pairwise(refino.instantes), start=1)
     ]
     corte.refinado = True
-    corte.erro_instante_s = erro
+    corte.erro_instante_s = refino.erro_instante_s
     corte.metodo_versao = f"{corte.metodo_versao}+{METODO_REFINO}"
     corte.fonte = (
         f"{corte.fonte} refinado contra {canal.nome_bruto} "
         f"a {canal.frequencia_hz:g} Hz"
     )
-    if erro is not None and erro > ALERTA_CORTE_S:
-        corte.motivo_refino = (
-            f"refinado, e o erro de instante de {erro:.3f} s passa do alerta de "
-            f"{ALERTA_CORTE_S:g} s: a serie de apoio nao e rapida o bastante"
-        )
+    # Refino parcial nao e silencio: as passagens que ficaram para tras saem
+    # declaradas, com o instante grosseiro que ja tinham.
+    corte.motivo_refino = refino.motivo
 
 
 def _por_ldx(conn, gravacao_id: str, corte: Corte) -> bool:

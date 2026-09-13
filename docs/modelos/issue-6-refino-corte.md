@@ -43,14 +43,36 @@ refinar_passagens(instantes, periodo_grosso_s, t_rapido, v_rapido)
    sai do período do canal grosseiro, como a issue exige, e não de constante
    escolhida à mão.
 3. O critério é o menor erro quadrático entre o sinal rápido da volta k,
-   deslocado do candidato, e o sinal rápido da volta âncora, comparados sobre a
-   menor das duas durações. Volta inteira, não janela arbitrária: usar tudo que
-   existe evita mais um número escolhido a dedo.
-4. O erro de instante declarado é o passo da varredura, que é o período da série
-   rápida. É exatamente a meta de PIL-RNF-10.
-5. Sem série rápida, com menos de duas passagens ou com volta curta demais para
-   comparar, a função devolve os instantes intactos e um motivo. Não refinar é
-   resultado, como em todo o resto desta etapa.
+   deslocado do candidato, e o sinal rápido da volta âncora, comparados sobre uma
+   janela curta ancorada na passagem (`JANELA_ALINHAMENTO_S`, 2 s, a medir no
+   acervo).
+4. Passagem cujo melhor encaixe deixa resíduo acima de
+   `RESIDUO_MAXIMO_ALINHAMENTO` fica com o instante grosseiro e é contada como
+   recusada. Deslocar por um encaixe que não encaixa trocaria erro conhecido por
+   erro inventado.
+5. Sem série rápida, com menos de duas passagens, com sinal constante na janela
+   ou com janela que não cabe na série, a função devolve os instantes intactos e
+   um motivo. Não refinar é resultado, como em todo o resto desta etapa.
+
+### Por que a janela é curta, e não a volta inteira
+
+A primeira versão comparava a volta inteira, e isso só vale quando todas as
+voltas duram o mesmo, que era a hipótese escondida na fixture original. Volta
+mais lenta percorre a mesma pista em mais tempo, então o sinal dela sai esticado:
+comparar uma volta inteira contra outra de duração diferente alinha o erro de
+ritmo em vez da posição na pista.
+
+Medido no contraexemplo sintético, com a versão de volta inteira:
+
+| Cenário | erro do 1 Hz | erro do refino |
+|---|---|---|
+| voltas idênticas | 0,700 s | 0,000 s |
+| variação de 1 a 2 s entre voltas | 0,600 s | 1,350 s |
+| volta com parada no meio | 0,400 s | 0,700 s |
+| volta de saída mais lenta | 0,600 s | 1,000 s |
+
+Três dos quatro cenários pioravam o que o 1 Hz já entregava. Com a janela curta
+mais a guarda de resíduo, nenhum piora, e a tabela nova está no PR.
 
 ## Quando o refino entra, e por que ele não mexe em quem já corta bem
 

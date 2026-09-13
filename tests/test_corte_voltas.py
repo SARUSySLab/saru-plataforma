@@ -290,107 +290,194 @@ def test_voltas_gravadas_respeitam_a_janela(conn) -> None:
 
 # --- refino do instante contra a serie rapida (excecao 5i, PIL-CT-58) ----
 #
-# Fixture sintetica com resposta conhecida por construcao. A volta de verdade
-# dura P segundos, a serie de velocidade e de 20 Hz e o canal de volta e de
-# 1 Hz: o contador vira na primeira amostra de 1 Hz DEPOIS do cruzamento, que e
-# o que um contador de voltas faz e o que produz tempo de volta em segundo
-# inteiro nas 17 gravacoes do acervo.
+# Fixture sintetica com resposta conhecida por construcao. A serie de
+# velocidade e funcao da POSICAO na pista, e cada volta pode durar um tempo
+# diferente: e o que separa esta fixture da primeira versao dela, que so tinha
+# voltas identicas e por isso escondia o defeito de alinhar volta inteira
+# contra volta inteira.
+#
+# O canal de volta de 1 Hz marca a passagem na primeira amostra DEPOIS do
+# cruzamento, que e o que um contador de voltas faz e o que produz tempo de
+# volta em segundo inteiro nas 17 gravacoes do acervo.
 
-PERIODO_VOLTA_S = 87.3  # nao inteiro de proposito: o erro do 1 Hz fica visivel
+PERIODO_VOLTA_S = 87.3
 LARGADA_S = 3.7
 
 
-def _serie_de_velocidade(hz: float, voltas: float = 6.0):
-    """Velocidade periodica na volta, com forma assimetrica.
+def _perfil(posicao: np.ndarray) -> np.ndarray:
+    """Velocidade em funcao da posicao na pista, `posicao` em [0, 1).
 
     Tres harmonicas com fases diferentes: o sinal se repete a cada volta e tem
     um so alinhamento possivel dentro de uma volta, que e o que o refino
     procura. Uma senoide pura teria simetria e nao serviria de fixture.
     """
-    n = int(voltas * PERIODO_VOLTA_S * hz)
-    t = np.arange(n + 1) / hz
-    fase = 2 * math.pi * (t - LARGADA_S) / PERIODO_VOLTA_S
-    v = (
+    f = 2 * math.pi * posicao
+    return (
         40.0
-        + 30.0 * np.sin(fase)
-        + 12.0 * np.sin(2 * fase + 0.7)
-        + 5.0 * np.sin(3 * fase + 2.1)
+        + 30.0 * np.sin(f)
+        + 12.0 * np.sin(2 * f + 0.7)
+        + 5.0 * np.sin(3 * f + 2.1)
     )
-    return t, v
 
 
-def _passagens_verdadeiras(quantas: int = 5) -> list[float]:
-    return [LARGADA_S + k * PERIODO_VOLTA_S for k in range(quantas)]
+def _sessao(duracoes: list[float], hz: float = 20.0, rabo_s: float = 20.0):
+    """Passagens verdadeiras e serie de velocidade de uma sessao sintetica.
+
+    Cada elemento de `duracoes` e o tempo de uma volta. Volta mais lenta
+    percorre a MESMA pista em mais tempo, entao o sinal dela sai esticado no
+    tempo: e exatamente o que quebra o alinhamento por volta inteira.
+    """
+    passagens = [LARGADA_S]
+    for d in duracoes:
+        passagens.append(passagens[-1] + d)
+    t = np.arange(0.0, passagens[-1] + rabo_s, 1 / hz)
+    s = np.zeros_like(t)
+    for k, d in enumerate(duracoes):
+        dentro = (t >= passagens[k]) & (t < passagens[k + 1])
+        s[dentro] = (t[dentro] - passagens[k]) / d
+    depois = t >= passagens[-1]
+    s[depois] = ((t[depois] - passagens[-1]) / duracoes[-1]) % 1.0
+    antes = t < passagens[0]
+    s[antes] = ((t[antes] - passagens[0]) / duracoes[0]) % 1.0
+    return passagens, t, _perfil(s)
 
 
-def _passagens_a_1hz(verdadeiras: list[float]) -> list[float]:
+def _a_1hz(verdadeiras: list[float]) -> list[float]:
     """O que o canal de volta de 1 Hz entrega: a amostra seguinte ao cruzamento."""
-    return [float(math.ceil(t)) for t in verdadeiras]
+    return [float(math.ceil(x)) for x in verdadeiras]
+
+
+def _erro_maximo(instantes: list[float], duracoes: list[float]) -> float:
+    tempos = [b - a for a, b in pairwise(instantes)]
+    return max(abs(x - d) for x, d in zip(tempos, duracoes, strict=True))
 
 
 def test_canal_de_1hz_sozinho_entrega_tempo_de_volta_inteiro() -> None:
-    """A linha de base que a issue #6 quer consertar, medida aqui pra o teste
-    seguinte ter contra o que comparar."""
-    grosseiras = _passagens_a_1hz(_passagens_verdadeiras())
+    """A linha de base que a issue #6 quer consertar, medida aqui pra os testes
+    seguintes terem contra o que comparar."""
+    duracoes = [PERIODO_VOLTA_S] * 4
+    verdadeiras, _t, _v = _sessao(duracoes)
+    grosseiras = _a_1hz(verdadeiras)
     tempos = [b - a for a, b in pairwise(grosseiras)]
-    assert all(t == int(t) for t in tempos), "o canal de 1 Hz nao deveria ter decimo"
-    assert max(abs(t - PERIODO_VOLTA_S) for t in tempos) > TOLERANCIA_CORTE_S
+    assert all(x == int(x) for x in tempos), "o canal de 1 Hz nao deveria ter decimo"
+    assert _erro_maximo(grosseiras, duracoes) > TOLERANCIA_CORTE_S
 
 
 def test_refino_recupera_o_instante_verdadeiro() -> None:
-    """PIL-CT-58. Com serie de velocidade a 20 Hz, o tempo de volta sai a menos
-    de `TOLERANCIA_CORTE_S` do verdadeiro, contra ate 1 s de erro sem o refino.
+    """PIL-CT-58, caso periodico. Com serie de velocidade a 20 Hz o tempo de
+    volta sai a menos de `TOLERANCIA_CORTE_S` do verdadeiro.
 
     A ancora nao se move de proposito, entao o que o teste cobra e o TEMPO DE
     VOLTA, que e diferenca entre instantes: o erro absoluto da ancora cancela
     nela, e e o tempo de volta que o piloto le."""
-    t_rapido, v_rapido = _serie_de_velocidade(hz=20.0)
-    grosseiras = _passagens_a_1hz(_passagens_verdadeiras())
+    duracoes = [PERIODO_VOLTA_S] * 4
+    verdadeiras, t_rapido, v_rapido = _sessao(duracoes)
+    grosseiras = _a_1hz(verdadeiras)
 
-    refinadas, erro, motivo = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
+    refino = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
 
-    assert motivo is None
-    # O erro declarado e o passo MEDIDO da serie de apoio, nao um arredondamento
-    # dela: `arange(n)/20` acumula alguns femtossegundos, e guardar o numero que
-    # saiu da medicao vale mais do que esconder isso atras de um round().
-    assert erro == pytest.approx(TOLERANCIA_CORTE_S, abs=1e-9)
-    assert len(refinadas) == len(grosseiras), "refino nao pode criar nem sumir passagem"
-    tempos = [b - a for a, b in pairwise(refinadas)]
-    for volta_s in tempos:
-        assert volta_s == pytest.approx(PERIODO_VOLTA_S, abs=TOLERANCIA_CORTE_S)
+    assert refino.motivo is None
+    assert refino.recusadas == 0
+    assert refino.alinhadas == len(duracoes)
+    assert len(refino.instantes) == len(grosseiras), "refino nao cria nem some passagem"
+    assert _erro_maximo(refino.instantes, duracoes) <= TOLERANCIA_CORTE_S
+
+
+def test_refino_aguenta_voltas_de_duracao_diferente() -> None:
+    """Contraexemplo do revisor. Variacao de 1 a 2 s entre voltas e o normal de
+    uma sessao, e a primeira versao do refino PIORAVA o 1 Hz nesse caso: erro
+    maximo subia de 0,60 s para 1,35 s, porque alinhar volta inteira contra
+    volta inteira alinha o erro de ritmo em vez da posicao na pista."""
+    duracoes = [87.3, 88.9, 86.4, 87.9]
+    verdadeiras, t_rapido, v_rapido = _sessao(duracoes)
+    grosseiras = _a_1hz(verdadeiras)
+
+    refino = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
+
+    assert refino.recusadas == 0
+    assert _erro_maximo(refino.instantes, duracoes) <= TOLERANCIA_CORTE_S
+
+
+def test_refino_com_parada_no_meio_nao_piora_o_1hz_e_declara() -> None:
+    """Contraexemplo do revisor. A volta com parada no meio nao tem sinal em
+    comum com a volta ancora, entao o encaixe nao converge. A resposta e ficar
+    com o instante grosseiro e DIZER isso, nao deslocar por um encaixe que nao
+    encaixa: o refino nunca pode entregar pior do que o 1 Hz ja entregava."""
+    duracoes = [87.3, 132.0, 87.6, 87.4]
+    verdadeiras, t_rapido, v_rapido = _sessao(duracoes)
+    grosseiras = _a_1hz(verdadeiras)
+    erro_1hz = _erro_maximo(grosseiras, duracoes)
+
+    refino = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
+
+    assert refino.recusadas >= 1, "a volta com parada tinha que ser recusada"
+    assert refino.motivo is not None and "grosseiro" in refino.motivo
+    assert _erro_maximo(refino.instantes, duracoes) <= erro_1hz
+    # A passagem recusada fica com o valor original, byte a byte.
+    assert any(a == b for a, b in zip(refino.instantes, grosseiras, strict=True))
+
+
+def test_refino_com_volta_de_saida_mais_lenta_nao_piora_o_1hz() -> None:
+    """Contraexemplo do revisor. A volta de saida e mais lenta que o resto, e e
+    ela que vira a ancora. A primeira versao subia o erro de 0,60 s para 1,00 s.
+    Aqui o teste cobra o que da pra garantir sem medicao no acervo: o refino
+    melhora, e em nenhum caso piora."""
+    duracoes = [95.0, 87.4, 87.2, 87.5]
+    verdadeiras, t_rapido, v_rapido = _sessao(duracoes)
+    grosseiras = _a_1hz(verdadeiras)
+    erro_1hz = _erro_maximo(grosseiras, duracoes)
+
+    refino = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
+
+    assert _erro_maximo(refino.instantes, duracoes) < erro_1hz
 
 
 def test_refino_sem_serie_mais_rapida_nao_muda_nada_e_diz_por_que() -> None:
     """Terceiro criterio da issue: sem serie de taxa maior o corte permanece
     como esta hoje e declara que nao pode refinar."""
-    t_rapido, v_rapido = _serie_de_velocidade(hz=1.0)
-    grosseiras = _passagens_a_1hz(_passagens_verdadeiras())
+    duracoes = [PERIODO_VOLTA_S] * 4
+    verdadeiras, t_rapido, v_rapido = _sessao(duracoes, hz=1.0)
+    grosseiras = _a_1hz(verdadeiras)
 
-    refinadas, erro, motivo = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
+    refino = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
 
-    assert refinadas == grosseiras
-    assert erro is None
-    assert motivo is not None and "mais rapida" in motivo
+    assert refino.instantes == grosseiras
+    assert refino.erro_instante_s is None
+    assert refino.alinhadas == 0
+    assert refino.motivo is not None and "mais rapida" in refino.motivo
 
 
 def test_refino_com_uma_passagem_so_nao_tem_ancora() -> None:
-    t_rapido, v_rapido = _serie_de_velocidade(hz=20.0)
-    refinadas, erro, motivo = refinar_passagens([10.0], 1.0, t_rapido, v_rapido)
-    assert refinadas == [10.0]
-    assert erro is None
-    assert motivo is not None
+    _v, t_rapido, v_rapido = _sessao([PERIODO_VOLTA_S] * 4)
+    refino = refinar_passagens([10.0], 1.0, t_rapido, v_rapido)
+    assert refino.instantes == [10.0]
+    assert refino.erro_instante_s is None
+    assert refino.motivo is not None
 
 
 def test_refino_nao_alcanca_serie_que_acaba_logo_depois_das_passagens() -> None:
-    """Janela de comparacao menor que a propria busca nao decide nada, e a
-    resposta e dizer isso em vez de deslocar por ruido."""
-    t_rapido, v_rapido = _serie_de_velocidade(hz=20.0, voltas=4.02)
-    grosseiras = _passagens_a_1hz(_passagens_verdadeiras(quantas=5))
-    grosseiras = [grosseiras[0], grosseiras[-1]]
-    refinadas, erro, motivo = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
-    assert refinadas == grosseiras
-    assert erro is None
-    assert motivo is not None
+    """Janela que nao cabe na serie de apoio nao decide nada, e a resposta e
+    dizer isso em vez de deslocar por ruido."""
+    duracoes = [PERIODO_VOLTA_S] * 4
+    verdadeiras, t_rapido, v_rapido = _sessao(duracoes, rabo_s=0.5)
+    grosseiras = _a_1hz([verdadeiras[0], verdadeiras[-1]])
+
+    refino = refinar_passagens(grosseiras, 1.0, t_rapido, v_rapido)
+
+    assert refino.instantes == grosseiras
+    assert refino.alinhadas == 0
+    assert refino.motivo is not None
+
+
+def test_refino_com_sinal_constante_nao_aceita_qualquer_deslocamento() -> None:
+    """Carro parado ou canal travado da residuo zero em todo deslocamento, e
+    aceitar o primeiro seria inventar instante."""
+    t_rapido = np.arange(0.0, 400.0, 0.05)
+    v_rapido = np.full_like(t_rapido, 40.0)
+    refino = refinar_passagens([4.0, 91.0, 179.0], 1.0, t_rapido, v_rapido)
+    assert refino.instantes == [4.0, 91.0, 179.0]
+    assert refino.alinhadas == 0
+    assert refino.motivo is not None and "constante" in refino.motivo
 
 
 class BancoQueExplode:
