@@ -203,9 +203,9 @@ o módulo grava bitola de 1,545 m, ou seja, a casa já trata largura e bitola co
 diferentes. A segunda é aritmética: uma bitola igual à largura total exigiria pneu com
 espessura zero para fora da roda.
 
-O teste `test_992_tem_entre_eixos_maior_e_bitola_larga` trava a comparação de bitola entre
-gerações e continua passando com qualquer das duas leituras, então ele não protege contra
-esse erro.
+O teste `test_992_difere_do_991_em_entre_eixos_e_bitola` só verifica que o 992.1 tem números
+próprios, sem afirmar direção nem valor, justamente porque as duas leituras seguem abertas.
+Nenhum teste protege contra esse erro enquanto o manual não for aberto.
 
 ### Entre-eixos do 992.1
 
