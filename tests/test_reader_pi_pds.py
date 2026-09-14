@@ -44,12 +44,17 @@ def leitor() -> LeitorPiPds:
 
 def test_formato_id_e_suporte_a_amostra(leitor: LeitorPiPds) -> None:
     assert leitor.formato_id == "pi_pds"
-    assert leitor.suporta_amostra is False
+    assert leitor.suporta_amostra is True
 
 
-def test_ler_levanta_not_implemented(leitor: LeitorPiPds) -> None:
-    with pytest.raises(NotImplementedError):
-        list(leitor.ler(FIXTURE_PDS))
+def test_ler_emite_lotes_em_streaming(leitor: LeitorPiPds) -> None:
+    lotes = list(leitor.ler(FIXTURE_PDS))
+    assert len(lotes) == 7
+    taxas = {l.frequencia_hz for l in lotes}
+    assert taxas == {1.0, 5.0, 10.0, 20.0, 25.0, 50.0, 100.0}
+    for lote in lotes:
+        assert "t_s" in lote.tabela.schema.names
+        assert lote.tabela.num_rows > 0
 
 
 def test_fixture_caminho_feliz(leitor: LeitorPiPds) -> None:

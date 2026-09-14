@@ -112,10 +112,11 @@ from __future__ import annotations
 
 import itertools
 import struct
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from .base import Cabecalho, CanalBruto, ErroDeLeitura, LeitorDeInventario
+from .base import Cabecalho, CanalBruto, ErroDeLeitura, LeitorDeInventario, Lote
 
 _MAGIC: bytes = b"\x1a\x12\x40\xf7"
 _OFF_MAGIC: int = 4
@@ -337,16 +338,20 @@ def _checar_invariante_offset(
 
 
 class LeitorPiPds(LeitorDeInventario):
-    """Inventario de canal do container Pi Toolbox `.pds`.
+    """Container Pi Toolbox `.pds`, formato `pi_pds`.
 
-    So le o dicionario de canais e a tabela de blocos de amostra, ambos
-    perto do fim do arquivo (busca limitada a `_JANELA_BUSCA_BYTES`): nunca
-    o corpo de amostra `float64`, que fica entre o cabecalho fixo e o
-    dicionario.
+    Le o dicionario de canais e a tabela de blocos de amostra perto do fim
+    do arquivo (inspecionar) e le a amostra em streaming de 64 KB (ler).
     """
 
     formato_id = "pi_pds"
     versao = "1"
+    suporta_amostra = True
+
+    def ler(self, caminho: Path) -> Iterator[Lote]:
+        from telemetria.leitores.cosworth_pi import CosworthPdsReader
+
+        return CosworthPdsReader().ler(caminho)
 
     def inspecionar(self, caminho: Path) -> Cabecalho:
         tamanho_arquivo = caminho.stat().st_size
