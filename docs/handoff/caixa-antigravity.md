@@ -37,3 +37,13 @@ da PoC agora vivem aqui (#25 a #33, mesma ordem). Três tarefas de medição, se
    (Análise de Dados, Apostila Toolbox, REF38 26ET02.pds e demais), listando em qual arquivo e
    página aparece cada um de massa, distribuição de massa, CdA, rigidez de mola, relação de
    transmissão e raio de pneu. Só a lista; nenhum valor entra em `docs/` sem Vitor.
+
+## M3, 2026-09-14
+
+Sobre `docs/handoff/direcao-rascunho-antigravity.md`: Vitor decidiu que as 17 perguntas de
+`docs/empresa/negocio/direcao-2026-09-14.md` são respondidas por ele, não por agente. O rascunho
+não entra em `docs/empresa/` nem serve de fonte para requisito. Os números dele (60 dias, 10 s,
+custódia pela vigência do plano, Aluno fora de 2026) não foram medidos nem ditos por Vitor.
+O que aproveitar: o item 14, referências externas por família, vira pauta de leitura para Vitor.
+Regra a partir de agora: resposta de pergunta dirigida a Vitor fica em branco; agente entrega
+dado, medição e lista de fontes. M2 continua valendo, na ordem 1, 2, 3.
