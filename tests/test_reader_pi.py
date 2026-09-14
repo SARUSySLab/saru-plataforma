@@ -15,6 +15,7 @@ from __future__ import annotations
 import itertools
 import re
 import struct
+import sys
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,7 @@ from saru_poc.readers.pi_listhead_dat import LeitorPiListheadDat
 from saru_poc.readers.pi_pid import LeitorPiPid
 
 FIXTURES = Path(__file__).parent / "fixtures"
+sys.path.insert(0, str(FIXTURES))
 FIXTURE_PID = FIXTURES / "pi_pid_sintetico.pid"
 FIXTURE_DAT = FIXTURES / "pi_listhead_sintetico.dat"
 
@@ -81,15 +83,45 @@ def test_pid_ler_bate_com_o_que_inspecionar_declarou(
         for nome in lote.tabela.schema.names:
             if nome == "t_s":
                 continue
-            coluna = lote.tabela.column(nome)
-            validos = len(coluna) - coluna.null_count
-            lido[nome] = lido.get(nome, 0) + validos
+            # Conta slots, nao valores validos: o slot do tick 1 dos canais
+            # de 100 Hz e marcador de bloco e sai nulo (ver `_TICK_MARCADOR`).
+            lido[nome] = lido.get(nome, 0) + len(lote.tabela.column(nome))
 
     for nome, n in esperado.items():
         assert nome in lido, f"canal {nome!r} sumiu no ler()"
         assert lido[nome] == n, (
             f"canal {nome!r}: inspecionar disse {n} amostras, ler devolveu {lido[nome]}"
         )
+
+
+def test_pid_ler_decodifica_o_layout_por_tick(leitor_pid: LeitorPiPid) -> None:
+    """Regressao da issue #26: o corpo e intercalado por tick com quadro de
+    tamanho variavel. A fixture grava uma rampa distinta por canal; ler
+    canal a canal contiguo (o layout errado de 2026-08-29) embaralha tudo.
+    `Speed` sai em kph porque o cabecalho declara escala 10 (divisor);
+    `Steering` e `Throttle Position` saem em contagem (escala 1 e faixa
+    que nao decide a direcao, ou escala ausente)."""
+    from pi_gerar_pid_sintetico import contagem_esperada
+
+    colunas: dict[str, list[float]] = {}
+    for lote in leitor_pid.ler(FIXTURE_PID):
+        for nome in lote.tabela.schema.names:
+            if nome != "t_s":
+                colunas.setdefault(nome, []).extend(
+                    lote.tabela.column(nome).to_pylist()
+                )
+
+    speed = colunas["Speed"]
+    assert speed[:3] == [100.0, 101.0, 102.0]
+    assert speed[-1] == pytest.approx((contagem_esperada("Speed", 99)) / 10)
+    throttle = colunas["Throttle Position"]
+    assert throttle[:3] == [0.0, 5.0, 10.0]
+    steering = colunas["Steering"]
+    # Slot do tick 1 de cada bloco (indices 1 e 101) e marcador: nulo.
+    assert steering[0] == 400.0 and steering[2] == 402.0
+    assert steering[1] is None and steering[101] is None
+    assert sum(v is None for v in steering) == 2
+    assert steering[199] == 400.0 + 199
 
 
 def test_pid_fixture_caminho_feliz(leitor_pid: LeitorPiPid) -> None:
@@ -224,9 +256,9 @@ def test_dat_ler_bate_com_o_que_inspecionar_declarou(
         for nome in lote.tabela.schema.names:
             if nome == "t_s":
                 continue
-            coluna = lote.tabela.column(nome)
-            validos = len(coluna) - coluna.null_count
-            lido[nome] = lido.get(nome, 0) + validos
+            # Conta slots, nao valores validos: o slot do tick 1 dos canais
+            # de 100 Hz e marcador de bloco e sai nulo (ver `_TICK_MARCADOR`).
+            lido[nome] = lido.get(nome, 0) + len(lote.tabela.column(nome))
 
     for nome, n in esperado.items():
         assert nome in lido, f"canal {nome!r} sumiu no ler()"
