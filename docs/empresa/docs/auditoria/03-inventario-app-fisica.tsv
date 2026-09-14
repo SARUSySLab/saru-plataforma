@@ -1,0 +1,288 @@
+repo	caminho	data_ultima_mudanca	tipo	area	estado	destino_proposto	duplica_de	resumo_uma_linha
+saru-app	docs/adr/0001-saru-os-repositorio-multi-servico.md	2026-08-11	adr	arquitetura_software	vigente	arquivo		Define saru-os como repositório multi-serviço (não monorepo do ecossistema), com saru-core/saru-core-jl como libs externas.
+saru-app	docs/adr/0002-borda-nestjs-engine-python.md	2026-08-11	adr	arquitetura_software	vigente	arquivo		Fixa três serviços complementares (web Next.js, api NestJS, engine Python) e defere Rust/Tauri até haver gargalo medido.
+saru-app	docs/adr/0003-convencao-de-nomes.md	2026-08-11	adr	arquitetura_software	vigente	arquivo		Padroniza nomes de serviço (telemetry-api→engine) e deixa o nome do repo pendente, depois resolvido pelo ADR-0022.
+saru-app	docs/adr/0004-cache-redis-nao-sqlite.md	2026-08-11	adr	dados	vigente	arquivo		Move cache persistente de SQLite commitado para Redis, cumprindo a regra "SQLite nunca".
+saru-app	docs/adr/0005-sd-transient-dynamics.md	2026-08-11	adr	dinamica_veicular	vigente	fisica (futuro repo)		Deduplica física do /simulate: engine delega ao saru-core (3-DOF); 14-DOF fica externo (Julia); remove cópia órfã quebrada.
+saru-app	docs/adr/0006-auth-identity.md	2026-08-11	adr	arquitetura_software	vigente	arquivo		Implementa autenticação JWT na borda NestJS (registro/login, cookie httpOnly, Postgres).
+saru-app	docs/adr/0007-bff-orquestracao-calculo.md	2026-08-11	adr	arquitetura_software	vigente	arquivo		Define o BFF NestJS como borda única do SPA, com dois regimes de orquestração (síncrono e fila assíncrona via Redis).
+saru-app	docs/adr/0008-refresh-token-rotation.md	2026-08-11	adr	arquitetura_software	vigente	arquivo		Implementa refresh token opaco rotacionado com detecção de reuso e revogação por família.
+saru-app	docs/adr/0009-crm-erp-na-borda-nestjs.md	2026-08-11	adr	arquitetura_software	vigente	arquivo		Migra rotas de CRM/ERP do engine Python para o BFF NestJS, guardadas por JWT.
+saru-app	docs/adr/0010-vehicle-setup-ssot.md	2026-08-11	adr	arquitetura_software	superado_por_adr_24	arquivo		Definia o SSoT de setup de veículo no saru-core-jl com geração 2-tier; §1/§2 superados pelo ADR-0024.
+saru-app	docs/adr/0011-ui-global-context-trackside.md	2026-08-11	adr	produto	vigente	arquivo		Cria barra de contexto global (Zustand) e extrai o módulo Trackside das ferramentas de pista do LTS.
+saru-app	docs/adr/0012-github-org-docs-mvp.md	2026-08-11	adr	processo	vigente	arquivo		Define organização GitHub em polyrepo (saru-app, saru-physics-py/jl, saru-docs, saru-research), GitHub Flow e escopo do MVP.
+saru-app	docs/adr/0013-setup-contract-json-schema-only.md	2026-08-11	adr	arquitetura_software	vigente	poc-trackday/portar		Remove protobuf morto do contrato de setup; contrato validado em runtime passa a ser o próprio código (pydantic/DTO).
+saru-app	docs/adr/0014-ddl-single-owner.md	2026-08-11	adr	dados	vigente	arquivo		Torna as migrations do BFF NestJS dono único do DDL do data-plane.
+saru-app	docs/adr/0015-gt7-capture-microservice.md	2026-08-11	adr	telemetria	vigente	arquivo		Define o gateway Go de captura GT7 como microserviço orquestrado pelo BFF, opt-in no compose.
+saru-app	docs/adr/0016-simulators-module-multisource-ingestion.md	2026-08-11	adr	telemetria	vigente	arquivo		Generaliza o módulo gt7 para sims (SimRegistry), cobrindo captura UDP multi-console via dois arquétipos.
+saru-app	docs/adr/0017-saru-coach-engine-causal-recommendations.md	2026-08-11	adr	ia_agentes	vigente	arquivo		Propõe motor de coaching causal em dois tiers sobre o FullAnalysisResult já cacheado.
+saru-app	docs/adr/0018-openrouter-ai-coach-layer.md	2026-08-11	adr	ia_agentes	vigente	arquivo		Define camada de IA via OpenRouter isolada no BFF, com guardrail anti-alucinação de âncoras numéricas.
+saru-app	docs/adr/0019-frontend-garage-module-live-review.md	2026-08-11	adr	produto	vigente	arquivo		Cria o módulo garage (captura/fontes/voltas) e separa superfícies LIVE (fullscreen) de REVIEW (hub).
+saru-app	docs/adr/0020-workbook-sharing-export-import.md	2026-08-11	adr	produto	vigente	arquivo		Define compartilhamento de workbooks v1 por arquivo JSON exportado/importado, adiando escopo de equipe.
+saru-app	docs/adr/0021-proxy-auth-guard-otimista.md	2026-08-11	adr	arquitetura_software	vigente	arquivo		Propõe guarda de rota otimista no proxy.ts (Next 16), mantendo autoridade real no BFF.
+saru-app	docs/adr/0022-nomenclatura-comercial-hub-sfl.md	2026-08-11	adr	ui_marca	vigente	arquivo		Oficializa "SARU Hub" como produto e "SFL" como nome comercial do módulo LTS.
+saru-app	docs/adr/0023-simulacao-em-background.md	2026-08-11	adr	arquitetura_software	vigente	arquivo		Move o QSS do regime síncrono para background via fila BullMQ já existente.
+saru-app	docs/adr/0024-ssot-veiculo-interino.md	2026-08-11	adr	dinamica_veicular	superado_por_adr_35	arquivo		Hospeda o SSoT de veículo interinamente em YAML no saru-physics-py; §1/§2 superados pelo ADR-0035.
+saru-app	docs/adr/0025-gateway-gt7-headless.md	2026-08-11	adr	arquitetura_software	vigente	arquivo		Remove o painel web do gateway GT7 do caminho de produto, tornando-o headless.
+saru-app	docs/adr/0026-ia-por-fase-do-loop.md	2026-08-11	adr	produto	vigente	arquivo		Reorganiza a navegação em 4 fases do loop (Preparar→Pista→Analisar→Evoluir) derivadas da rota.
+saru-app	docs/adr/0027-espinha-evento-sessao-run.md	2026-08-11	adr	produto	vigente	poc-trackday/portar		Cria o agregado relacional Evento→Sessão→Run como espinha do track day.
+saru-app	docs/adr/0028-vida-util-por-km-de-run.md	2026-08-11	adr	produto	vigente	arquivo		Modela vida útil de peça por razão de uso append-only, km derivado de voltas×comprimento de pista; execução adiada pelo ADR-0034.
+saru-app	docs/adr/0029-pneu-como-ativo-do-erp.md	2026-08-11	adr	pneu	vigente	arquivo		Modela jogo de pneus como ativo com lacre e razão de uso append-only; execução adiada pelo ADR-0034.
+saru-app	docs/adr/0030-descongelamento-crm-erp.md	2026-08-11	adr	produto	superado_por_adr_34	arquivo		Descongelava CRM/ERP como hub de ativos do track day; substituído pelo ADR-0034.
+saru-app	docs/adr/0031-cfd-fora-do-produto.md	2026-08-11	adr	produto	vigente	poc-trackday/docs		Decisão negativa: nenhum módulo de CFD entra no produto, só consumo de coeficiente de terceiro.
+saru-app	docs/adr/0032-autorizacao-ownership-e-rbac.md	2026-08-11	adr	arquitetura_software	vigente	poc-trackday/portar		Define ownership como padrão de autorização (404 nunca 403) e restringe RBAC a dado global.
+saru-app	docs/adr/0033-validade-de-volta-por-distancia.md	2026-08-19	adr	telemetria	rascunho	poc-trackday/portar		Propõe trocar o piso de tempo (60s hardcoded) por cobertura geométrica de distância/setores.
+saru-app	docs/adr/0034-crm-erp-pos-mvp-recongelamento.md	2026-08-11	adr	produto	vigente	arquivo		Recongela CRM/ERP até o MVP fechar, revertendo o ADR-0030.
+saru-app	docs/adr/0035-catalogo-de-veiculos-servido-pela-api.md	2026-08-11	adr	dados	vigente	arquivo		Torna o catálogo de veículos servido pelo BFF a partir do banco; YAML de física vira seed.
+saru-app	docs/adr/0036-ia-do-mvp-track-day.md	2026-08-11	adr	produto	vigente	poc-trackday/docs		Põe a Run Sheet como objeto central do MVP, sidebar em seção(fase)→módulo→view.
+saru-app	docs/adr/0037-motor-grafico-telemetria-uplot.md	2026-08-02	adr	telemetria	vigente	poc-trackday/portar		Substitui recharts por uPlot (Canvas) com downsampling LTTB para telemetria de alta frequência.
+saru-app	docs/adr/0038-ia-por-cadeia-de-entidades.md	2026-08-19	adr	produto	rascunho	arquivo		Propõe trocar o topo da sidebar pela cadeia de entidades do usuário (campeonato→carro→etapa→bateria→análise).
+saru-app	docs/adr/0039-workbook-como-motor-unico-de-analise.md	2026-08-15	adr	produto	vigente	arquivo		Unifica o motor de render: as 4 lentes do Analyzer viram presets de workbook em vez de telas fixas.
+saru-app	docs/adr/0040-persistencia-lts-no-bff-e-escrita-erp.md	2026-08-19	adr	arquitetura_software	obsoleto	arquivo		Propunha mover persistência do LTS para o BFF; marcado explicitamente "NÃO ADOTADO".
+saru-app	docs/adr/0041-tunel-publico-quick-tunnel-ciclo-semi-automatico.md	2026-08-19	adr	processo	rascunho	arquivo		Formaliza o quick tunnel Cloudflare via Makefile como único caminho sancionado de exposição pública.
+saru-app	docs/adr/0042-borda-de-exibicao-unidades-paddock.md	2026-08-11	adr	telemetria	vigente	poc-trackday/portar		Fixa que dado interno é sempre SI e a conversão para unidades de paddock acontece só na borda de exibição.
+saru-app	docs/adr/0043-duckdb-motorsport-telemetry-nao-e-fonte-de-unidade.md	2026-08-19	adr	telemetria	rascunho	poc-trackday/portar		Bancada real encontra bugs na extensão DuckDB motorsport_telemetry; adotada só como leitor exploratório.
+saru-app	docs/adr/0044-dlf-duas-variantes-um-leitor-por-forma.md	2026-08-19	adr	telemetria	rascunho	poc-trackday/portar		Identifica duas variantes de .dlf com a mesma assinatura e propõe rotear pela forma do dado.
+saru-app	docs/adr/0045-paleta-da-marca-e-tema-bento.md	2026-08-13	adr	ui_marca	superado_por_adr_46	arquivo		Fixava rosa pastel da logo no dark e tema Bento no claro; substituído pelo ADR-0046.
+saru-app	docs/adr/0046-paleta-vanguard-e-solar-neutro.md	2026-08-15	adr	ui_marca	rascunho	poc-trackday/portar		Substitui o ADR-0045: paleta "Vanguard" no dark e Solar neutro quente no claro, com contrastes WCAG medidos.
+saru-app	docs/adr/0047-voltas-da-bateria-vem-do-arquivo.md	2026-08-16	adr	telemetria	rascunho	poc-trackday/portar		Propõe que o número de voltas venha do lap_count do arquivo; o digitado desce a anotação.
+saru-app	docs/adr/0048-pista-por-gps-cascata-de-resolucao.md	2026-08-22	adr	telemetria	rascunho	poc-trackday/portar		Resolve pista em cascata venue→GPS(raio 5km)→cliente→falha explícita.
+saru-app	docs/adr/0049-contrato-canonico-de-canais.md	2026-08-22	adr	telemetria	rascunho	poc-trackday/portar		Cria shared/proto/telemetry-channels.json como dono único de nome/unidade/sinal de canal.
+saru-app	docs/adr/MASTER_ADR.md	2026-08-22	indice	arquitetura_software	vigente	arquivo		Overview consolidado por domínio dos ADRs 0001-0014 (0015+ não consolidados).
+saru-app	docs/adr/RASTREABILIDADE.md	2026-08-14	indice	arquitetura_software	vigente	arquivo		Matriz de rastreabilidade requisito↔ADR↔padrão GoF↔arquivo de código↔endpoint↔teste, específica do saru-app.
+saru-app	docs/adr/README.md	2026-08-22	indice	processo	vigente	arquivo		Índice master dos 49 ADRs com status atual de cada um.
+saru-app	docs/decisions/gaps-encontrados-2026-07-30-c.md	2026-08-13	auditoria	arquitetura_software	stale	arquivo		Terceira sessão de caça a gaps no diff de uma branch; achados sem veredito.
+saru-app	docs/decisions/pauta-vinicius-2026-08-01.md	2026-08-11	sessao	arquitetura_software	stale	arquivo		Pauta pós-fork S2-D para o dono sobre WIRE_MODEL_CONFIG, posse de vehicle_id e IA da sidebar.
+saru-app	docs/decisions/pauta-vinicius-2026-08-08.md	2026-08-11	sessao	telemetria	stale	arquivo		Pauta ao dono sobre overlay multi-volta, resgate do módulo Garage e formatos de acervo.
+saru-app	docs/decisions/pendencias-para-o-dono-2026-07-30-b.md	2026-08-13	sessao	arquitetura_software	stale	arquivo		Segunda sessão de agente registrando o que ficou aberto após a ratificação de 2026-07-30.
+saru-app	docs/decisions/pendencias-para-o-dono-2026-07-30.md	2026-08-11	sessao	arquitetura_software	stale	arquivo		Lista decisões que travam a execução, resolvidas na ratificação subsequente.
+saru-app	docs/decisions/pesquisa-e-decisoes-auditoria-2026-08-02.md	2026-08-11	auditoria	fisica (futuro repo)	stale	arquivo		Triagem de auditoria com perguntas fechadas de física/UX e prompts de pesquisa externa.
+saru-app	docs/decisions/ratificacao-do-dono-2026-07-29.md	2026-08-11	relatorio	processo	vigente	arquivo		Registro formal das decisões do dono sobre os ADRs 0016-0033.
+saru-app	docs/decisions/ratificacao-do-dono-2026-07-30.md	2026-08-11	relatorio	processo	vigente	arquivo		Ratifica as 4 decisões da pendência de 30/07 após auditoria adversarial.
+saru-app	docs/decisions/README.md	2026-08-11	indice	processo	vigente	arquivo		Índice do fluxo de ratificação (pauta→ratificação), distinto do ADR formal e imutável.
+saru-app	docs/research/2026-07-28-padroes-visualizacao-e-libs.md	2026-08-11	pesquisa	ui_marca	obsoleto	arquivo		Consolida padrões de UX de MoTeC/AiM/Pi/WinTAX e adoção no frontend antigo, não reverificado.
+saru-app	docs/research/2026-07-29-racelogic-vbox.md	2026-08-11	pesquisa	telemetria	vigente	empresa/docs/pesquisa		Mapeia o ecossistema Racelogic VBOX e padrões de UX aproveitáveis.
+saru-app	docs/research/2026-07-aquisicao-de-dados.md	2026-08-19	pesquisa	telemetria	vigente	empresa/docs/pesquisa		Pesquisa sobre aquisição de dados (Cosworth Pi Toolbox, Bosch WinDarab, MoTeC .ldx, GPS/OBD).
+saru-app	docs/research/2026-07-fundamentacao-tecnica-analyzer.md	2026-08-19	pesquisa	dinamica_veicular	vigente	empresa/docs/pesquisa		Compara metodologias de análise de telemetria (Segers, OptimumG, Carroll Smith) com o engine antigo.
+saru-app	docs/research/2026-07-pistas-e-track-days.md	2026-08-19	pesquisa	outro	vigente	empresa/docs/pesquisa		Pesquisa sobre pistas-alvo (Brasília, Interlagos, Goiânia) e cena de track days.
+saru-app	docs/research/2026-07-ui-ux-analise-pos-sessao.md	2026-08-19	pesquisa	ui_marca	vigente	empresa/docs/pesquisa		Pesquisa de UI/UX de análise pós-sessão em MoTeC, AiM, Pi Toolbox e ferramentas web modernas.
+saru-app	docs/research/2026-07-ui-ux-telemetria-ao-vivo.md	2026-08-19	pesquisa	ui_marca	vigente	empresa/docs/pesquisa		Pesquisa de UI/UX de telemetria ao vivo em GT7, ACC, iRacing e overlays de simulador.
+saru-app	docs/research/2026-07-ui-ux-video-sincronizado.md	2026-08-19	pesquisa	ui_marca	vigente	empresa/docs/pesquisa		Pesquisa de UX de sincronização vídeo onboard × telemetria.
+saru-app	docs/research/2026-08-15-aim-racestudio2-drk.md	2026-08-19	prompt	telemetria	vigente	arquivo		Prompt para pesquisa externa sobre o binário AiM RaceStudio 2; respondido na inbox.
+saru-app	docs/research/2026-08-16-acervo-porsche-cup-modelo-de-coleta.md	2026-08-16	pesquisa	processo	vigente	empresa/docs/pesquisa		Levantamento do acervo real de um engenheiro Porsche Cup, revelando o modelo Etapa→Sessão→Outing→Volta.
+saru-app	docs/research/2026-08-16-como-as-suites-constroem-mapa-de-pista.md	2026-08-16	pesquisa	telemetria	vigente	poc-trackday/portar		Pesquisa com fonte sobre como MoTeC i2, Pi Toolbox e AiM RaceStudio 3 geram e ancoram o mapa de pista.
+saru-app	docs/research/2026-08-16-metodo-de-analise-porsche-cup.md	2026-08-16	pesquisa	dinamica_veicular	vigente	empresa/docs/pesquisa		Documenta o método de análise de telemetria ensinado pela Porsche Cup Brasil.
+saru-app	docs/research/2026-08-16-ponto-intervalo-como-estado-de-primeira-classe.md	2026-08-16	especificacao	arquitetura_software	obsoleto	poc-trackday/portar		Direção para tratar ponto e intervalo de seleção como estado sincronizado entre widgets.
+saru-app	docs/research/2026-08-16-regulamento-e-manual-porsche-cup.md	2026-08-16	pesquisa	processo	vigente	empresa/docs/pesquisa		O que regulamentos e manuais oficiais da Porsche Cup exigem registrar.
+saru-app	docs/research/2026-08-16-workbooks-motec-contra-lentes-do-sa.md	2026-08-16	pesquisa	ui_marca	stale	poc-trackday/portar		Compara taxonomia de workbooks do MoTeC i2 com as lentes do SA antigo, achando lacunas de cobertura.
+saru-app	docs/research/2026-08-22-parsers-canais-fontes-externas.md	2026-08-22	pesquisa	telemetria	vigente	poc-trackday/portar		Levantamento de parsers e dicionários de canais por formato (.xrk/.ld/.pds/.vbo/.bmsbin) com veredito de licença.
+saru-app	docs/research/competitive-sim-telemetry-2026-07.md	2026-08-19	pesquisa	produto	vigente	empresa/docs/pesquisa		Mapeia o mercado de coaches de IA e ferramentas de telemetria para sim racing.
+saru-app	docs/research/Decodificação de Telemetria Automotiva.md	2026-08-11	relatorio	telemetria	vigente	poc-trackday/portar		Engenharia reversa sobre formatos Cosworth Pi (.pds/.pid), LISTHEAD e Bosch WinDarab (.bmsbin).
+saru-app	docs/research/documento_completo_telemetria_motorsport_refinado.md	2026-08-11	pesquisa	telemetria	vigente	empresa/docs/pesquisa		Pesquisa refinada sobre KPIs, progressão, interfaces e arquitetura de produto para telemetria amadora.
+saru-app	docs/research/inbox/2026-08-15-pesquisa-formato-racestudio2.md	2026-08-19	pesquisa	telemetria	vigente	poc-trackday/portar		Resposta sobre o binário RaceStudio 2: sem spec pública, caminho é acoplar a lib MatLabXRK.
+saru-app	docs/research/Otimização de Traçado de Corrida.md	2026-08-11	pesquisa	dinamica_veicular	duplicado	descartar	docs/research/relatorio_tecnico_racing_line_minima_curvatura.md	Versão bruta da formulação de traçado de mínima curvatura, superada pela versão refinada.
+saru-app	docs/research/pesquisa-formatos-pi-cosworth-windarab-ground-truth-2026-08-08.md	2026-08-11	pesquisa	telemetria	duplicado	arquivo	docs/research/Decodificação de Telemetria Automotiva.md	Pesquisa sobre leitores e specs para .pds/.pid/LISTHEAD/.bmsbin, sobreposta ao relatório mais detalhado.
+saru-app	docs/research/pesquisa_ux_telemetria_bibliotecas_graficos.md	2026-08-11	pesquisa	ui_marca	duplicado	arquivo	docs/research/Pesquisa UX Telemetria e Gráficos.md	Comparativo de bibliotecas de gráfico amarrado ao Analyzer antigo, duplicando o comparativo genérico.
+saru-app	docs/research/Pesquisa UX Telemetria e Gráficos.md	2026-08-11	relatorio	ui_marca	vigente	poc-trackday/portar		Comparativo genérico de bibliotecas de gráfico (uPlot, Dygraphs, ECharts, Plotly, SciChart) para telemetria.
+saru-app	docs/research/prompt-coordenadas-pistas-2026-08-13.md	2026-08-19	prompt	dados	vigente	arquivo		Prompt para pesquisa externa de coordenadas de referência de autódromos, para popular tracks.yaml; já respondido.
+saru-app	docs/research/prompt-validacao-trackmap-2026-08-13.md	2026-08-19	prompt	telemetria	vigente	arquivo		Prompt para confirmar se o track map nasce de GPS real ou reconstrução inercial; já respondido.
+saru-app	docs/research/prompt-workbooks-referencia-2026-08-13.md	2026-08-19	prompt	ui_marca	vigente	poc-trackday/portar		Prompt para pesquisar workbooks/worksheets publicados por equipes e fabricantes, sem resposta registrada.
+saru-app	docs/research/README.md	2026-08-22	indice	outro	stale	arquivo		Índice dos estudos de pesquisa, com 13 arquivos citados como fora do índice na última atualização.
+saru-app	docs/research/reference-workbooks/README.md	2026-08-19	indice	ui_marca	vigente	poc-trackday/portar		Descreve os workbooks de referência do MoTeC i2 Pro e a taxonomia de 7 workbooks/37 worksheets.
+saru-app	docs/research/relatorio_tecnico_racing_line_minima_curvatura.md	2026-08-11	relatorio	dinamica_veicular	vigente	fisica (futuro repo)		Relatório validado sobre traçado ótimo por mínima curvatura (QP iterativo, Heilmeier/TUMFTM).
+saru-app	docs/research/resposta-coordenadas-pistas-2026-08-13.md	2026-08-19	pesquisa	dados	vigente	poc-trackday/portar		Tabela de coordenadas WGS84 e comprimentos de circuitos-alvo com fonte por linha.
+saru-app	docs/research/resposta-coordenadas-pistas-longa-2026-08-13.md	2026-08-19	pesquisa	dados	duplicado	descartar	docs/research/resposta-coordenadas-pistas-2026-08-13.md	Versão discursiva e mais longa da mesma pesquisa de coordenadas de circuitos.
+saru-app	docs/research/resposta-validacao-trackmap-2026-08-13.md	2026-08-19	pesquisa	telemetria	vigente	poc-trackday/portar		Detalha por software onde se confirma a origem GPS vs inercial do track map.
+saru-app	docs/execution/2026-08-14-plano-outing.md	2026-08-22	plano	produto	superado_por_adr_47	arquivo		Plano de execução da hierarquia Outing/Workbooks, marcado morto por entregas já materializadas.
+saru-app	docs/execution/2026-08-14-trackday-mvp/KIT-E-SENSORES.md	2026-08-19	runbook	processo	obsoleto	arquivo		Lista de compra de kit e sensores para o track day de 14-16/08/2026 em Brasília, evento já ocorrido.
+saru-app	docs/execution/2026-08-14-trackday-mvp/OPERACAO-DIA.md	2026-08-19	runbook	processo	vigente	poc-trackday/portar		Runbook de operação de dia de pista, material vivo que sustenta a frente 5 mesmo após o evento passar.
+saru-app	docs/execution/2026-08-14-trackday-mvp/PESQUISA-brasilia-tracado.md	2026-08-19	pesquisa	telemetria	obsoleto	arquivo		Pergunta preparada para deep research sobre traçado do Autódromo de Brasília, específica do evento passado.
+saru-app	docs/execution/2026-08-14-trackday-mvp/plano-ui-coleta-2026-08-14.md	2026-08-19	plano	ui_marca	obsoleto	arquivo		Resposta a relatório de UI/UX e branding do Antigravity, amarrada ao código do saru-app.
+saru-app	docs/execution/2026-08-14-trackday-mvp/PROMPT-continuacao-2026-08-13c.md	2026-08-19	prompt	processo	obsoleto	arquivo		Prompt de handoff de sessão pré-demo de 13/08/2026, estado de terreno já superado.
+saru-app	docs/execution/2026-08-14-trackday-mvp/PROMPT-continuacao-2026-08-13.md	2026-08-19	prompt	processo	obsoleto	arquivo		Prompt de handoff de sessão de 13/08/2026 sobre preparação do track day.
+saru-app	docs/execution/2026-08-14-trackday-mvp/PROMPT-continuacao-mvp.md	2026-08-19	prompt	processo	obsoleto	arquivo		Prompt de continuação do Track Day MVP de 12/08/2026, cita path antigo /home/vitor/Projects/SARU/saru-app.
+saru-app	docs/execution/2026-08-14-trackday-mvp/README.md	2026-08-22	indice	produto	obsoleto	poc-trackday/docs		Índice do Track Day MVP de 14/08/2026, congelado; contém decisões D1-D7 reaproveitáveis.
+saru-app	docs/execution/2026-08-14-trackday-mvp/TASK-ANTIGRAVITY-relatorio.md	2026-08-19	especificacao	telemetria	obsoleto	poc-trackday/portar		Especificação da trilha de relatório HTML autocontido do MVP, já executada.
+saru-app	docs/execution/2026-08-14-trackday-mvp/TASK-CLAUDE-ingestao.md	2026-08-19	especificacao	telemetria	obsoleto	poc-trackday/portar		Especificação da trilha de ingestão do TrackAddict e pista de Brasília do MVP, já executada.
+saru-app	docs/execution/2026-08-16-bancada-windows-exports.md	2026-08-16	runbook	telemetria	vigente	poc-trackday/portar		Plano para gerar pares binário/export-texto em bancada Windows para validar parsers de formatos travados.
+saru-app	docs/execution/2026-08-16-cerimonia-voltas-derivadas.md	2026-08-22	plano	dados	superado_por_adr_47	arquivo		Cerimônia sobre origem do número de voltas, superada pela ADR-0047 que decidiu o caminho oposto.
+saru-app	docs/execution/2026-08-16-direcao-pos-passeio.md	2026-08-22	sessao	ui_marca	stale	arquivo		Registro de decisões pós-auditoria de passeio no hub logado, com seções já defasadas por errata.
+saru-app	docs/execution/2026-08-16-inventario-engineer-mode-home.md	2026-08-22	auditoria	ui_marca	stale	arquivo		Inventário dos ramos que o modo engenheiro altera na home, com defeito corrigido por errata.
+saru-app	docs/execution/2026-08-16-mapa-de-agentes.md	2026-08-22	sessao	processo	obsoleto	arquivo		Reconhecimento read-only das sessões de agente simultâneas em 2026-08-16, pendências já fechadas.
+saru-app	docs/execution/2026-08-16-matriz-widget-motor-render.md	2026-08-22	auditoria	arquitetura_software	vigente	poc-trackday/portar		Matriz de qual motor de gráfico (uPlot vs recharts) cada widget usa.
+saru-app	docs/execution/2026-08-16-requisito-crud-universal.md	2026-08-19	especificacao	produto	vigente	poc-trackday/portar		Requisito de CRUD universal com matriz de cobertura medida por entidade do BFF.
+saru-app	docs/execution/2026-08-16-sessao-design-consolidado.md	2026-08-22	relatorio	ui_marca	obsoleto	arquivo		Consolidado de fechamento da sessão de design/frontend de 2026-08-16, paleta e reforma de workbooks.
+saru-app	docs/execution/2026-08-19-uiux-fluxo-coleta.md	2026-08-19	auditoria	ui_marca	vigente	poc-trackday/portar		Laudo de 13 pontos de UI/UX do fluxo de coleta do piloto, base das frentes 1-5 executadas depois.
+saru-app	docs/execution/2026-08-20-feedback-giuliano-engenheiro.md	2026-08-20	relatorio	produto	vigente	poc-trackday/portar		Feedback de campo de engenheiro de pista sênior, com bug de rate-limit medido e pedido de referência de frenagem por G.
+saru-app	docs/execution/2026-08-21-handoff-frente-5-e-divida.md	2026-08-21	sessao	produto	obsoleto	arquivo		Handoff das frentes 1-4 do laudo de coleta entregues e frente 5 aguardando decisão.
+saru-app	docs/execution/2026-08-22-cerimonia-contrato-canonico-e-parsers.md	2026-08-22	plano	telemetria	vigente	poc-trackday/portar		Cerimônia para contrato canônico de canais/unidades e correção de 3 bugs de parser.
+saru-app	docs/execution/2026-08-22-cerimonia-frenagem-por-g.md	2026-08-22	calibracao	dinamica_veicular	vigente	poc-trackday/portar		Cerimônia de derivação de frenagem/viragem a partir de G sem canal de pedal.
+saru-app	docs/execution/2026-08-22-inventario-mvp.md	2026-08-22	auditoria	produto	obsoleto	arquivo		Inventário de docs × código com veredito VIVO/STALE/MORTO para execution/audit/adr do saru-app.
+saru-app	docs/execution/PROMPT-continuacao-2026-08-16.md	2026-08-22	prompt	processo	obsoleto	arquivo		Prompt de continuação de 2026-08-16 para passeio pelo hub logado, marcado executado.
+saru-app	docs/execution/PROMPT-continuacao-2026-08-17.md	2026-08-22	prompt	processo	obsoleto	arquivo		Prompt de continuação de 2026-08-17 para lint do CI e laudo de docs, marcado executado.
+saru-app	docs/execution/PROMPT-sessao-sfl-lts.md	2026-08-22	prompt	dinamica_veicular	stale	fisica (futuro repo)		Prompt de sessão para retomar a tela SFL/LTS de simulação e setup, toca física em model.ts.
+saru-app	docs/execution/PROMPT-sessao-uiux-coleta.md	2026-08-22	prompt	ui_marca	obsoleto	arquivo		Prompt de abertura da sessão de UI/UX do fluxo de coleta, executado com handoff registrado.
+saru-app	docs/execution/README.md	2026-08-22	indice	produto	obsoleto	arquivo		Índice da pasta execution com tabela de todos os documentos e seus conteúdos.
+saru-app	docs/plans/contrato-canais-numpy-2026-07-27.md	2026-08-19	especificacao	telemetria	vigente	poc-trackday/docs		Decisão sobre como np.ndarray entra no contrato da API OpenAPI, com medição de payload de overlay.
+saru-app	docs/plans/eff-ui-refactor-plan.md	2026-08-19	plano	ui_marca	obsoleto	arquivo		Guia de refactor de UX/UI inspirado no Effective Motorsport, referencia ADR-0011 do saru-app antigo.
+saru-app	docs/plans/fila-de-ataque-2026-07-29.md	2026-08-19	plano	produto	obsoleto	arquivo		Fila de ataque pós-ratificação do dono de 2026-07-29 com itens P0-P2 já fechados.
+saru-app	docs/plans/gaps-trackday-espinha-2026-07.md	2026-08-19	especificacao	produto	obsoleto	poc-trackday/docs		Spec da espinha Evento-Sessão-Run e gaps de MVP de track day.
+saru-app	docs/plans/mvp-decisoes-research.md	2026-08-19	pesquisa	processo	obsoleto	empresa/docs/pesquisa		Dossiê de decisões embasado em pesquisa web primária sobre 6 pendências de MVP de 2026-07-10.
+saru-app	docs/plans/mvp-higiene-arquitetura-plano-acao.md	2026-08-19	plano	arquitetura_software	obsoleto	arquivo		Plano de higienização e arquitetura multi-repo v0.1, cita saru-os como nome do frontend.
+saru-app	docs/plans/mvp-higiene-arquitetura-seguimento.md	2026-08-19	plano	arquitetura_software	obsoleto	arquivo		Seguimento v0.2 do plano de higienização, cita saru-os e saru-core-jl.
+saru-app	docs/plans/README.md	2026-08-19	indice	processo	obsoleto	arquivo		Índice simples da pasta plans com 12 links, sem descrição de conteúdo.
+saru-app	docs/plans/reforma-frontend-trackday-2026-07.md	2026-08-19	especificacao	produto	obsoleto	poc-trackday/docs		Spec V1 da reforma de IA do frontend para MVP track day, 4 fases.
+saru-app	docs/plans/saru-hub-estruturacao-2026-07.md	2026-08-19	plano	produto	obsoleto	arquivo		Plano de estruturação SARU Hub/Analyzer/SFL de 2026-07-23.
+saru-app	docs/plans/sessoes-reforma-frontend-2026-07.md	2026-08-19	prompt	produto	obsoleto	arquivo		Prompts de sessão para reforma do frontend track day, cita path antigo ~/Projects/SARU/saru-app.
+saru-app	docs/plans/simulators-module-plan-2026-07.md	2026-08-19	plano	produto	obsoleto	empresa/docs/decisions		Plano mestre do módulo de simuladores multi-fonte com coach causal por física, direção abandonada.
+saru-app	docs/plans/spec-s2d-condicoes-iniciais-2026-07-30.md	2026-08-19	especificacao	dados	obsoleto	arquivo		Spec S2-D de condições iniciais e ciclo de vida da Run Sheet, schema específico do saru-app.
+saru-app	docs/product/achados-design-system-2026-08-14.md	2026-08-14	relatorio	ui_marca	vigente	arquivo		Lista correções e achados fora de escopo da trilha de design tokens.
+saru-app	docs/product/analyzer-abas-desalinhadas-2026-07-29.md	2026-08-11	relatorio	produto	stale	arquivo		Achado resgatado de branch nunca mergeada sobre abas do Analyzer fora da hierarquia documentada.
+saru-app	docs/product/analyzer-gap-frontend-e-tabs-modulares.md	2026-08-11	especificacao	produto	vigente	arquivo		Diagnostica gap frontend/engine do Analyzer e especifica tabs modulares, já implementado até Fase 3.
+saru-app	docs/product/analyzer-templates-e-workbooks.md	2026-08-11	relatorio	produto	vigente	arquivo		Mapeia workbooks e templates do Analyzer contra vocabulário MoTeC/AiM/Bosch/Cosworth.
+saru-app	docs/product/auditoria-customizacao-visual.md	2026-08-11	auditoria	ui_marca	vigente	arquivo		Audita bibliotecas de visualização em uso e o que falta para customização visual pelo cliente.
+saru-app	docs/product/benchmark-effective-motorsport-2026-07.md	2026-08-11	pesquisa	produto	vigente	empresa/docs/pesquisa		Compara módulo a módulo o SARU Hub com a concorrente Effective Motorsport.
+saru-app	docs/product/brief-design-tokens-2026-08-13.md	2026-08-13	plano	ui_marca	stale	empresa/docs/marca		Define reforma de tokens (paleta rosa/grená + tema Bento) e corrige valores HSL errados da paleta original.
+saru-app	docs/product/escopo-veiculos-e-setup-tiers.md	2026-08-11	especificacao	produto	vigente	fisica (futuro repo)		Propõe três tiers de veículo (Street/Performance/Race) para o simulador de volta.
+saru-app	docs/product/fase-4-gt7-setup-academy.md	2026-08-11	plano	produto	vigente	arquivo		Registra status da Fase 4 (ponte GT7, setup por pista e Saru Academy), itens concluídos e deferidos.
+saru-app	docs/product/gaps-frontend-2026-08-08.md	2026-08-11	auditoria	arquitetura_software	vigente	arquivo		Mapeia gaps do frontend medidos no código: widgets sem tamanho ajustável, overlay de 1 volta só.
+saru-app	docs/product/gaps-loop-2026-08-13.md	2026-08-13	auditoria	dados	vigente	arquivo		Registra fechamento de falha de segurança (acervo público sem autenticação) e gaps do loop.
+saru-app	docs/product/guia-onde-edito-o-que.md	2026-08-11	runbook	ui_marca	stale	arquivo		Guia arquivo-e-linha de onde editar cada elemento visual do Analyzer a partir do SSoT tokens.css.
+saru-app	docs/product/matriz-cobertura-vital-2026-08-13.md	2026-08-13	relatorio	telemetria	vigente	poc-trackday/portar		Mede cobertura real de canais vitais de motor por formato do acervo, achando canais não gravados.
+saru-app	docs/product/matriz-gaps-release-hub.md	2026-08-11	relatorio	arquitetura_software	stale	arquivo		Fotografa estado implementado × pendente de todos os serviços do saru-app para o release do MVP.
+saru-app	docs/product/MVP-BETA-SPEC.md	2026-08-11	especificacao	produto	stale	arquivo		Especifica o MVP para beta fechado com pilotos, arquitetura de 3 serviços.
+saru-app	docs/product/oportunidades-track-day.md	2026-08-11	brainstorm	produto	vigente	empresa/docs/pesquisa		Lista quatro oportunidades de produto para track day no Brasil.
+saru-app	docs/product/personas-e-modularidade.md	2026-08-11	especificacao	produto	vigente	poc-trackday/docs		Define cinco personas do Hub e arquitetura de modularidade por perfil via JWT.
+saru-app	docs/product/programa-produto-mvp-2026-08-13.md	2026-08-13	plano	arquitetura_software	vigente	arquivo		Programa de produto medindo a dívida técnica do frontend como base de custo.
+saru-app	docs/product/PROMPT-agente-design-2026-08-13.md	2026-08-13	prompt	ia_agentes	obsoleto	arquivo		Prompt para sessão dedicada de design system na worktree isolada.
+saru-app	docs/product/README.md	2026-08-11	indice	produto	stale	arquivo		Índice da pasta product, diz "19 documentos"; hoje são 27.
+saru-app	docs/product/spec-gap-08-compartilhar-workbook.md	2026-08-11	especificacao	produto	vigente	arquivo		Especifica exportar/importar workbook como JSON, registrando dependência de membership inexistente.
+saru-app	docs/product/spec-gap-09-auth-guard-ssr.md	2026-08-11	especificacao	arquitetura_software	vigente	arquivo		Especifica guarda de autenticação no servidor via proxy.ts do Next.js 16.
+saru-app	docs/product/spec-gap-14-vital-signs.md	2026-08-11	especificacao	telemetria	vigente	poc-trackday/docs		Especifica recorte v1 de vital signs após constatar que óleo/água/voltagem não existem em nenhum perfil.
+saru-app	docs/product/spec-multivolta-sa-2026-07-29.md	2026-08-11	especificacao	produto	superado_por_adr_39	poc-trackday/docs		Propõe unificar seleção de voltas como dimensão global do Analyzer; conflita com o ADR-0039 já aceito.
+saru-app	docs/product/spec-workbook-channel-binding-2026-08-13.md	2026-08-13	especificacao	telemetria	vigente	poc-trackday/portar		Especifica binding dinâmico de canal com qualidade declarada, para eliminar zeros de sensor morto.
+saru-app	docs/product/workflow-usuario-consolidado-2026-07-28.md	2026-08-11	especificacao	produto	stale	arquivo		Consolida o workflow ideal do usuário nos quatro eixos do loop, não re-verificado.
+saru-app	docs/product/workflow-vs-codigo-2026-07-28.md	2026-08-11	relatorio	produto	stale	arquivo		Compara workflow documentado com implementação real, etapa a etapa.
+saru-app	docs/branding/README.md	2026-08-14	indice	ui_marca	rascunho	empresa/docs/marca		Índice de branding, hoje apenas o título, sem conteúdo.
+saru-app	docs/design/README.md	2026-08-11	especificacao	ui_marca	stale	empresa/docs/marca		Documenta o design canônico do Hub Shell e confirma fidelidade da implementação ao handoff.
+saru-app	docs/audit/2026-08-15-formatos-acervo.md	2026-08-15	auditoria	telemetria	vigente	poc-trackday/portar		Mede por extensão quantos arquivos do acervo real produzem múltiplas voltas válidas.
+saru-app	docs/audit/2026-08-16-coleta-trackside-import.md	2026-08-22	auditoria	produto	obsoleto	arquivo		Audita telas de coleta Trackside e /sa/import, achando coluna fuel_out_l com dois sentidos.
+saru-app	docs/audit/2026-08-16-fronteira-de-volta-pid.md	2026-08-16	auditoria	telemetria	vigente	poc-trackday/portar		Bancada sobre 25 arquivos .pid mostra que o beacon perde a primeira volta por latch.
+saru-app	docs/audit/2026-08-16-passeio-hub-logado.md	2026-08-22	auditoria	ui_marca	obsoleto	arquivo		Passeio por 20 rotas do hub antigo, separador decimal errado e outras inconsistências, maioria corrigida.
+saru-app	docs/audit/2026-08-22-calibracao-frenagem-por-g.md	2026-08-22	calibracao	telemetria	vigente	poc-trackday/portar		Calibra limiar de frenagem por aceleração longitudinal contra 232 voltas com pedal real.
+saru-app	docs/audit/2026-08-22-catalogo-canais-acervo.md	2026-08-22	auditoria	telemetria	vigente	poc-trackday/portar		Catálogo completo de canais crus de 261 arquivos do acervo por formato.
+saru-app	docs/audit/2026-08-22-censo-canais-acervo.md	2026-08-22	auditoria	telemetria	vigente	poc-trackday/portar		Confere o que cada formato declara sobre seus canais contra a física medida, IMU do .dlf rotacionada.
+saru-app	docs/audit/2026-08-22-widgets-multiformato.md	2026-08-23	auditoria	telemetria	vigente	poc-trackday/portar		Cruza 22 widgets do frontend antigo contra 5 famílias de formato.
+saru-app	docs/audit/AUDIT-FINDINGS-2026-06-28.md	2026-08-22	auditoria	arquitetura_software	obsoleto	arquivo		Snapshot de 2026-06-28 quando o repo se chamava saru-os, achados P0/P1 já fechados.
+saru-app	docs/audit/auditoria-wip-branches-2026-08-08.md	2026-08-22	auditoria	processo	obsoleto	arquivo		Forense de WIP não commitado antes de um resgate em branches próprias, já executado.
+saru-app	docs/audit/autorizacao-e-contratos-2026-07-27.md	2026-08-22	auditoria	arquitetura_software	superado_por_adr_32	arquivo		Mostra que um commit "RBAC" quebrou o CRM por 19 horas; superado pelo ADR-0032.
+saru-app	docs/audit/capacidade-desligada-2026-08-03.md	2026-08-22	auditoria	produto	obsoleto	arquivo		Inventário de rotas do BFF sem consumidor e componentes órfãos do frontend antigo.
+saru-app	docs/audit/DEMO_READINESS.md	2026-08-22	relatorio	produto	obsoleto	arquivo		Checklist validando o fluxo de demo de 90 segundos do produto antigo em 2026-07-20.
+saru-app	docs/audit/formatos-pi-cosworth-2026-08-04.md	2026-08-11	auditoria	telemetria	vigente	poc-trackday/portar		Engenharia reversa em nível de byte dos formatos .pid, .dat e .pds da Pi/Cosworth.
+saru-app	docs/audit/frontend-analise-e-fluxo-2026-07-25.md	2026-08-22	auditoria	produto	obsoleto	arquivo	docs/audit/frontend-sweep-2026-08-02.md	Análise estática do frontend antigo com plano de reforma já executado; superado por dois sweeps posteriores.
+saru-app	docs/audit/frontend-sweep-2026-08-02.md	2026-08-22	auditoria	arquitetura_software	obsoleto	arquivo		Segunda varredura do frontend cobrindo segurança de tenant e acessibilidade.
+saru-app	docs/audit/laudo-docs-2026-08-17.md	2026-08-19	auditoria	processo	obsoleto	arquivo		Dá veredito as-is/to-be/executado/histórico/órfão a cada doc de docs/plans/.
+saru-app	docs/audit/pipeline-correcao-2026-08-04.md	2026-08-11	auditoria	telemetria	vigente	poc-trackday/portar		Audita 70 achados de unidade, escala e segmentação de volta do byte ao KPI exibido.
+saru-app	docs/audit/README.md	2026-08-22	indice	processo	obsoleto	arquivo		Índice de todas as auditorias do repositório.
+saru-app	docs/audit/services-e-branches-2026-07-25.md	2026-08-22	auditoria	arquitetura_software	obsoleto	arquivo		Audita os três serviços e o mapa de branches de 2026-07-25.
+saru-app	docs/audit/TAREFA-0-AUDITORIA-2026-07-25.md	2026-08-22	auditoria	fisica (futuro repo)	vigente	fisica (futuro repo)		Inventaria cinco repositórios e sete motores de simulação, recomenda manter QSS e 3-DOF, suspender o 14-DOF.
+saru-app	docs/audit/UIUX_AUDIT_2026-07-15.md	2026-08-22	auditoria	produto	obsoleto	arquivo	docs/audit/2026-08-16-passeio-hub-logado.md	Auditoria dinâmica Playwright de 2026-07-15, quando o repo se chamava saru-os.
+saru-app	docs/testing/e2e-playwright.md	2026-08-11	especificacao	processo	obsoleto	arquivo		Especifica a suíte E2E Playwright do frontend antigo.
+saru-app	docs/testing/README.md	2026-08-11	indice	processo	obsoleto	arquivo		Índice da pasta de testes.
+saru-app	docs/testing/telemetry-data-inventory.md	2026-08-11	auditoria	telemetria	vigente	poc-trackday/portar		Inventaria as pastas data/ dos repositórios SARU e mede o que o engine antigo realmente lê.
+saru-app	docs/runbooks/README.md	2026-08-14	indice	processo	obsoleto	arquivo		Índice de runbooks apontando para o runbook de túnel público.
+saru-app	docs/runbooks/tunel-publico.md	2026-08-11	runbook	processo	vigente	poc-trackday/portar		Runbook para subir túnel público via Cloudflare quick tunnel, só via compose/make.
+saru-app	docs/physics/load_transfer_optimumg.md	2026-08-11	especificacao	dinamica_veicular	vigente	fisica (futuro repo)		Especifica modelo de transferência de carga lateral em três componentes, baseado em seminários OptimumG.
+saru-app	docs/physics/README.md	2026-08-14	indice	dinamica_veicular	vigente	fisica (futuro repo)		Índice de um único documento, a especificação de transferência de carga OptimumG.
+saru-app	docs/calibration/README.md	2026-08-14	indice	telemetria	rascunho	descartar		Índice vazio da pasta calibration, sem nenhum documento listado.
+saru-app	docs/architecture/api-contracts.md	2026-08-11	especificacao	arquitetura_software	vigente	arquivo		Lista endpoints REST atuais da borda NestJS e do engine FastAPI e o roadmap gRPC.
+saru-app	docs/architecture/deployment.md	2026-08-11	runbook	arquitetura_software	vigente	arquivo		Descreve os compose files dev/prod e o load balancing ip_hash do nginx.
+saru-app	docs/architecture/formato-dlf-esparso.md	2026-08-11	especificacao	telemetria	vigente	poc-trackday/portar		Especifica por engenharia reversa medida o formato .DLF esparso escrito pelo logger AiM.
+saru-app	docs/architecture/frontend-estado-atual-2026-07-28.md	2026-08-11	auditoria	arquitetura_software	stale	arquivo		Foto do código do frontend Next.js em 2026-07-28, não reverificada.
+saru-app	docs/architecture/iracing-vs-sim-capture.md	2026-08-11	auditoria	telemetria	vigente	arquivo		Audita o ADR-0016 contra o código real de captura GT7.
+saru-app	docs/architecture/mapa-app-rotas-navegacao.md	2026-08-11	relatorio	arquitetura_software	stale	arquivo		Mapeia rotas, telas e menu do frontend em linguagem não técnica.
+saru-app	docs/architecture/MIGRACAO_TELEMETRIA_ACERVO.md	2026-08-11	relatorio	dados	vigente	poc-trackday/portar		Inventaria a migração do acervo real de telemetria para data/telemetry/.
+saru-app	docs/architecture/README.md	2026-08-11	indice	arquitetura_software	vigente	arquivo		Índice da pasta docs/architecture apontando para ARCHITECTURE.md, adr/ e STANDARDS.md.
+saru-app	docs/architecture/request-flow.md	2026-08-11	especificacao	arquitetura_software	vigente	arquivo		Documenta o call path ponta-a-ponta de uma requisição entre frontend, proxy, BFF e engine.
+saru-app	docs/architecture/rotas-propostas-sa-sfl-2026-07-28.md	2026-08-11	plano	arquitetura_software	superado_por_adr_26	arquivo	docs/adr/0026-ia-por-fase-do-loop.md	Propõe árvore de rotas para Analyzer/Fast Lap; superseded pelos ADR-0026/0027.
+saru-app	docs/architecture/service-topology.md	2026-08-11	especificacao	arquitetura_software	vigente	arquivo		Descreve os serviços do docker compose (nginx, frontend, BFF, engine, gt7-gateway, postgres, redis, minio).
+saru-app	docs/architecture/sim-capture-as-is.md	2026-08-11	auditoria	telemetria	vigente	arquivo		Audita como a captura de telemetria GT7 funciona hoje via UDP e o microserviço Go.
+saru-app	docs/architecture/spec-relatorio-trackday-p3.md	2026-08-11	especificacao	produto	rascunho	poc-trackday/docs		Especifica o relatório de track day interpretado para a persona P3, ainda não implementada.
+saru-app	docs/architecture/system-overview.md	2026-08-11	especificacao	arquitetura_software	stale	arquivo		Mapeia os 7 repos do ecossistema SARU; lista saru-KB como repo vivo, hoje descontinuado.
+saru-app	docs/architecture/telemetria-sot-e-ingestao-2026-07-28.md	2026-08-11	especificacao	telemetria	stale	poc-trackday/portar	docs/architecture/MIGRACAO_TELEMETRIA_ACERVO.md	Consolida onde estão os arquivos de telemetria, resgatado de branch não mergeada.
+saru-app	docs/architecture/use-cases-mvp.md	2026-08-11	especificacao	produto	vigente	poc-trackday/docs		Define atores, casos de uso e rastreabilidade do MVP do hub SARU.
+saru-app	docs/architecture/vehicle-setup-sot.md	2026-08-11	especificacao	dinamica_veicular	superado_por_adr_24	arquivo	docs/adr/0024-ssot-veiculo-interino.md	Design original de SSoT de veículo/setup que virou ADR-0010 e foi superado pelo ADR-0024.
+saru-app	docs/analysis/2026-08-12-blueprint-coleta-evento-planalto.md	2026-08-12	plano	produto	vigente	empresa/docs/decisions		Desenha a operação de coleta multi-piloto/multi-camada (T0-T4) para o evento de Brasília.
+saru-app	docs/analysis/2026-08-12-gap-analysis-hierarquia-motorsport.md	2026-08-12	auditoria	dados	stale	poc-trackday/portar		Audita a ausência de Etapa/Outing no schema de dados; G1-G3 já corrigidos dois dias depois.
+saru-app	docs/analysis/2026-08-14-assessment-ui-coleta-workbooks.md	2026-08-14	auditoria	produto	vigente	arquivo		Mede que a hierarquia Etapa/Sessão/Outing já existe e propõe UI de run sheet e workbooks.
+saru-app	docs/analysis/README.md	2026-08-14	indice	outro	vigente	arquivo		Índice simples dos três documentos da pasta docs/analysis.
+saru-app	docs/ARCHITECTURE.md	2026-08-11	especificacao	arquitetura_software	vigente	arquivo		SoT de arquitetura do saru-app: serviços atuais, arquitetura-alvo, itens deferidos e decisões travadas.
+saru-app	docs/STANDARDS.md	2026-08-11	especificacao	arquitetura_software	vigente	empresa/docs/processo		Consolida convenções de código cross-repo do ecossistema SARU.
+saru-app	docs/sessions/analyzer-fases-0-4-handoff.md	2026-08-19	sessao	telemetria	obsoleto	arquivo		Handoff de sessão que implementou fases 0 a 4A do Analyzer no saru-app.
+saru-app	docs/sessions/consolidacao-develop-2026-07-18.md	2026-08-19	sessao	arquitetura_software	obsoleto	arquivo		Sessão que absorveu 6 branches no develop e fechou o ADR-0014.
+saru-app	docs/sessions/feat-analysis-workbooks.md	2026-08-19	sessao	telemetria	obsoleto	arquivo		Sessão que introduziu o sistema de Workbooks no módulo SA do saru-app.
+saru-app	docs/sessions/feat-sim-accounts.md	2026-08-19	sessao	produto	obsoleto	arquivo		Sessão de criação do vínculo de contas de simuladores GT7/ACC com a conta de usuário SARU.
+saru-app	docs/sessions/feat-user-library.md	2026-08-19	sessao	produto	obsoleto	arquivo		Sessão de criação da Biblioteca do usuário (carros e voltas).
+saru-app	docs/sessions/handoff-2026-07-30-agente-vitor.md	2026-08-19	prompt	arquitetura_software	obsoleto	arquivo		Prompt de retomada de sessão de 30/07, receita de ambiente Postgres corrigida pelo handoff seguinte.
+saru-app	docs/sessions/handoff-2026-07-30-c-agente-vitor.md	2026-08-19	sessao	arquitetura_software	obsoleto	arquivo		Terceira sessão do dia 30/07, corrigiu 5 bugs vivos.
+saru-app	docs/sessions/handoff-2026-08-01-agente-vitor.md	2026-08-19	sessao	arquitetura_software	obsoleto	arquivo		Handoff de 01/08 com gate completo e verificação adversarial de 7 achados.
+saru-app	docs/sessions/prompt-continuacao-2026-07-31.md	2026-08-19	prompt	arquitetura_software	obsoleto	arquivo		Prompt de continuação com ambiente Postgres/Redis descartável em portas próprias.
+saru-app	docs/sessions/README.md	2026-08-17	indice	processo	vigente	arquivo		Índice da pasta sessions, distingue handoff de SPM.md.
+saru-app	docs/sessions/ref-laptimes.md	2026-08-19	sessao	telemetria	obsoleto	arquivo		Sessão de integração de tempos de referência e classificação de voltas no LapAnalyzer.
+saru-app	docs/sessions/sa-tyre-real.md	2026-08-19	sessao	pneu	obsoleto	arquivo		Sessão que implementou o painel Tyre Engineer com temperatura e pressão reais por roda.
+saru-app	docs/history/handoffs-jun-jul-2026.md	2026-08-17	sessao	arquitetura_software	obsoleto	arquivo		Handoffs arquivados de 29/06 a 30/07/2026, incluindo renomeação saru-os para saru-app.
+saru-app	docs/history/ORIGINAL_REQUEST.md	2026-06-26	especificacao	produto	obsoleto	arquivo		Pedido original de 14/06/2026 do SARU Unified Platform, incluindo rejeição de SQLite.
+saru-app	docs/history/PROJECT.md	2026-06-26	especificacao	arquitetura_software	obsoleto	arquivo		Especificação de arquitetura original do SARU Unified Platform (monorepo Next.js + FastAPI).
+saru-app	docs/history/README.md	2026-08-17	indice	processo	vigente	arquivo		Índice da pasta history.
+saru-app	docs/archive/docs_audit_report.md	2026-08-11	auditoria	processo	obsoleto	arquivo		Relatório de auditoria de docs de 2026-07 classificando conteúdo em lixo, P&D e útil, hoje superado.
+saru-app	docs/archive/fio-da-meada-2026-08-04.md	2026-08-17	sessao	telemetria	obsoleto	poc-trackday/docs		Registro de sessão sobre disciplina de medição em canais de telemetria.
+saru-app	docs/archive/handoff-2026-08-03-analyzer.md	2026-08-17	sessao	telemetria	obsoleto	poc-trackday/docs		Handoff sobre bugs reais de ingestão de telemetria: pista errada, canais MoTeC vs engine, .DLF logger vs export.
+saru-app	docs/archive/MIGRATION_ROADMAP.md	2026-08-11	plano	arquitetura_software	obsoleto	arquivo		Roteiro deferido de migração para monorepo Rust/gRPC, substituído pelo ROADMAP.md vigente.
+saru-app	docs/archive/README.md	2026-08-17	indice	processo	vigente	arquivo		Índice de docs/archive, lista os 4 documentos superados e seus sucessores.
+saru-app	docs/feedback/2026-08-12-teste-de-campo-completude-funcional.md	2026-08-17	relatorio	produto	obsoleto	arquivo		Relatório de teste de campo com 3 bugs altos, já corrigidos.
+saru-app	docs/feedback/2026-08-12-teste-de-campo-usabilidade.md	2026-08-13	relatorio	ui_marca	vigente	arquivo		Relatório de usabilidade do mesmo teste de campo, achados ainda abertos.
+saru-app	docs/feedback/README.md	2026-08-13	indice	processo	vigente	arquivo		Índice da pasta feedback.
+saru-app	docs/prompts/audit-global-org.md	2026-08-13	prompt	arquitetura_software	obsoleto	arquivo		Prompt para auditoria global de organização do ecossistema SARU.
+saru-app	docs/prompts/audit-saru-core.md	2026-08-13	prompt	fisica (futuro repo)	vigente	fisica (futuro repo)		Prompt para auditar a lib saru-core, cobrindo tiers de veículo, pneu de rua e ambiente/altitude.
+saru-app	docs/prompts/iracing-multi-sim-recon.md	2026-08-13	prompt	telemetria	obsoleto	arquivo		Prompt de plano para integração iRacing e consolidação multi-sim, read-only.
+saru-app	docs/prompts/README.md	2026-08-17	indice	processo	vigente	arquivo		Índice da pasta prompts.
+saru-app	docs/prompts/sessao-hub-simulacao-background.md	2026-08-13	prompt	arquitetura_software	obsoleto	arquivo		Prompt de implementação de simulação em background, branch já executada.
+saru-app	docs/images/README.md	2026-08-14	indice	outro	vigente	arquivo		Índice da pasta images, sem conteúdo além do título.
+saru-app	README.md	2026-08-08	especificacao	produto	vigente	arquivo		Apresenta a suíte SARU e o passo a passo de subida local via Docker do saru-app.
+saru-app	CLAUDE.md	2026-08-16	especificacao	arquitetura_software	vigente	arquivo		Guia operacional do saru-app (serviços, padrão estético, comandos docker).
+saru-app	AGENTS.md	2026-08-16	outro	processo	duplicado	descartar	CLAUDE.md	Symlink para CLAUDE.md, conteúdo idêntico.
+saru-app	SPM.md	2026-08-21	sessao	processo	vigente	arquivo		Diário de handoffs de sessão do saru-app, último registro cobre cascata de pista por GPS e dívida técnica.
+saru-app	docs/README.md	2026-08-11	indice	processo	stale	arquivo		Porta de entrada da documentação, contagens desatualizadas (46 ADRs, 19 product, 9 research; hoje 49/27/33).
+saru-app	docs/AUDIT-AND-RESEARCH-PROMPT.md	2026-08-13	prompt	processo	obsoleto	arquivo		Prompt para auditar gaps de integração frontend-backend e listar dívidas, específico da arquitetura antiga.
+saru-app	docs/telemetry-data-flow.md	2026-08-11	especificacao	telemetria	vigente	poc-trackday/portar		Mapeia o pipeline real de parsers de telemetria até o contrato de fio da SA, verificado por execução sobre arquivos reais.
+saru-app	docs/ROADMAP.md	2026-08-11	plano	produto	obsoleto	arquivo		Roadmap por fases do saru-app com status de cada ADR, arquitetura Next.js/NestJS/FastAPI.
+saru-app	docs/GETTING_STARTED.md	2026-08-11	runbook	processo	obsoleto	arquivo		Guia operacional para rodar, validar e testar a stack Docker do saru-app localmente.
+saru-physics-py	README.md	2026-06-27	especificacao	fisica (futuro repo)	vigente	fisica (futuro repo)		Apresenta o saru-core como núcleo de física puro (QSS, veículo, pistas) consumido via submodule.
+saru-physics-py	CLAUDE.md	2026-07-07	especificacao	fisica (futuro repo)	vigente	fisica (futuro repo)		Guia operacional do saru-core: stack, arquitetura no ecossistema, branches, regras de leitura seletiva de docs.
+saru-physics-py	SPM.md	2026-07-17	sessao	fisica (futuro repo)	vigente	fisica (futuro repo)		Diário de sessões de física, último registro fecha a paridade de load sensitivity no standing start.
+saru-physics-py	docs/adr/MASTER_ADR.md	2026-07-15	indice	arquitetura_software	obsoleto	descartar		Ponteiro para ADRs cross-ecossistema no saru-KB, repositório descontinuado em 2026-08.
+saru-physics-py	docs/track_formats.md	2026-06-26	especificacao	dinamica_veicular	vigente	fisica (futuro repo)		Descreve formatos HDF5 (QSS) e OpenCRG (14-DOF) de pista, incluindo pipeline de Brasília.
+saru-physics-py	docs/vehicle_model_theory.md	2026-06-26	especificacao	dinamica_veicular	vigente	fisica (futuro repo)		Teoria do modelo de veículo (eixos ISO 8855, hierarquia 3/7/14-DOF, Pacejka).
+saru-physics-py	docs/GAP-AUDIT-2026-06-28.md	2026-06-28	auditoria	dinamica_veicular	obsoleto	fisica (futuro repo)		Auditoria de gaps do QSS priorizando ausência de load sensitivity, gap já corrigido em sessões posteriores.
+saru-physics-py	docs/vehicle_calibrations.md	2026-07-15	calibracao	dinamica_veicular	vigente	fisica (futuro repo)		Fichas técnicas de calibração de veículos (Porsche 992 GT3 R, McLaren 720S GT3).
+saru-physics-py	docs/tire_physics.md	2026-06-26	especificacao	pneu	vigente	fisica (futuro repo)		Catálogo de coeficientes do modelo de pneu Pacejka Magic Formula MF5.2+/MF-Swift.
+saru-physics-py	docs/PHYSICS_AUDIT.md	2026-06-27	auditoria	dinamica_veicular	obsoleto	fisica (futuro repo)		Registra a discrepância de load sensitivity ausente no QSS, gap já corrigido em sessões posteriores.
+saru-physics-py	docs/AUDIT-AND-RESEARCH-PROMPT.md	2026-06-28	prompt	dinamica_veicular	obsoleto	arquivo		Prompt de auditoria de gaps físicos e pesquisa, tarefa já executada.
+saru-physics-jl	README.md	2026-06-29	especificacao	dinamica_veicular	stale	fisica (futuro repo)		Apresenta o solver 14-DOF transiente em Julia e status de validação, desatualizado frente aos handoffs do SPM.md.
+saru-physics-jl	CLAUDE.md	2026-07-15	especificacao	dinamica_veicular	vigente	fisica (futuro repo)		Guia operacional com status real embutido (14-DOF converge honesto 109,48s) e papel de worker assíncrono.
+saru-physics-jl	SPM.md	2026-07-15	sessao	dinamica_veicular	vigente	fisica (futuro repo)		Diário de sessões, aplicação de load sensitivity k=-0,12 e correção de geometria 40F/60R.
+saru-physics-jl	docs/ARCHITECTURE.md	2026-06-30	especificacao	arquitetura_software	vigente	fisica (futuro repo)		Arquitetura do worker 14-DOF Julia, contrato YAML+HDF5 → lap_time, hierarquia de fidelidade por subsistema.
+saru-physics-jl	docs/ROADMAP.md	2026-07-07	plano	dinamica_veicular	stale	fisica (futuro repo)		Roadmap faseado do 14-DOF Julia, marca Fase 2 regredida a DNF, superado pelas correções do SPM.md.
+saru-physics-jl	docs/AUDIT-FINDINGS.md	2026-07-15	auditoria	dinamica_veicular	vigente	fisica (futuro repo)		Achados comparando componentes reais vs stub do solver Julia contra o Python.
+saru-physics-jl	docs/REFERENCES-AND-RESEARCH.md	2026-07-07	pesquisa	dinamica_veicular	vigente	fisica (futuro repo)		Agenda de pesquisa e fontes usadas na modelagem 14-DOF (Khalil 2018, MATLAB de referência).
+saru-physics-jl	docs/NEXT-SESSION-PROMPT.md	2026-07-07	prompt	processo	obsoleto	arquivo		Prompt de continuação de sessão de 2026-07-02, tarefas já executadas.
+saru-physics-jl	docs/SESSION-BRIEF.md	2026-07-07	sessao	dinamica_veicular	obsoleto	arquivo		Briefing de sessão focada em convergir o 14-DOF e ligar o worker Redis, superado pelas sessões seguintes.
+saru-physics-jl	docs/STAGE3-NMPC-DRIVER-PLAN.md	2026-07-14	plano	dinamica_veicular	rascunho	fisica (futuro repo)		Plano de substituir o driver algébrico por NMPC para fechar o gap de 102s para 94s honesto, não implementado.
+saru-physics-jl	docs/RESEARCH-PROMPTS-FASE2.md	2026-06-29	pesquisa	pneu	obsoleto	arquivo		Prompts de pesquisa sobre dado de pneu MF6.2 grounded para GT3, já incorporada (k=-0,12 aplicado).
+saru-physics-jl	docs/AUDIT-AND-RESEARCH-PROMPT.md	2026-06-28	prompt	dinamica_veicular	obsoleto	arquivo		Prompt de auditoria de gaps do solver 14-DOF Julia, já executada.
+saru-physics-jl	docs/adr/MASTER_ADR.md	2026-07-15	indice	arquitetura_software	obsoleto	descartar		Ponteiro para ADRs cross-ecossistema no saru-KB, repositório descontinuado em 2026-08.
+saru-telemetry-gt7	README.md	2026-07-17	especificacao	telemetria	vigente	arquivo		Gateway local Go que recebe telemetria UDP do GT7 e serve painel web, com modo demo replay validado.
+saru-telemetry-gt7	docs/ARCHITECTURE.md	2026-07-17	especificacao	arquitetura_software	vigente	arquivo		Arquitetura do MVP GT7 (capture, session, store, stream, httpapi) sem broker nem Postgres, SQLite local.
+saru-telemetry-gt7	docs/VALIDATION.md	2026-07-17	relatorio	telemetria	vigente	arquivo		Validação técnica das dependências do gateway GT7 com versões fixadas.
+saru-telemetry-gt7	docs/HOW_TO_USE.md	2026-07-17	runbook	telemetria	vigente	arquivo		Guia operacional completo para rodar o gateway GT7 em Ubuntu com Docker, rede local e PS4/PS5.
+saru-desktop-app	README.md	2026-06-26	outro	produto	obsoleto	arquivo		Aviso de arquivamento do protótipo inicial de frontend Next.js, substituído pelo hub do saru-app e nunca continuado.
