@@ -25,7 +25,7 @@ escrita mora em `~/.claude/CLAUDE.md`; aqui só o que é deste repositório.
 2. Número de física só com tabela de medição no acervo (E-RN-02). Estimativa é rascunho.
 3. Issue fecha só com o protocolo de `docs/empresa/processo/validacao-de-issue.md`: roteiro de
    conferência de 3 a 5 passos, antes e depois em `docs/html/<issue>.html` e tabela de medição.
-4. Ordem das issues da PoC, fechadas aqui: #24 e #21, depois #7 e #4, depois #3, #10, #2, #6, #19.
+4. Ordem das issues (portadas da PoC): #25 e #26, depois #27 e #28, depois #29, #30, #31, #32, #33.
 5. Nada em `src/` sem issue. Branch `<fam>/<issue>-<tema>` (pil, equ, eng, cam, alu, emp).
 6. Toda decisão da sessão vai para `docs/empresa/decisions.md` na mesma sessão.
 7. Antigravity pesquisa, varre e mede; Claude escreve código e documento. Resposta R<n> não é
