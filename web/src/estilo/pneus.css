@@ -1,0 +1,137 @@
+/* Bloco 16 (temperatura de pneu). So os 4 tokens de cor ja definidos em
+   tokens.css: nenhuma cor nova nasce aqui, do jeito que o resto da casa
+   exige. A regua e sempre auto-referenciada (min/max do que a propria
+   gravacao mediu), nunca uma janela ideal inventada: o acervo nao documenta
+   faixa alvo de temperatura de pneu em lugar nenhum, entao desenhar uma
+   faixa "boa" seria dado que ninguem mediu virando decoracao. */
+
+.pneus-grade {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  /* a ordem no grid E o desenho do carro visto de cima: FL/FR na linha de
+     cima, RL/RR embaixo, pra assimetria esquerda-direita e dianteira-
+     traseira saltarem aos olhos sem o piloto ter que ler rotulo nenhum */
+  grid-template-areas:
+    "fl fr"
+    "rl rr";
+}
+.pneus-grade .canto-fl { grid-area: fl; }
+.pneus-grade .canto-fr { grid-area: fr; }
+.pneus-grade .canto-rl { grid-area: rl; }
+.pneus-grade .canto-rr { grid-area: rr; }
+
+.canto {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s3);
+  min-width: 0;
+}
+.canto.canto-falta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 74px;
+}
+
+.canto-rotulo {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 4px;
+}
+
+.canto-numero {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1;
+}
+.canto-numero .un { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+
+/* regua: eixo compartilhado pelos 4 cantos, escala de min a max do que foi
+   medido NESSA gravacao. O ponto marca onde o canto cai dentro do proprio
+   universo dos outros 3, que e a comparacao que o piloto realmente faz. */
+.regua {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border);
+  margin-top: var(--s2);
+}
+.regua .regua-ponto {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--brand);
+  border: 2px solid var(--surface);
+  transform: translate(-50%, -50%);
+}
+.regua-rotulos {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--faint);
+  margin-top: 3px;
+}
+
+.pneus-deltas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px dashed var(--border);
+}
+.delta-linha { display: flex; align-items: center; gap: var(--s3); }
+.delta-linha .k { font-size: 11.5px; color: var(--muted); width: 118px; flex: none; }
+.delta-linha .v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  width: 64px;
+  flex: none;
+  text-align: right;
+}
+
+/* barra divergente centrada em zero: mostra o sinal (esquerda x direita ou
+   dianteira x traseira) e a magnitude, escalada pelo maior |delta| dos dois
+   pares, entao os dois deltas ficam comparaveis entre si tambem. */
+.delta-barra {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  min-width: 40px;
+}
+.delta-barra::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--border-strong);
+}
+.delta-barra .preenchido {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--brand);
+  border-radius: 3px;
+}
+
+.pneus-falta-tudo {
+  font-size: 11px;
+  color: var(--faint);
+  line-height: 1.4;
+  margin: 0 0 var(--s3);
+}

@@ -1,0 +1,178 @@
+/* Tela do ciclo da bateria (fases 2, 3 e 11). Usa os tokens de tokens.css:
+   nenhuma cor literal aqui, senao o tema escuro quebra. */
+
+/* Mesmo enquadramento do card de envio: centrado nos dois eixos. `dvh` e nao
+   `vh` porque a barra do browser no mobile some e volta, e `vh` congela na
+   altura do carregamento. `align-content: center` no lugar de place-items pra
+   o card nao encolher quando o conteudo passa da altura da area. */
+/* Trava de viewport (pedido de 29/08, mesma regra do campeonato): a casca
+   prende a pagina em 100dvh e aqui tudo e flex + min-height 0 + overflow
+   hidden. O que nao cabe nao rola: PAGINA (ver ListaPaginada). O
+   enquadramento centrado saiu junto com o scroll: a area agora e coluna que
+   preenche a altura que a casca da. */
+.ciclo-area { flex: 1; min-height: 0; display: flex; justify-content: center; overflow: hidden; padding-top: var(--s3); }
+.ciclo { width: min(880px, 100%); min-height: 0; display: flex; flex-direction: column; gap: var(--s3); }
+.ciclo-trilha { flex-shrink: 0; }
+.ciclo-nota { flex-shrink: 0; }
+
+/* A trilha NAVEGA (pedido 2.1 de 29/08): cada passo alcancavel e um botao que
+   abre a lista daquele nivel sem desfazer a escolha. O resumo embaixo do
+   rotulo diz O QUE esta escolhido, entao a trilha tambem e o mapa do dia. */
+/* Cinco passos desde 30/08, quando o PILOTO entrou entre evento e sessao. O
+   grid era fixo em 4 colunas e a Telemetria caia sozinha numa segunda linha.
+   `auto-fit` com minimo estreito mantem os cinco na mesma faixa em tela de
+   trabalho e quebra em duas linhas so quando a janela e mesmo pequena. */
+.ciclo-trilha { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s2); list-style: none; }
+.ciclo-trilha li { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
+.ciclo-trilha li.feito { border-color: var(--ok); }
+.ciclo-trilha li.atual { border-color: var(--brand); background: var(--brand-soft); }
+.ciclo-trilha .trilha-link, .ciclo-trilha .trilha-morta { display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 0; padding: 7px 9px; background: none; border: none; text-align: left; }
+.ciclo-trilha .trilha-link { cursor: pointer; }
+.ciclo-trilha .trilha-link:hover .trilha-rotulo { color: var(--brand); }
+.ciclo-trilha .trilha-rotulo { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--faint); }
+.ciclo-trilha li.feito .trilha-rotulo { color: var(--ok); }
+.ciclo-trilha li.atual .trilha-rotulo { color: var(--brand); }
+.ciclo-trilha .trilha-resumo { font-size: 11.5px; min-width: 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ciclo-trilha .trilha-morta .trilha-rotulo { opacity: .5; }
+
+.ciclo-bloco { flex: 1; min-height: 0; overflow: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
+.ciclo-bloco > header { flex-shrink: 0; }
+
+/* caixa da lista paginada: mede a altura sobrando e mostra so o que cabe */
+.ciclo-lista-caixa { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.ciclo-lista-caixa .ciclo-lista { flex: 1; min-height: 0; overflow: hidden; }
+.ciclo-paginas { flex-shrink: 0; height: 24px; display: flex; align-items: center; justify-content: space-between; gap: var(--s2); font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.ciclo-paginas.form { justify-content: center; grid-column: 1 / -1; }
+.ciclo-seta { font-size: 15px; line-height: 1; padding: 0 8px; color: var(--muted); background: transparent; border: 1px solid var(--border-strong); border-radius: var(--r-sm); cursor: pointer; }
+.ciclo-seta:hover:not(:disabled) { background: var(--brand-soft); }
+.ciclo-seta:disabled { opacity: .35; cursor: default; }
+.ciclo-bloco header { display: flex; align-items: baseline; gap: var(--s2); }
+.ciclo-bloco h3 { font-size: 14px; font-weight: 600; }
+.ciclo-escolhido { font-size: 13px; color: var(--text); }
+.ciclo-nota { font-size: 11px; color: var(--faint); line-height: 1.5; }
+.ciclo-erro { font-size: 12px; color: var(--danger); background: var(--brand-soft); border-radius: var(--r-sm); padding: var(--s2) var(--s3); }
+.fraco { color: var(--faint); }
+
+.ciclo-lista { display: flex; flex-direction: column; gap: 2px; list-style: none; }
+/* a linha e um flex: o botao de escolher estica, o de excluir fica do lado
+   com a MESMA cara dos outros excluir (o seletor generico de button engolia
+   o .limpar e o deixava em coluna com fundo, dai a falta de padrao) */
+.ciclo-lista li { display: flex; align-items: center; gap: var(--s2); }
+.ciclo-lista button { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 8px var(--s3); background: var(--bg); border: 1px solid transparent; border-radius: var(--r-sm); }
+.ciclo-lista button:hover { border-color: var(--brand); }
+/* o item JA escolhido fica marcado: a lista tambem e leitura de estado
+   quando se chega nela pela trilha, nao so formulario de escolha */
+.ciclo-lista button.escolhido { border-color: var(--brand); background: var(--brand-soft); }
+.ciclo-lista button.limpar { width: auto; flex: none; flex-direction: row; padding: 0 5px; background: transparent; border: 1px solid var(--border-strong); margin-left: 0; }
+.ciclo-lista button.limpar.perigo { border-color: var(--danger); }
+.ciclo-lista button.limpar.perigo:hover { background: var(--danger); }
+.ciclo-lista .t { font-size: 13px; color: var(--text); }
+.ciclo-lista .q { font-size: 11px; color: var(--faint); font-family: var(--mono); }
+
+.ciclo-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); align-items: end; }
+.ciclo-form label { display: flex; flex-direction: column; gap: 4px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.ciclo-form input, .ciclo-form select { font-family: var(--data); font-size: 13px; color: var(--text); background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 8px 9px; text-transform: none; letter-spacing: 0; }
+.ciclo-form input:focus, .ciclo-form select:focus { outline: none; border-color: var(--brand); }
+.ciclo-form button { grid-column: 1 / -1; }
+/* Salvar/Cancelar da edicao ficam lado a lado, nao um por cima do outro: o
+   `.ciclo-acoes` ja e flex, so precisa ocupar a linha toda do grid do form. */
+.ciclo-form .ciclo-acoes { grid-column: 1 / -1; }
+.ciclo-form .ciclo-acoes button { grid-column: auto; }
+
+.ciclo-acoes { display: flex; flex-wrap: wrap; gap: var(--s2); }
+
+/* Seletor de trecho na barra de escopo: cor de destaque porque e o usuario que
+   muda, que e a convencao de interface da casa. */
+.seletor-trecho { font-family: var(--mono); font-size: 12px; color: var(--brand); background: var(--bg); border: 1px solid var(--brand); border-radius: var(--r-sm); padding: 3px 6px; max-width: 260px; }
+
+/* O envio dentro do bloco da bateria nao repete o enquadramento centralizado
+   da pagina de envio: aqui ele e uma secao de um passo, nao a tela inteira. */
+.ciclo-envio { border-top: 1px solid var(--border); padding-top: var(--s3); display: flex; flex-direction: column; gap: var(--s2); }
+.ciclo-envio .envio-area { min-height: 0; display: block; }
+.ciclo-envio .envio { width: 100%; background: var(--bg); padding: var(--s4); }
+
+/* baterias irmas: linha compacta de alternancia rapida */
+.ciclo-irmas { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin: var(--s2) 0; font-size: 12px; }
+.ciclo-irmas .fraco { color: var(--faint); }
+.ciclo-irmas button { font-size: 12px; padding: 2px 8px; }
+
+/* botao de criacao do nivel: alinhado a direita, na cor de destaque da marca
+   (pedido de 29/08). E a ACAO principal da etapa, o resto do header e rotulo. */
+.ciclo-bloco header .criar, .ciclo-coluna h4 .criar { margin-left: auto; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--brand); background: var(--brand-soft); border: 1px solid var(--brand); border-radius: var(--r-sm); padding: 3px 10px; cursor: pointer; }
+.ciclo-bloco header .criar:hover, .ciclo-coluna h4 .criar:hover { background: var(--brand); color: var(--bg); }
+
+/* dentro do modal o formulario respira em UMA coluna: 2 colunas em 440px
+   apertava rotulo e campo (pedido de 29/08) */
+.modal-cartao .ciclo-form { grid-template-columns: 1fr; gap: var(--s3); }
+.modal-cartao .ciclo-form label { font-size: 10.5px; }
+.modal-cartao .ciclo-form input, .modal-cartao .ciclo-form select { width: 100%; box-sizing: border-box; }
+.modal-cartao .ciclo-acoes { display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s2); }
+
+/* lista compacta de telemetrias penduradas na bateria */
+.ciclo-lista.compacta { margin-top: var(--s2); }
+.ciclo-lista.compacta .linha-gravacao { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); padding: 5px var(--s3); border: 1px solid var(--border); border-radius: var(--r-sm); margin-bottom: 4px; font-size: 12px; background: var(--surface); }
+.ciclo-lista.compacta .linha-gravacao .q { color: var(--faint); }
+
+/* contexto do cabecalho da etapa: onde estou, sem repetir cards */
+.ciclo-cabeca-contexto { font-size: 11px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+
+/* o passo da bateria escolhida em DUAS colunas: telemetria e registro do box
+   (reorganizacao de 29/08). Em tela estreita empilha. */
+.ciclo-duas { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); align-items: stretch; }
+.ciclo-coluna { min-height: 0; display: flex; flex-direction: column; gap: var(--s2); overflow: hidden; }
+@media (max-width: 720px) { .ciclo-duas { grid-template-columns: 1fr; } }
+.ciclo-coluna { display: flex; flex-direction: column; gap: var(--s2); min-width: 0; }
+.ciclo-coluna > h4 { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--faint); font-weight: 700; }
+
+/* cards de registro do box, com estado de preenchimento (pedido de 29/08:
+   feedback visual quando preenchido) */
+.ciclo-registro { display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%; padding: var(--s3); background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); cursor: pointer; }
+.ciclo-registro:hover { border-color: var(--brand); }
+.ciclo-registro .cabeca { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2); }
+.ciclo-registro .nome { font-size: 13px; color: var(--text); font-weight: 600; }
+.ciclo-registro .estado { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.ciclo-registro .detalhe { font-size: 11px; color: var(--faint); }
+.ciclo-registro.ok { border-left: 3px solid var(--ok); }
+.ciclo-registro.ok .estado { color: var(--ok); }
+
+/* acoes da linha de gravacao pendurada (soltar/excluir lado a lado) */
+.ciclo-lista.compacta .linha-gravacao .acoes { display: flex; gap: var(--s2); flex: none; }
+
+/* Modal de cadastro NAO rola (pedido de 29/08): teto de altura com overflow
+   escondido; formulario que nao couber pagina (CamposPaginados). So os
+   cadastros do ciclo usam a variante: as gavetas grandes (contexto/ficha)
+   continuam com o comportamento proprio delas. */
+.modal-cartao.sem-scroll { max-height: 90dvh; overflow: hidden; display: flex; flex-direction: column; }
+.modal-cartao.sem-scroll .ciclo-form { min-height: 0; overflow: hidden; }
+.ciclo-form-pagina { display: grid; grid-template-columns: 1fr; gap: var(--s3); grid-column: 1 / -1; }
+.ciclo-form-pagina[hidden] { display: none; }
+
+/* --- campo de data e hora (formato brasileiro, pedido de 30/08) ----------- */
+
+.campo-data-hora { display: flex; gap: var(--s2); align-items: flex-end; flex-wrap: wrap; }
+.cdh-parte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cdh-hora { max-width: 92px; }
+.cdh-rotulo { font-family: var(--mono); font-size: 9px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--faint); }
+.cdh-entrada { position: relative; display: flex; align-items: center; }
+.cdh-entrada input[type="text"] { padding-right: 26px; }
+.campo-data-hora input[type="text"] { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.campo-data-hora input[aria-invalid="true"] { border-color: var(--danger); }
+.cdh-calendario { position: absolute; right: 4px; display: flex; align-items: center;
+  color: var(--faint); background: none; border: none; cursor: pointer; padding: 2px; }
+.cdh-calendario:hover { color: var(--brand); }
+/* O nativo existe so pra abrir o calendario: ele nunca e lido nem exibido,
+   porque e ele que traria o formato do idioma do navegador de volta. */
+.cdh-oculto { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.cdh-erro { font-size: 11px; color: var(--danger); align-self: center; }
+
+/* O "+ telemetria" mora no titulo da coluna, igual ao "+ sessao" e ao
+   "+ saida" moram no cabecalho dos blocos deles. */
+.ciclo-coluna h4 { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+
+/* Registro vazio e convite clicavel, nao estado morto: a cor da marca diz
+   que dali sai uma acao (pedido do Lucas, 30/08). */
+.ciclo-registro.falta { border-color: var(--brand); }
+.ciclo-registro.falta .estado { color: var(--brand); font-weight: 700; }
+.ciclo-registro.falta:hover { background: var(--brand-soft); }

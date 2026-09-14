@@ -1,0 +1,129 @@
+/* Telas que nasceram na integracao: login, envio de telemetria e Sarue.
+   Arquivo separado do app.css de proposito, pra nao competir com o trabalho
+   em curso nos blocos de grafico. Usa os mesmos tokens de tokens.css: aqui
+   nao ha cor literal nenhuma, senao o tema escuro quebra. */
+
+/* --- login ------------------------------------------------------------- */
+.login-fundo { min-height: 100vh; display: grid; place-items: center; background: var(--bg); padding: var(--s4); }
+.login-caixa { width: min(360px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--s5); display: flex; flex-direction: column; gap: var(--s3); }
+/* altura fixa e largura automatica: a marca e 675x160, e travar a largura
+   distorceria a proporcao em tela estreita */
+.login-logo { height: 48px; width: auto; }
+/* A marca completa no topo do painel, no lugar do simbolo mais o texto rosa:
+   a logo ja carrega o nome, e ter os dois era o nome duas vezes. `max-width`
+   pra ela nunca estourar o painel quando ele estreita. */
+/* No tema claro a marca e um bloco escuro. O raio evita que ela pareca um
+   retangulo colado por engano na interface. */
+:root:not([data-theme="dark"]) .marca-logo,
+:root:not([data-theme="dark"]) .login-logo { border-radius: var(--r-sm); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .marca-logo,
+  :root:not([data-theme="light"]) .login-logo { border-radius: 0; }
+}
+:root[data-theme="light"] .marca-logo,
+:root[data-theme="light"] .login-logo { border-radius: var(--r-sm); }
+
+.marca-home { display: block; padding: 0; border: none; background: none; cursor: pointer; }
+.marca-home:hover .marca-logo { opacity: .82; }
+
+/* sem padding lateral: era resquicio do toggle absoluto e fazia a AREA da
+   logo cobrir o botao de fechar a sidebar (dificil de clicar, 29/08) */
+.marca-logo { height: 40px; width: auto; max-width: 100%; display: block; }
+/* a arte clara (svg) foi recortada ao conteudo por MEDICAO de pixels
+   (viewBox 52 488 1394 330, proporcao de wordmark ~4.4:1): com o mesmo
+   height de 40px ela ocupa a mesma caixa da variante escura, como pedido. */
+
+.login-marca { display: flex; align-items: center; gap: var(--s3); }
+.login-marca .g { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--brand); }
+.login-marca h1 { font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
+.login-sub { font-size: 13px; color: var(--muted); margin-bottom: var(--s2); }
+.login-caixa label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.login-caixa input { font-family: var(--data); font-size: 14px; color: var(--text); background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 9px 10px; text-transform: none; letter-spacing: 0; }
+.login-caixa input:focus { outline: none; border-color: var(--brand); }
+.login-caixa .dica { font-size: 10px; color: var(--faint); text-transform: none; letter-spacing: 0; }
+/* Tres botoes segmentados, do tamanho do painel. Fica no rodape junto da
+   conta porque tema e preferencia de ambiente, nao navegacao. */
+.tema { display: flex; width: 100%; margin-bottom: var(--s3); border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+.tema button { flex: 1; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); background: var(--bg); border: none; padding: 6px 4px; }
+.tema button + button { border-left: 1px solid var(--border); }
+.tema button:hover { color: var(--text); }
+.tema button.ativo { color: var(--brand); background: var(--brand-soft); }
+
+.rail-conta { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.rail-conta .quem { font-family: var(--mono); font-size: 10px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+/* Botao de verdade, com borda e area de clique: como link discreto no rodape
+   ninguem achava. Sair e acao rara mas tem que ser encontravel de primeira. */
+.rail-conta .sair { font-family: var(--data); font-size: 11px; color: var(--muted); background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 3px 10px; }
+.rail-conta .sair:hover { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
+
+/* Item desativado continua legivel, so perde a afordancia: apagar demais faz
+   parecer defeito de renderizacao em vez de estado. */
+.rail .nivel:disabled { opacity: .38; cursor: not-allowed; }
+.rail .nivel:disabled:hover { background: none; border-color: transparent; }
+.rail-indisponivel { font-size: 11px; line-height: 1.45; color: var(--warn); background: var(--warn-soft); border-radius: var(--r-sm); padding: var(--s2) var(--s3); margin: var(--s3) var(--s4) 0; }
+
+.login-erro { font-size: 12px; color: var(--danger); background: var(--brand-soft); border-radius: var(--r-sm); padding: var(--s2); }
+
+.primario { font-family: var(--data); font-size: 13px; font-weight: 600; color: var(--bg); background: var(--brand); border: 1px solid var(--brand); border-radius: var(--r-sm); padding: 9px 14px; }
+.primario:disabled { opacity: .45; }
+.primario:not(:disabled):hover { filter: brightness(1.1); }
+
+/* --- envio de telemetria ------------------------------------------------ */
+/* O card fica centrado nos dois eixos da area de conteudo. `min-height` com
+   `dvh` e nao `vh` porque no mobile a barra do browser some e volta, e `vh`
+   congela na altura de quando a pagina carregou, deixando o card fora do
+   centro justamente em quem esta com o celular na mao no box. */
+.envio-area { min-height: 62dvh; display: grid; place-items: center; }
+.envio { width: min(620px, 100%); display: flex; flex-direction: column; gap: var(--s3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--s5); }
+.envio-cabeca h3 { font-size: 15px; font-weight: 600; }
+.envio-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.envio-lista { display: flex; flex-direction: column; gap: 2px; }
+.envio-lista li { display: flex; align-items: center; gap: var(--s2); font-size: 12px; padding: 6px var(--s2); background: var(--bg); border-radius: var(--r-sm); }
+.envio-lista .nome { flex: 1; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.envio-lista .peso, .envio-estado .peso { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+.envio-estado { display: flex; flex-direction: column; gap: var(--s2); font-size: 13px; }
+.envio-estado.ok { color: var(--ok); }
+.envio-estado.alerta { color: var(--warn); }
+/* barra de progresso REAL: a fracao vem do evento de upload do XMLHttpRequest,
+   nao de uma animacao. Barra falsa e pior que barra nenhuma num arquivo de 400 MB. */
+.barra { height: 6px; background: var(--raised); border-radius: 3px; overflow: hidden; }
+.barra .preenchida { height: 100%; background: var(--brand); transition: width .2s; }
+
+/* --- Sarue -------------------------------------------------------------- */
+.sarue { max-width: 720px; display: flex; flex-direction: column; gap: var(--s3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--s5); }
+.sarue-cabeca h3 { font-size: 15px; font-weight: 600; }
+.sarue-nota { font-size: 11px; color: var(--faint); }
+.sarue-avisos { display: flex; flex-direction: column; gap: var(--s2); }
+/* aviso usa a paleta de DESTAQUE, nao a de alerta: e a leitura do sistema,
+   nao um erro dele. Mesma regra do card de Insight. */
+.sarue-aviso { display: flex; gap: var(--s3); align-items: flex-start; font-size: 13px; line-height: 1.45; background: var(--brand-soft); border-left: 2px solid var(--brand); border-radius: var(--r-sm); padding: var(--s3); }
+.sarue-aviso p { flex: 1; }
+.sarue-conversa { display: flex; flex-direction: column; gap: var(--s3); max-height: 52dvh; overflow-y: auto; overscroll-behavior: contain; }
+.sarue-sugestoes { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.sarue-turno { display: flex; flex-direction: column; gap: 4px; }
+.sarue-pergunta { font-size: 12px; font-family: var(--mono); color: var(--faint); }
+.sarue-resposta { font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+.sarue-resposta.pensando, .sarue-resposta.falhou { color: var(--faint); font-style: italic; }
+/* o guardrail do servidor aparece na tela. Esconder daria ao texto uma
+   autoridade que o proprio sistema ja sabe que ele nao tem. */
+.sarue-suspeita { font-size: 11px; color: var(--warn); background: var(--warn-soft); border-radius: var(--r-sm); padding: 6px var(--s2); }
+.sarue-erro { font-size: 12px; color: var(--danger); }
+.sarue-entrada { display: flex; gap: var(--s2); }
+.sarue-entrada input { flex: 1; font-family: var(--data); font-size: 13px; color: var(--text); background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 9px 10px; }
+.sarue-entrada input:focus { outline: none; border-color: var(--brand); }
+
+/* Passo de vínculo com a bateria, depois do upload. Aparece só quando a
+   gravação ficou solta: fechar o ciclo é escolha do usuário, e a tela tem que
+   fazer a pergunta em vez de deixar a gravação órfã em silêncio. */
+.envio-bateria { display: flex; flex-direction: column; gap: var(--s3); border-top: 1px solid var(--border); padding-top: var(--s3); color: var(--text); }
+.envio-bateria p { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.envio-bateria label { display: flex; flex-direction: column; gap: 4px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.envio-bateria select { font-family: var(--data); font-size: 13px; color: var(--text); background: var(--bg); border: 1px solid var(--brand); border-radius: var(--r-sm); padding: 8px 9px; text-transform: none; letter-spacing: 0; }
+
+/* Indicador de trabalho em curso. Gira de verdade, nao e barra falsa: durante o
+   upload a fracao vem do evento real do XMLHttpRequest, e durante o
+   processamento o giro so diz "ainda estou olhando", que e a verdade, porque o
+   servidor nao expoe progresso das etapas. */
+.giro { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; border: 2px solid var(--border-strong); border-top-color: var(--brand); border-radius: 50%; animation: girar .8s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .giro { animation-duration: 2.4s; } }

@@ -1,0 +1,52 @@
+[project]
+name = "saru-poc-trackday"
+version = "0.1.0"
+description = "PoC core SARU: do arquivo do piloto ao insight, ponta a ponta num track day"
+requires-python = ">=3.12"
+dependencies = [
+    "psycopg[binary]>=3.2",
+    "pyarrow>=18.0",
+    "duckdb>=1.1",
+    "numpy>=2.1",
+    "pandas>=2.2",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.9",
+    # Auth (decisao do Lucas, 29/08: pyjwt + argon2, sem framework de auth).
+    # fastavor de nao trazer fastapi-users: ele traz modelo de usuario proprio,
+    # e a tabela `usuario` ja existe em 001_identidade com o schema do catalogo.
+    "pyjwt>=2.9",
+    "argon2-cffi>=23.1",
+    # Cliente HTTP do servidor pra fora: OpenRouter (Sarue) e API de clima.
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+# Leitor nativo AiM .xrk. Isolado porque puxa binario e nao pode travar o setup.
+aim = ["libxrk>=0.12"]
+# Relay de live timing na pista. So o notebook da pista instala isto; o
+# smbprotocol (SMB2/3 puro-python) so e usado quando a fonte e `smb://`, pra
+# ler os XML do PC de cronometragem que nao serve HTTP. httpx ja e core.
+relay = ["smbprotocol>=1.14"]
+dev = ["pytest>=8.3", "ruff>=0.7"]
+
+[project.scripts]
+saru-poc = "saru_poc.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saru_poc"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27",
+]

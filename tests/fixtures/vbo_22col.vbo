@@ -1,0 +1,58 @@
+File created on 01/03/2023 @ 14:54:04
+
+[header]
+satellites
+time
+latitude
+longitude
+velocity kmh
+heading
+height
+vertical velocity m/s
+sampleperiod
+avifileindex
+avisynctime
+VBOX_laptime
+VBOX_lapnumber
+VBOX_yaw
+VBOX_accz
+VBOX_accx
+VBOX_accy
+VBOX_asteer
+VBOX_pbrk
+VBOX_ath
+VBOX_gear
+VBOX_rpm
+
+[channel units]
+s
+s
+#
+°/s
+G
+G
+G
+°
+bar
+%
+#
+rpm
+
+[comments]
+(c) Racelogic
+
+[AVI]
+sinteticofixture_0001
+mp4
+mp4
+
+[laptiming]
+Start        +2801.999150 -1422.223780 +2801.999660 -1422.221940 ¬ Start / Finish
+
+[column names]
+sats time lat long velocity heading height vert-vel Tsample avifileindex avitime VBOX_laptime VBOX_lapnumber VBOX_yaw VBOX_accz VBOX_accx VBOX_accy VBOX_asteer VBOX_pbrk VBOX_ath VBOX_gear VBOX_rpm
+
+[data]
+140 175943.400 -1422.05535600 +2802.02919000 222.347 180.942 +00796.41 -0000.49 0.100 0001 000000073 +1.010400E+02 +3.000000E+01 +5.500000E+00 +1.325000E+00 +1.000000E-01 +6.000000E-01 +1.440625E+02 +4.400000E-01 +9.900000E+01 +5.000000E+00 +8.028000E+03
+140 175943.500 -1422.05870400 +2802.02921400 222.847 180.378 +00796.28 -0000.54 0.100 0001 000000173 +1.010400E+02 +3.000000E+01 +7.300000E+00 +1.250000E+00 +1.000000E-01 +7.000000E-01 +1.441875E+02 +4.400000E-01 +9.950000E+01 +5.000000E+00 +8.041000E+03
+140 175943.600 -1422.06205800 +2802.02919600 223.052 179.756 +00796.19 -0000.56 0.100 0001 000000273 +1.010400E+02 +3.000000E+01 +7.100000E+00 +1.375000E+00 +1.000000E-01 +7.250000E-01 +1.442500E+02 +4.400000E-01 +9.950000E+01 +5.000000E+00 +8.051000E+03
