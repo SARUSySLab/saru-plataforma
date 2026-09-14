@@ -104,7 +104,7 @@ perdas por trecho (CAM-F9).
 | Necessidade | O histórico volta a volta é derivado, porque a fonte não o entrega | CAM-F5 | CAM-OBJ-03 |
 | Desejo | Vender ranking recreativo por classe e dashboard do evento white-label ao organizador | CAM-F3 item O6 | CAM-OBJ-04 |
 | Frustração | Track day não tem cronometragem oficial, então o dado existe e não tem onde virar análise | CAM-F3 leitura de mercado | CAM-PRB-01 |
-| Latente | Um evento hospeda campeonatos diferentes ao mesmo tempo, e o evento é quem declara a disciplina | CAM-F12 | a virar regra de negócio no arquivo 02 |
+| Latente | Um evento hospeda campeonatos diferentes ao mesmo tempo, e o evento é quem declara a disciplina | CAM-F12 | CAM-RN-12 |
 
 ## Referência de mercado
 
