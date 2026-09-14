@@ -60,7 +60,12 @@ def test_varios_nomes_brutos_pro_mesmo_canal(banco) -> None:
 
 
 def test_freio_ficou_em_pressao_nao_em_fracao(banco) -> None:
-    """Decisao de 29/08: normalize_by_max sai, o freio fica na unidade nativa."""
+    """Decisao de 29/08: normalize_by_max sai, o freio fica em pressao (kPa).
+
+    A entrada pode ser `bar` (fator 100) ou `contagem` do logger, quando o
+    fator foi medido contra o export do fabricante (perfil `pi_pid`, issue
+    #26: 0,199645 bar por contagem, 19,9645 kPa). Em nenhum caso o fator
+    pode ser 1, que seria contagem crua passando por kPa."""
     linhas = banco.execute(
         """select m.perfil_id, m.unidade_entrada, m.fator_escala, g.unidade_canonica
            from mapeamento_canal m
@@ -69,10 +74,13 @@ def test_freio_ficou_em_pressao_nao_em_fracao(banco) -> None:
            where m.canal_canonico_id = 'brake_press'"""
     ).fetchall()
     assert linhas, "brake_press sem mapeamento"
-    for _perfil, unidade_entrada, fator, canonica in linhas:
-        assert unidade_entrada == "bar"
-        assert canonica == "kPa"
-        assert fator == pytest.approx(100.0)
+    for perfil, unidade_entrada, fator, canonica in linhas:
+        assert canonica == "kPa", perfil
+        assert unidade_entrada in ("bar", "contagem"), perfil
+        if unidade_entrada == "bar":
+            assert fator == pytest.approx(100.0), perfil
+        else:
+            assert fator != pytest.approx(1.0) and fator > 0, perfil
 
 
 def test_nenhum_mapeamento_semeado_dependia_de_normalize_by_max(banco) -> None:
