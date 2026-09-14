@@ -28,3 +28,6 @@ na pasta guarda-chuva) e o chat com Vitor.
 | pendente | ADR mestre único em `saru/docs/adr/` | Hoje em 4 lugares | | recomendada |
 | pendente | Física em `saru/docs/fisica/` até existir repositório de física | Sem código, sem repositório | | recomendada |
 | pendente | Drive: `Trabalho/SARU` em 4 áreas; quarentena de `.env`, instaladores e logs; Apuama VD e pneu para `docs/fisica/` | Auditoria 05 | | recomendada |
+| 2026-09-14 | `CLAUDE.md` da plataforma (até 40 linhas) entra na branch `port/saru-docs`, dentro do PR 10, antes do merge | Um PR a menos; o contrato nasce junto com o porte | PR novo em `main` depois do 10 | aprovada |
+| 2026-09-14 | As nove issues abertas da PoC (#24, #21, #7, #4, #3, #10, #2, #6, #19) são portadas para `saru-plataforma` e fechadas aqui, na ordem acordada; a PoC não recebe mais issue | Repositório único; a PoC está congelada | Fechar na PoC e espelhar aqui | aprovada |
+| 2026-09-14 | Porte do `saru` para `docs/empresa/` mantém íntegros `decisions.md` e `requisitos/`; o resto pode ser reorganizado e enxugado | Vitor: "portar tudo, organizado, otimizando, sem perder decisões e requisitos" | Porte literal sem reorganizar | aprovada |
