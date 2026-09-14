@@ -15,3 +15,5 @@ data/
 web/src/fixtures/
 web/node_modules/
 web/dist/
+.claude/.estado-caixa
+.agents/.estado-caixa

@@ -1,0 +1,8 @@
+{
+  "caixa-por-repositorio": {
+    "enabled": true,
+    "PreInvocation": [
+      { "command": "bash .agents/hooks/caixa-antigravity.sh" }
+    ]
+  }
+}
