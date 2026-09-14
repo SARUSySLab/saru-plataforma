@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SARU Cockpit N0 | Diagnóstico de Piloto & Performance</title>
+  <style>
+    :root {
+      --bg: hsl(345 8% 6%);
+      --surface: hsl(345 6% 11%);
+      --surface-hover: hsl(345 6% 15%);
+      --raised: hsl(345 6% 18%);
+      --border: hsl(345 6% 22%);
+      --border-strong: hsl(346 8% 38%);
+      --border-focus: #f04c83;
+      --text: hsl(20 15% 94%);
+      --muted: hsl(28 8% 68%);
+      --faint: hsl(28 6% 50%);
+      
+      --brand: #f04c83;
+      --brand-soft: rgba(240, 76, 131, 0.12);
+      
+      --ok: #28ad72;
+      --ok-soft: rgba(40, 173, 114, 0.12);
+      --warn: #e59324;
+      --warn-soft: rgba(229, 147, 36, 0.12);
+      --danger: #ef4444;
+      --danger-soft: rgba(239, 68, 68, 0.12);
+
+      --lap-a: #f04c83;
+      --lap-b: #5e96de;
+      
+      --ch-thr: #28ad72;
+      --ch-spd: #5e96de;
+      --ch-brk: #f04c83;
+      --ch-str: #b0761c;
+
+      --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+      --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --display: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .tabular {
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* TOP NAV & CONTEXT */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand-block {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-badge {
+      background: var(--brand);
+      color: #fff;
+      font-family: var(--display);
+      font-weight: 900;
+      font-size: 14px;
+      letter-spacing: 1.5px;
+      padding: 4px 10px;
+      border-radius: 4px;
+    }
+
+    .product-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.5px;
+    }
+
+    .product-mode {
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: 6px;
+      background: var(--raised);
+      padding: 2px 8px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .session-meta {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 12px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .meta-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .meta-value {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-toggle {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-toggle:hover {
+      border-color: var(--brand);
+      color: var(--text);
+    }
+
+    .btn-toggle.active {
+      background: var(--brand-soft);
+      border-color: var(--brand);
+      color: var(--brand);
+    }
+
+    /* MAIN DESKTOP GRID */
+    main {
+      flex: 1;
+      padding: 20px 24px;
+      max-width: 1760px;
+      margin: 0 auto;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 380px 1fr 420px;
+      grid-template-rows: auto 1fr;
+      gap: 20px;
+    }
+
+    /* SUMMARY STRIP */
+    .summary-strip {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--border-strong);
+    }
+
+    .kpi-card.highlight-brand::before { background: var(--brand); }
+    .kpi-card.highlight-ok::before { background: var(--ok); }
+    .kpi-card.highlight-warn::before { background: var(--warn); }
+    .kpi-card.highlight-b::before { background: var(--lap-b); }
+
+    .kpi-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .kpi-number {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.5px;
+    }
+
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .delta-bad { color: var(--danger); font-weight: 700; }
+    .delta-good { color: var(--ok); font-weight: 700; }
+
+    /* COLUMN 1: TOP 3 PERDAS DE TEMPO (O MAIS IMPORTANTE PARA O PILOTO N0) */
+    .col-losses {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-counter {
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 10px;
+      border: 1px solid rgba(240, 76, 131, 0.3);
+    }
+
+    .loss-item {
+      background: var(--raised);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .loss-item:hover, .loss-item.selected {
+      border-color: var(--brand);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .loss-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .corner-name {
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .corner-num {
+      background: var(--border-strong);
+      color: var(--text);
+      font-size: 10px;
+      font-weight: 800;
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+
+    .loss-time {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--danger);
+    }
+
+    .loss-cause {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .loss-action {
+      font-size: 11px;
+      color: var(--text);
+      background: var(--surface);
+      padding: 8px 10px;
+      border-radius: 4px;
+      border-left: 3px solid var(--brand);
+      line-height: 1.4;
+    }
+
+    .loss-action strong {
+      color: var(--brand);
+    }
+
+    /* COLUMN 2: PISTA INTERATIVA & TELEMETRIA DA CURVA SELECIONADA */
+    .col-center {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .map-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 380px;
+      position: relative;
+    }
+
+    .map-svg-wrap {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    svg.track-svg {
+      width: 100%;
+      height: 100%;
+      max-height: 310px;
+    }
+
+    .track-path-base {
+      stroke: var(--border-strong);
+      stroke-width: 18;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .track-sector {
+      fill: none;
+      stroke-width: 14;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: stroke 0.3s;
+      cursor: pointer;
+    }
+
+    .sector-loss-high { stroke: var(--danger); }
+    .sector-loss-med { stroke: var(--warn); }
+    .sector-ok { stroke: var(--ok); }
+
+    .track-marker {
+      fill: var(--text);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 800;
+      text-anchor: middle;
+      dominant-baseline: central;
+      cursor: pointer;
+    }
+
+    .telemetry-strip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .strip-channels {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .channel-canvas-wrap {
+      height: 90px;
+      position: relative;
+      background: var(--bg);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .channel-label {
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-bullet {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    /* COLUMN 3: TRAIL-BRAKING & ESTERÇO */
+    .col-trail {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .trail-gauge-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: center;
+      text-align: center;
+    }
+
+    .gauge-circle {
+      position: relative;
+      width: 140px;
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gauge-score {
+      font-size: 38px;
+      font-weight: 900;
+      font-family: var(--display);
+      letter-spacing: -1px;
+      color: var(--ok);
+    }
+
+    .gauge-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .friction-ellipse-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .friction-canvas-wrap {
+      width: 100%;
+      height: 220px;
+      background: var(--bg);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .trail-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .trail-table th {
+      text-align: left;
+      padding: 6px 8px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .trail-table td {
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .trail-tag {
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 700;
+      font-size: 10px;
+    }
+
+    .trail-opt { background: var(--ok-soft); color: var(--ok); }
+    .trail-mod { background: var(--warn-soft); color: var(--warn); }
+    .trail-bad { background: var(--danger-soft); color: var(--danger); }
+
+    /* FOOTER BAR */
+    footer {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 20px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 16px;
+    }
+
+    .footer-links a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .footer-links a:hover {
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <header>
+    <div class="brand-block">
+      <div class="logo-badge">SARU</div>
+      <div>
+        <span class="product-title">COCKPIT DO PILOTO</span>
+        <span class="product-mode">NÍVEL N0: TRACKDAY & AMADOR</span>
+      </div>
+    </div>
+
+    <div class="session-meta">
+      <div class="meta-item">
+        <span class="meta-label">PILOTO</span>
+        <span class="meta-value">Vitor Toledo</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">VEÍCULO</span>
+        <span class="meta-value">Porsche 911 GT3 Cup (991.2)</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">CIRCUITO</span>
+        <span class="meta-value">AIC Curitiba (3.695 m)</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">VOLTA EM ANÁLISE</span>
+        <span class="meta-value tabular">Volta 05 (Melhor)</span>
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <button class="btn-toggle active" id="btnModeN0">Visão Piloto (N0)</button>
+      <a href="mock-pitwall-desktop.html" class="btn-toggle" id="btnModeN1">Visão Engenheiro (N1)</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. FAIXA DE RESUMO EXECUTIVO -->
+    <div class="summary-strip">
+      <div class="kpi-card highlight-brand">
+        <span class="kpi-title">Melhor Volta Real</span>
+        <span class="kpi-number tabular">1:24.312</span>
+        <span class="kpi-sub">Volta 05 de 14 válidas</span>
+      </div>
+
+      <div class="kpi-card highlight-b">
+        <span class="kpi-title">Volta de Referência</span>
+        <span class="kpi-number tabular">1:23.890</span>
+        <span class="kpi-sub">Referência Ideal Combinada</span>
+      </div>
+
+      <div class="kpi-card highlight-warn">
+        <span class="kpi-title">Delta Total Acumulado</span>
+        <span class="kpi-number tabular delta-bad">+0.422s</span>
+        <span class="kpi-sub">Tempo recuperável identificado</span>
+      </div>
+
+      <div class="kpi-card highlight-ok">
+        <span class="kpi-title">Índice Trail-Braking</span>
+        <span class="kpi-number tabular delta-good">76 / 100</span>
+        <span class="kpi-sub">Transição freio e esterço consistente</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-title">Velocidade Máxima</span>
+        <span class="kpi-number tabular">238 km/h</span>
+        <span class="kpi-sub">Reta Principal (AIC)</span>
+      </div>
+    </div>
+
+    <!-- 2. COLUNA DA ESQUERDA: TOP 3 PERDAS DE TEMPO (AÇÃO DIRETA) -->
+    <div class="col-losses">
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">
+            <span>Top 3 Perdas de Tempo</span>
+            <span class="badge-counter">3 Oportunidades</span>
+          </div>
+          <span style="font-size: 11px; color: var(--muted);">Meta: -0.422s</span>
+        </div>
+
+        <!-- PERDA 1 -->
+        <div class="loss-item selected" onclick="selectLoss(0)">
+          <div class="loss-head">
+            <div class="corner-name">
+              <span class="corner-num">C1</span>
+              <span>Curva da Vitória (S de Alta)</span>
+            </div>
+            <span class="loss-time tabular">+0.210s</span>
+          </div>
+          <div class="loss-cause">
+            Frenagem iniciada 18 metros antes do ponto ótimo. Você freou na placa de 120 m em vez da placa de 100 m.
+          </div>
+          <div class="loss-action">
+            <strong>O que fazer:</strong> Freie mais tarde na placa de 100 m com 85 bar de pressão e alivie progressivamente até o ápice.
+          </div>
+        </div>
+
+        <!-- PERDA 2 -->
+        <div class="loss-item" onclick="selectLoss(1)">
+          <div class="loss-head">
+            <div class="corner-name">
+              <span class="corner-num">C4</span>
+              <span>Ferradura (Curva Longa)</span>
+            </div>
+            <span class="loss-time tabular">+0.145s</span>
+          </div>
+          <div class="loss-cause">
+            Velocidade mínima no ápice de 92 km/h contra 99 km/h da referência. Freio foi 100% solto antes de apontar o carro.
+          </div>
+          <div class="loss-action">
+            <strong>O que fazer:</strong> Mantenha 15% de freio enquanto gira o volante para assentar a dianteira (trail-braking).
+          </div>
+        </div>
+
+        <!-- PERDA 3 -->
+        <div class="loss-item" onclick="selectLoss(2)">
+          <div class="loss-head">
+            <div class="corner-name">
+              <span class="corner-num">C7</span>
+              <span>Junção (Entrada da Reta)</span>
+            </div>
+            <span class="loss-time tabular">+0.067s</span>
+          </div>
+          <div class="loss-cause">
+            Retomada de acelerador atrasada em 0.25 segundos. Carro já estava reto mas com pedal em 40%.
+          </div>
+          <div class="loss-action">
+            <strong>O que fazer:</strong> Aplique 100% de borboleta assim que passar o ápice da zebra interna.
+          </div>
+        </div>
+      </div>
+
+      <!-- RECOMENDAÇÃO TÁTICA GERAL -->
+      <div class="section-card" style="border-left: 3px solid var(--ok);">
+        <div class="section-title" style="color: var(--ok);">Dica do Engenheiro Virtual</div>
+        <p style="font-size: 12px; line-height: 1.5; color: var(--text);">
+          Seu ritmo de corrida é consistente. 85% do seu delta está concentrado em apenas 2 curvas (C1 e C4). Concentre-se apenas na modulação de freio da Curva 1 na próxima saída.
+        </p>
+      </div>
+    </div>
+
+    <!-- 3. COLUNA CENTRAL: MAPA DO CIRCUITO & TELEMETRIA COMPARATIVA -->
+    <div class="col-center">
+      <!-- MAPA SVG -->
+      <div class="map-container">
+        <div class="section-header">
+          <div class="section-title">Mapa de Delta por Curva (AIC 3.695 m)</div>
+          <div style="font-size: 11px; display: flex; gap: 12px;">
+            <span style="color: var(--ok);">● Ganho/Paridade</span>
+            <span style="color: var(--warn);">● Perda Moderada</span>
+            <span style="color: var(--danger);">● Perda Crítica (Top 3)</span>
+          </div>
+        </div>
+
+        <div class="map-svg-wrap">
+          <svg class="track-svg" viewBox="0 0 800 450">
+            <!-- Traçado AIC Aproximado -->
+            <path class="track-path-base" d="M 120,380 L 680,380 C 740,380 770,340 760,280 L 730,160 C 720,110 680,90 620,100 L 480,120 C 440,130 420,160 400,190 L 360,250 C 330,290 280,290 250,250 L 220,180 C 200,130 150,130 120,170 L 80,240 C 50,300 70,380 120,380 Z" />
+            
+            <!-- Setores Coloridos -->
+            <!-- Reta e C1 -->
+            <path id="sec-c1" class="track-sector sector-loss-high" d="M 620,380 L 680,380 C 740,380 770,340 760,280" onclick="selectLoss(0)" />
+            <!-- C4 Ferradura -->
+            <path id="sec-c4" class="track-sector sector-loss-med" d="M 480,120 C 440,130 420,160 400,190" onclick="selectLoss(1)" />
+            <!-- C7 Junção -->
+            <path id="sec-c7" class="track-sector sector-loss-med" d="M 80,240 C 50,300 70,380 120,380" onclick="selectLoss(2)" />
+            
+            <!-- Marcadores de Curva -->
+            <circle cx="730" cy="330" r="14" fill="var(--danger)" />
+            <text x="730" y="330" class="track-marker" onclick="selectLoss(0)">C1</text>
+
+            <circle cx="430" cy="150" r="14" fill="var(--warn)" />
+            <text x="430" y="150" class="track-marker" onclick="selectLoss(1)">C4</text>
+
+            <circle cx="70" cy="310" r="14" fill="var(--warn)" />
+            <text x="70" y="310" class="track-marker" onclick="selectLoss(2)">C7</text>
+
+            <circle cx="235" cy="215" r="12" fill="var(--ok)" />
+            <text x="235" y="215" class="track-marker">C5</text>
+
+            <!-- Linha de Largada -->
+            <line x1="260" y1="365" x2="260" y2="395" stroke="#fff" stroke-width="4" stroke-dasharray="2,2" />
+            <text x="260" y="355" fill="var(--muted)" font-size="10" font-family="var(--mono)" text-anchor="middle">LARGADA / CHEGADA</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- TELEMETRIA COMPARATIVA SIMPLIFICADA (FOCO NA CURVA SELECIONADA) -->
+      <div class="telemetry-strip">
+        <div class="section-header">
+          <div class="section-title">
+            <span id="stripTitle">Foco de Telemetria: Curva 1 (S de Alta)</span>
+          </div>
+          <div style="display: flex; gap: 14px; font-size: 11px;">
+            <span style="color: var(--lap-a);"><span class="legend-bullet" style="background: var(--lap-a);"></span> Sua Melhor Volta (1:24.312)</span>
+            <span style="color: var(--lap-b);"><span class="legend-bullet" style="background: var(--lap-b);"></span> Volta Referência (1:23.890)</span>
+          </div>
+        </div>
+
+        <div class="strip-channels">
+          <!-- CANAL 1: VELOCIDADE -->
+          <div class="channel-canvas-wrap">
+            <div class="channel-label" style="color: var(--ch-spd);">
+              <span>Velocidade GPS (km/h)</span>
+              <span class="tabular" id="curSpeedVal" style="color: var(--text);">214 vs 228 km/h</span>
+            </div>
+            <canvas id="speedCanvas" width="700" height="90"></canvas>
+          </div>
+
+          <!-- CANAL 2: FREIO & ACELERADOR -->
+          <div class="channel-canvas-wrap">
+            <div class="channel-label" style="color: var(--ch-brk);">
+              <span>Pressão de Freio (bar) & Acelerador (%)</span>
+            </div>
+            <canvas id="pedalCanvas" width="700" height="90"></canvas>
+          </div>
+
+          <!-- CANAL 3: DELTA DE TEMPO -->
+          <div class="channel-canvas-wrap">
+            <div class="channel-label" style="color: var(--brand);">
+              <span>Delta de Tempo Acumulado (s)</span>
+              <span class="tabular" id="curDeltaVal" style="color: var(--danger);">+0.210s</span>
+            </div>
+            <canvas id="deltaCanvas" width="700" height="90"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. COLUNA DA DIREITA: ANÁLISE DE TRAIL-BRAKING & MODULAÇÃO -->
+    <div class="col-trail">
+      <!-- GAUGE CIRCULAR -->
+      <div class="trail-gauge-card">
+        <div class="section-title" style="width: 100%; text-align: left;">Nota Geral de Trail-Braking</div>
+        
+        <div class="gauge-circle">
+          <svg width="140" height="140" viewBox="0 0 140 140">
+            <circle cx="70" cy="70" r="58" fill="none" stroke="var(--border)" stroke-width="12" />
+            <circle cx="70" cy="70" r="58" fill="none" stroke="var(--ok)" stroke-width="12"
+                    stroke-dasharray="364.4" stroke-dashoffset="87.4" stroke-linecap="round"
+                    transform="rotate(-90 70 70)" />
+          </svg>
+          <div style="position: absolute; display: flex; flex-direction: column; align-items: center;">
+            <span class="gauge-score tabular">76</span>
+            <span class="gauge-label">Pontos / 100</span>
+          </div>
+        </div>
+
+        <p style="font-size: 11px; color: var(--muted); line-height: 1.4;">
+          Avaliação baseada na elipse de atrito e sobreposição entre alívio de freio e ângulo de volante na entrada de curva.
+        </p>
+      </div>
+
+      <!-- DIAGRAMA DA ELIPSE DE ATRITO (SIMPLIFICADO N0) -->
+      <div class="friction-ellipse-card">
+        <div class="section-header">
+          <div class="section-title">Elipse de Uso de Aderência (G-G)</div>
+          <span style="font-size: 10px; color: var(--muted);">Pico 1.75 G</span>
+        </div>
+
+        <div class="friction-canvas-wrap">
+          <canvas id="frictionCanvas" width="240" height="200"></canvas>
+        </div>
+
+        <div style="font-size: 11px; color: var(--text); background: var(--bg); padding: 8px; border-radius: 4px; border-left: 3px solid var(--warn);">
+          <strong>Diagnóstico C4:</strong> Na Curva 4, você zerou o freio enquanto a aceleração lateral era apenas 0.4G. O pneu dianteiro tinha mais 50% de capacidade não utilizada.
+        </div>
+      </div>
+
+      <!-- TABELA DE FRENAGEM POR CURVA -->
+      <div class="section-card">
+        <div class="section-title">Avaliação por Curva</div>
+        <table class="trail-table tabular">
+          <thead>
+            <tr>
+              <th>Curva</th>
+              <th>Pico (bar)</th>
+              <th>Transição</th>
+              <th>Nota</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Curva 1</td>
+              <td>88 bar</td>
+              <td>Muito cedo</td>
+              <td><span class="trail-tag trail-mod">68/100</span></td>
+            </tr>
+            <tr>
+              <td>Curva 2</td>
+              <td>54 bar</td>
+              <td>Suave</td>
+              <td><span class="trail-tag trail-opt">91/100</span></td>
+            </tr>
+            <tr>
+              <td>Curva 4</td>
+              <td>79 bar</td>
+              <td>Abrupta</td>
+              <td><span class="trail-tag trail-bad">55/100</span></td>
+            </tr>
+            <tr>
+              <td>Curva 5</td>
+              <td>62 bar</td>
+              <td>Excelente</td>
+              <td><span class="trail-tag trail-opt">94/100</span></td>
+            </tr>
+            <tr>
+              <td>Curva 7</td>
+              <td>71 bar</td>
+              <td>Regular</td>
+              <td><span class="trail-tag trail-mod">74/100</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <div>
+      <span>SARU Automotive Engineering Suite • Documento de Design & Mock PC Desktop (1440x900 / 1920x1080)</span>
+    </div>
+    <div class="footer-links">
+      <a href="../requisitos/05-rastreabilidade.md">Rastreabilidade RF-05/RF-07/RF-08</a>
+      <a href="../arquitetura/README.md">Arquitetura de Software</a>
+      <a href="mock-pitwall-desktop.html">Visualização N1 (Engenharia)</a>
+    </div>
+  </footer>
+
+  <script>
+    // DADOS MOCK DAS 3 MAIORES PERDAS DE TEMPO
+    const losses = [
+      {
+        title: "Foco de Telemetria: Curva 1 (S de Alta)",
+        curSpeed: "214 vs 228 km/h",
+        curDelta: "+0.210s",
+        brakePeak: 88,
+        trailNote: "Frenagem antecipada em 18m. Alívio de pedal muito rápido."
+      },
+      {
+        title: "Foco de Telemetria: Curva 4 (Ferradura)",
+        curSpeed: "92 vs 99 km/h",
+        curDelta: "+0.145s",
+        brakePeak: 79,
+        trailNote: "Freio 100% solto antes do ápice. Frente do Porsche perdeu carga."
+      },
+      {
+        title: "Foco de Telemetria: Curva 7 (Junção)",
+        curSpeed: "135 vs 142 km/h",
+        curDelta: "+0.067s",
+        brakePeak: 71,
+        trailNote: "Hesitação de 0.25s para aplicar potência plena na saída."
+      }
+    ];
+
+    function selectLoss(idx) {
+      document.querySelectorAll('.loss-item').forEach((el, i) => {
+        el.classList.toggle('selected', i === idx);
+      });
+      const data = losses[idx];
+      document.getElementById('stripTitle').innerText = data.title;
+      document.getElementById('curSpeedVal').innerText = data.curSpeed;
+      document.getElementById('curDeltaVal').innerText = data.curDelta;
+      renderTelemetry(idx);
+      renderFriction(idx);
+    }
+
+    // DESENHO DE GRÁFICOS INTERATIVOS VIA CANVAS NATIVO
+    function renderTelemetry(idx) {
+      // 1. SPEED CANVAS
+      const spd = document.getElementById('speedCanvas');
+      const ctxS = spd.getContext('2d');
+      ctxS.clearRect(0, 0, spd.width, spd.height);
+      
+      // Grid lines
+      ctxS.strokeStyle = '#1e2838';
+      ctxS.lineWidth = 1;
+      ctxS.beginPath();
+      ctxS.moveTo(0, 45); ctxS.lineTo(spd.width, 45);
+      ctxS.stroke();
+
+      // Lap A (Sua Volta - Rosa)
+      ctxS.strokeStyle = '#f04c83';
+      ctxS.lineWidth = 2.5;
+      ctxS.beginPath();
+      ctxS.moveTo(20, 20);
+      ctxS.bezierCurveTo(200, 20 + idx*10, 350, 75, 450, 75);
+      ctxS.bezierCurveTo(550, 75, 620, 30 + idx*8, 680, 25);
+      ctxS.stroke();
+
+      // Lap B (Referência - Azul)
+      ctxS.strokeStyle = '#5e96de';
+      ctxS.lineWidth = 2;
+      ctxS.setLineDash([4, 4]);
+      ctxS.beginPath();
+      ctxS.moveTo(20, 18);
+      ctxS.bezierCurveTo(240, 18, 360, 60, 450, 60);
+      ctxS.bezierCurveTo(540, 60, 610, 20, 680, 18);
+      ctxS.stroke();
+      ctxS.setLineDash([]);
+
+      // 2. PEDAL CANVAS
+      const ped = document.getElementById('pedalCanvas');
+      const ctxP = ped.getContext('2d');
+      ctxP.clearRect(0, 0, ped.width, ped.height);
+
+      // Throttle (Verde)
+      ctxP.strokeStyle = '#28ad72';
+      ctxP.lineWidth = 2;
+      ctxP.beginPath();
+      ctxP.moveTo(20, 15);
+      ctxP.lineTo(180, 15);
+      ctxP.lineTo(210, 80);
+      ctxP.lineTo(440, 80);
+      ctxP.lineTo(500, 15);
+      ctxP.lineTo(680, 15);
+      ctxP.stroke();
+
+      // Brake (Rosa)
+      ctxP.strokeStyle = '#f04c83';
+      ctxP.fillStyle = 'rgba(240, 76, 131, 0.15)';
+      ctxP.lineWidth = 2;
+      ctxP.beginPath();
+      ctxP.moveTo(190, 85);
+      ctxP.lineTo(230, 20);
+      ctxP.lineTo(320, 45 + idx*10);
+      ctxP.lineTo(430, 85);
+      ctxP.lineTo(190, 85);
+      ctxP.fill();
+      ctxP.stroke();
+
+      // 3. DELTA CANVAS
+      const dlt = document.getElementById('deltaCanvas');
+      const ctxD = dlt.getContext('2d');
+      ctxD.clearRect(0, 0, dlt.width, dlt.height);
+
+      // Zero baseline
+      ctxD.strokeStyle = '#475569';
+      ctxD.lineWidth = 1;
+      ctxD.beginPath();
+      ctxD.moveTo(0, 45); ctxD.lineTo(dlt.width, 45);
+      ctxD.stroke();
+
+      // Delta trace
+      ctxD.strokeStyle = '#f04c83';
+      ctxD.lineWidth = 2.5;
+      ctxD.beginPath();
+      ctxD.moveTo(20, 45);
+      ctxD.lineTo(200, 45);
+      ctxD.bezierCurveTo(300, 45, 450, 45 + 15 + idx*6, 680, 45 + 25 + idx*8);
+      ctxD.stroke();
+    }
+
+    // 4. FRICTION ELLIPSE CANVAS (G-G DIAGRAM)
+    function renderFriction(idx) {
+      const cvs = document.getElementById('frictionCanvas');
+      const ctx = cvs.getContext('2d');
+      const cx = cvs.width / 2;
+      const cy = cvs.height / 2;
+      ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+      // Axis
+      ctx.strokeStyle = '#1e2838';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, 10); ctx.lineTo(cx, cvs.height - 10);
+      ctx.moveTo(10, cy); ctx.lineTo(cvs.width - 10, cy);
+      ctx.stroke();
+
+      // Theoretical Grip Limit (1.75 G circle)
+      ctx.strokeStyle = '#28ad72';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 75, 75, 0, 0, 2 * Math.PI);
+      ctx.stroke();
+
+      // Real Driver Trace (Curva)
+      ctx.strokeStyle = '#f04c83';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      // Straight braking (-Ax)
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx, cy + 68);
+      // Corner entry (Trail-Braking quadrant)
+      if (idx === 1) {
+        // C4 bad trail: cuts corner inside ellipse
+        ctx.bezierCurveTo(cx + 20, cy + 50, cx + 30, cy + 10, cx + 65, cy);
+      } else {
+        // Good trail: hugs outer envelope
+        ctx.bezierCurveTo(cx + 45, cy + 55, cx + 65, cy + 40, cx + 70, cy);
+      }
+      ctx.stroke();
+
+      // Mark the transition point
+      ctx.fillStyle = idx === 1 ? '#e59324' : '#28ad72';
+      ctx.beginPath();
+      ctx.arc(idx === 1 ? cx + 25 : cx + 55, cy + 45, 5, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Labels
+      ctx.font = "9px JetBrains Mono";
+      ctx.fillStyle = "#73849c";
+      ctx.fillText("+Ay (Esq)", 12, cy - 6);
+      ctx.fillText("-Ay (Dir)", cvs.width - 55, cy - 6);
+      ctx.fillText("+Ax (Acel)", cx + 6, 20);
+      ctx.fillText("-Ax (Freio)", cx + 6, cvs.height - 15);
+    }
+
+    // Inicialização
+    window.addEventListener('load', () => {
+      selectLoss(0);
+    });
+  </script>
+</body>
+</html>

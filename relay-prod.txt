@@ -1,0 +1,37 @@
+# ============================================================
+# RELAY DE LIVE TIMING -> PRODUCAO (saru.lassoftware.com.br)
+# Rodar a partir da raiz do repo saru-poc-trackday.
+# O relay roda NESTA maquina (que enxerga o PC .10 por SMB) e
+# posta na API de prod por HTTPS. So o token e criado na prod.
+# ============================================================
+
+# ---- PASSO 1: criar o token de maquina NA PROD (via railway ssh) ----
+# `railway run` NAO serve aqui: ele injeta o env de prod localmente, mas o
+# host do banco e `postgres.railway.internal`, que so resolve DENTRO da rede
+# do Railway. Entao a criacao roda DENTRO do container do service app.
+
+# 1a) entra no container:
+railway ssh
+
+# 1b) JA DENTRO do container (prompt root@...:/app#), cole ESTE BLOCO INTEIRO.
+#     E um heredoc: passa o script literal pro python3, sem quebrar por aspas.
+
+python3 <<'EOF'
+from saru_poc import auth
+with auth.connect() as c:
+    r = c.execute("select id from usuario where role in ('owner','admin','gestor') order by role limit 1").fetchone()
+assert r, "sem gestor no banco de PROD"
+print("TOKEN_PROD:", auth.criar_maquina("relay-mbr", r[0])["token"])
+EOF
+
+# 1c) copie o TOKEN_PROD: saru_mq_... (aparece 1x), depois `exit` pra sair do container.
+
+
+# ---- PASSO 2: subir o relay contra prod (rode DEPOIS de ter o token) ----
+# Troque SARU_MAQUINA_TOKEN pelo token do passo 1.
+# Isto fica rodando continuo (Ctrl+C encerra). --intervalo 2 = le a cada 2s.
+
+# SARU_MAQUINA_TOKEN='saru_mq_...' SARU_SMB_PASSWORD='<senha-do-PC-de-cronometragem>' \
+# uv run --extra relay python scripts/relay_livetiming.py \
+#   --fonte smb://amelio@192.125.125.10/Users/amelio/XML/current.xml \
+#   --api https://saru.lassoftware.com.br --intervalo 2

@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.pytest_cache/
+.ruff_cache/
+data/
+*.parquet
+*.duckdb
+
+# Fixture do front: dado GERADO por web/scripts/gerar-fixture.mjs, nao fonte.
+# Versionar 768 KB de JSON derivado poluiria o diff a cada regeracao, e o
+# gerador esta versionado, entao o dado e reproduzivel. `npm run dev` e
+# `npm run build` regeram antes de rodar, entao clone limpo funciona.
+web/src/fixtures/
+web/node_modules/
+web/dist/

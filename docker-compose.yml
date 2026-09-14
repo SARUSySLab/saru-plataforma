@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: saru-poc-postgres
+    environment:
+      POSTGRES_DB: ${SARU_PG_DB:-saru_poc}
+      POSTGRES_USER: ${SARU_PG_USER:-saru}
+      POSTGRES_PASSWORD: ${SARU_PG_PASSWORD:-saru}
+    ports:
+      - "${SARU_PG_PORT:-5442}:5432"
+    volumes:
+      - saru_poc_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SARU_PG_USER:-saru} -d ${SARU_PG_DB:-saru_poc}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  saru_poc_pgdata:
