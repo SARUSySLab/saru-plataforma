@@ -98,7 +98,7 @@ medido (E-RN-02).
 | PIL-RN-08 volta válida por cobertura | Vitor, no chat (ADR-0033 ratificado) | 2026-09-13 | nenhuma: validade por cobertura espacial e setores, velocidade mínima 20 km/h |
 | PIL-RN-10 unidade única por canal canônico | Vitor, no chat (ADR-0049 ratificado) | 2026-09-13 | nenhuma: teste de fatores plausíveis; exclusão se ambíguo |
 | PIL-RN-11, PIL-RN-12, PIL-RN-14, PIL-RN-15 | práticas já no código e ratificadas por Vitor | 2026-08-28 a 2026-09-13 | nenhuma |
-| PIL-RN-13 limiar de frenagem por G | Vitor, no chat (calibração F10 ratificada) | 2026-09-13 | nenhuma: limiar -3,5 m/s² por 10 m com trail-braking combinado |
+| PIL-RN-13 limiar de frenagem por G | Vitor, no chat, após a tabela de medição no acervo (E-UC-02): 417 voltas de quatro fontes com pedal, sensibilidade 0,948 a 0,994, até 0,42 falso positivo por volta; tabela em `saru/docs/fisica/calibracao/2026-09-13-limiar-frenagem-por-g.md` | 2026-09-14 | nenhuma: limiar -3,5 m/s² sustentado por 10 m; o cálculo de trail-braking combinado segue sem medição própria |
 
 ## Impacto de mudança
 
