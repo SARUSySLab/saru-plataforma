@@ -39,34 +39,52 @@ fim):
    que falta pra decidir a leitura dele.
 
 2. **Tabela de blocos de amostra**: logo apos o dicionario, uma lista de
-   registros de 64 bytes, um por canal QUE TEM DADO (um canal do dicionario
-   pode nao ter registro aqui: medido em varios arquivos do acervo, o
-   dicionario declara N canais e a tabela cobre N-1, o canal ausente fica
-   sem amostra gravada nesta captura). Campos medidos (todos `<i` de 4
-   bytes, offsets relativos ao inicio do registro de 64 bytes):
+   registros de 64 bytes, um por BLOCO de amostra. Nos arquivos pequenos
+   (F3, 47 arquivos de 2026-08-29) ha um bloco por canal e a tabela vem em
+   ordem de indice. No `REF 992.pds` do 992.1 (105,8 MB, medido em
+   2026-09-14, ver `docs/pi-pds-medicao.md`) ha 4311 blocos pra 2937
+   canais: um canal pode ter varios blocos (ate 71), a tabela NAO vem em
+   ordem de indice e os offsets de amostra nao sao monotonicos. Campos
+   medidos (todos `<i` de 4 bytes, offsets relativos ao inicio do registro):
    - offset 0: indice do canal (0-based, mesmo espaco do offset 544 do
      dicionario).
    - offset 16: intervalo entre amostras, em unidades de 1e-7 s (100 ns).
      `frequencia_hz = 1e7 / intervalo`. Validado contra os 7 valores que
      aparecem no acervo (100, 50, 25, 20, 10, 5 e 1 Hz), todos frequencias
      de log padrao de telemetria automotiva.
-   - offset 20: numero de amostras do canal nesta captura.
+   - offset 20: numero de amostras do bloco.
    - offset 48: offset (em bytes, a partir do inicio do arquivo) de onde
-     comecam as amostras `float64` deste canal. NAO lido por este leitor
-     (inventario, nao amostra), mas serve de invariante: a diferenca de
-     offset entre dois registros consecutivos da tabela tem que fechar
-     exato com `n_amostras_do_anterior * 8` (8 bytes por amostra
-     `float64`). Fechou em 100% dos registros consecutivos nos 25 arquivos
-     do acervo que este leitor conseguiu decifrar.
-   - offsets 56 e 60: o indice do canal (offset 0) mais 1, repetido duas
-     vezes. Serve de checksum barato do registro: se nao bater, o registro
-     nao e mais tabela (fim da tabela).
+     comecam as amostras deste bloco. NAO lido por este leitor (inventario,
+     nao amostra), mas serve de invariante, ver abaixo.
+   - offset 56: numero de serie do registro. Nos arquivos F3 vale
+     `indice + 1`; no 992.1 e uma permutacao de 0 a 4310, sem relacao com o
+     indice. Nao serve de checksum.
+   - offset 60: nos arquivos F3 vale `indice + 1`; no 992.1 vale isso em
+     2393 dos 4311 registros e outra coisa nos demais (significado nao
+     medido). Nao serve de checksum.
+   Um registro e valido quando intervalo e numero de amostras sao positivos,
+   o indice cabe no dicionario e o bloco de amostra termina antes do
+   dicionario. O primeiro registro invalido encerra a tabela (medido: no
+   992.1 e no F3 o registro seguinte ao ultimo valido e lixo com intervalo
+   zero).
+
+   Tamanho da amostra: 8 bytes (`float64`) nos arquivos F3; no 992.1, 4
+   bytes em 1328 canais, 1 byte em 918 e 2 bytes em 236 (canais discretos).
+   Nenhum campo isolado do registro de dicionario ou da tabela determina o
+   tamanho (varrido byte a byte e em u16 e u32, 2026-09-14). Por isso o
+   tamanho e DEDUZIDO da propria tabela: com os blocos em ordem de offset, a
+   distancia entre blocos consecutivos dividida pelo numero de amostras do
+   primeiro tem que dar 1, 2, 4 ou 8. Essa e a invariante deste leitor:
+   nenhum par pode se sobrepor (distancia menor que o numero de amostras), e
+   pelo menos `_FRACAO_MINIMA_PARES_FECHADOS` dos pares tem que fechar
+   exato. Medido: 45 de 45 pares no F3; 4308 de 4310 no 992.1, os dois
+   restantes sao buracos (padding entre segmentos), nunca sobreposicao.
 
 O `frequencia_hz * n_amostras` fecha com a mesma duracao total (em segundos)
 pra todo canal do arquivo: essa e a invariante que teria substituido a soma
 de bytes por bloco do `pi_pid` se este formato guardasse os canais
-intercalados. Aqui nao guarda: cada canal tem seu proprio bloco continuo de
-`float64`, entao a invariante usada e a de offset consecutivo acima.
+intercalados. Aqui nao guarda: cada bloco e continuo, entao a invariante
+usada e a de offset consecutivo acima.
 
 BUSCA SEM PONTEIRO DE CABECALHO: nao foi identificado, no cabecalho fixo do
 arquivo, um ponteiro explicito pro inicio do dicionario (ao contrario do
@@ -78,18 +96,16 @@ de validacao acima). A janela nunca materializa o arquivo inteiro: nos 25
 arquivos decifrados, dicionario+tabela somam no maximo ~40 KB, bem dentro
 da janela de alguns MB usada aqui.
 
-ARQUIVOS QUE ESTE LEITOR REJEITA (divida declarada, nao lida por falta de
-medicao, ver `docs/pi-pds-medicao.md`):
-- os 10 arquivos de `workbooks/pi-toolbox-bootcamp/` (layout de 304 bytes,
-  sem indice de canal identificavel no registro do dicionario);
-- ao menos 9 arquivos de `telemetria/porsche-cup/` (os de "Shakedown", o
-  `CLASS.pds` e o `REF 991.2.pds`): sao grandes demais (25-98 MB) e
-  parecem conter VARIOS dicionarios concatenados (varias capturas num
-  arquivo so, um caso de arquitetura que este leitor nao decide sozinho:
-  ver a secao correspondente no relatorio de entrega). A busca deste
-  leitor encontra ruido de amostra que por acaso repete em passo 552 bytes
-  dentro da janela e a invariante de offset rejeita o resultado, entao o
-  arquivo levanta `ErroDeLeitura` em vez de devolver inventario errado.
+ARQUIVOS QUE ESTE LEITOR REJEITA (medicao de 2026-09-14 em 71 arquivos
+unicos do Drive, 27 abrem; lista por arquivo em `docs/pi-pds-medicao.md`):
+- 10 arquivos de `Estudo/Cursos/Bootcamp_FullTime/` (layout de 304 bytes,
+  sem nome duplicado em +88);
+- 34 arquivos de `Porsche_Cup/` (Shakedown 2025, 26ET07 antigo, CLASS,
+  FREE PRACTICE, RACE, REF 25ET6, REF38, REF 3.8, REF 991.2): ou nenhum
+  candidato de 552 B nos ultimos 4 MB, ou candidatos de 8 a 52 canais sem
+  nenhum registro de tabela valido logo em seguida. O dicionario real esta
+  fora da janela ou tem outro layout; nao medido ainda. O leitor levanta
+  `ErroDeLeitura` em vez de devolver inventario errado.
 """
 
 from __future__ import annotations
@@ -126,9 +142,14 @@ _OFF_TAB_IDX_CHECK2: int = 60
 #: Um tick vale 100 ns. Ver docstring do modulo: validado contra as 7
 #: frequencias padrao (1, 5, 10, 20, 25, 50, 100 Hz) que aparecem no acervo.
 _TICK_S: float = 1e-7
-#: `float64`: 8 bytes por amostra, usado so na invariante de offset (este
-#: leitor nunca le a amostra em si).
-_BYTES_POR_AMOSTRA: int = 8
+#: Tamanhos de amostra medidos no acervo (1, 2 e 4 bytes no 992.1, 8 nos
+#: F3), usados so na invariante de offset (este leitor nunca le a amostra).
+_TAMANHOS_DE_AMOSTRA: tuple[int, ...] = (1, 2, 4, 8)
+#: Fracao minima de pares consecutivos (em ordem de offset) que fecham exato
+#: com um dos tamanhos acima. Medido: 1,000 no F3 e 0,9995 no 992.1; um
+#: candidato de ruido nao passa de poucos por cento (ver
+#: `docs/pi-pds-medicao.md`).
+_FRACAO_MINIMA_PARES_FECHADOS: float = 0.9
 
 #: Janela de busca a partir do fim do arquivo. Generosa: o maior
 #: dicionario+tabela medido no acervo (48 canais) soma ~29 KB.
@@ -229,68 +250,90 @@ def _candidatos_dicionario(dados: bytes) -> list[tuple[int, int]]:
         if n >= _MIN_REGISTROS_CANDIDATO:
             candidatos.append((inicio, n))
 
-    candidatos.sort(key=lambda c: c[1], reverse=True)
+    # Maior sequencia primeiro; em empate, o menor offset: um nome UTF-16
+    # sem o primeiro caractere ainda repete em +88, entao cada dicionario
+    # real gera copias deslocadas em +2 e +4 B, e a verdadeira e a primeira.
+    candidatos.sort(key=lambda c: (-c[1], c[0]))
     return candidatos
 
 
 @dataclass(frozen=True)
-class _EntradaTabela:
+class _BlocoTabela:
+    idx: int
     intervalo_ticks: int
     n_amostras: int
     byte_offset: int
 
 
-def _ler_tabela(dados: bytes, offset_inicio: int) -> dict[int, _EntradaTabela]:
+def _ler_tabela(
+    dados: bytes, offset_inicio: int, n_dicionario: int, offset_dicionario_abs: int
+) -> list[_BlocoTabela]:
     """Le a tabela de blocos de amostra, um registro de 64 B por vez.
 
-    Para no primeiro registro invalido (fim natural da tabela: nem todo
-    arquivo tem registro de tabela pra todos os canais do dicionario, ver
-    docstring do modulo).
+    `offset_dicionario_abs` e absoluto no arquivo (o offset de bloco da
+    tabela tambem e): todo bloco de amostra termina antes do dicionario.
+
+    Para no primeiro registro invalido (fim natural da tabela). Um canal pode
+    aparecer em varios registros (varios blocos), ver docstring do modulo.
     """
-    entradas: dict[int, _EntradaTabela] = {}
+    blocos: list[_BlocoTabela] = []
     p = offset_inicio
     while p + _TAMANHO_REGISTRO_TABELA <= len(dados):
         idx = struct.unpack_from("<i", dados, p + _OFF_TAB_IDX)[0]
         intervalo = struct.unpack_from("<i", dados, p + _OFF_TAB_INTERVALO)[0]
         n_amostras = struct.unpack_from("<i", dados, p + _OFF_TAB_N_AMOSTRAS)[0]
         byte_offset = struct.unpack_from("<i", dados, p + _OFF_TAB_BYTE_OFFSET)[0]
-        check1 = struct.unpack_from("<i", dados, p + _OFF_TAB_IDX_CHECK1)[0]
-        check2 = struct.unpack_from("<i", dados, p + _OFF_TAB_IDX_CHECK2)[0]
 
         if intervalo <= 0 or n_amostras <= 0:
             break
-        if not (check1 == check2 == idx + 1):
+        if not (0 <= idx < n_dicionario):
+            break
+        if byte_offset <= 0 or byte_offset + n_amostras > offset_dicionario_abs:
             break
 
-        entradas[idx] = _EntradaTabela(intervalo, n_amostras, byte_offset)
+        blocos.append(_BlocoTabela(idx, intervalo, n_amostras, byte_offset))
         p += _TAMANHO_REGISTRO_TABELA
 
-    return entradas
+    return blocos
 
 
 def _checar_invariante_offset(
-    entradas: dict[int, _EntradaTabela], caminho: Path
-) -> None:
-    """A tabela e lida em ordem fisica (= ordem de indice, ver docstring).
+    blocos: list[_BlocoTabela], caminho: Path
+) -> tuple[int, int]:
+    """Blocos em ordem de offset: a distancia ate o proximo tem que ser o
+    numero de amostras vezes 1, 2, 4 ou 8 bytes.
 
-    O offset de bytes de um registro tem que ser exatamente o offset do
-    anterior mais `n_amostras * 8` (float64): e o unico jeito barato de
-    confirmar que decodificamos os campos certos, sem ler a amostra em si.
-    Um so registro que nao feche derruba o arquivo inteiro: e a mesma
-    postura do `pi_pid` pra soma de bytes por bloco.
+    Devolve `(pares_fechados, buracos)`. Sobreposicao (distancia menor que
+    uma amostra por ponto) derruba o arquivo: a tabela decodificada nao e
+    confiavel. Buraco (distancia maior que 8 por amostra sem fechar exato)
+    e tolerado ate o teto de `_FRACAO_MINIMA_PARES_FECHADOS`, ver docstring
+    do modulo.
     """
-    indices = sorted(entradas)
-    for anterior, atual in itertools.pairwise(indices):
-        e_anterior = entradas[anterior]
-        e_atual = entradas[atual]
-        esperado = e_anterior.byte_offset + e_anterior.n_amostras * _BYTES_POR_AMOSTRA
-        if e_atual.byte_offset != esperado:
+    ordenados = sorted(blocos, key=lambda b: b.byte_offset)
+    fechados = 0
+    buracos = 0
+    for anterior, atual in itertools.pairwise(ordenados):
+        distancia = atual.byte_offset - anterior.byte_offset
+        if distancia < anterior.n_amostras:
             raise ErroDeLeitura(
-                f"{caminho}: invariante de offset quebrada entre os canais de "
-                f"indice {anterior} e {atual} da tabela: esperava offset "
-                f"{esperado}, achou {e_atual.byte_offset}. A tabela decodificada "
-                "nao e confiavel."
+                f"{caminho}: blocos de amostra sobrepostos na tabela: canal "
+                f"{anterior.idx} em offset {anterior.byte_offset} com "
+                f"{anterior.n_amostras} amostras e canal {atual.idx} em offset "
+                f"{atual.byte_offset}. A tabela decodificada nao e confiavel."
             )
+        if any(distancia == anterior.n_amostras * t for t in _TAMANHOS_DE_AMOSTRA):
+            fechados += 1
+        else:
+            buracos += 1
+    pares = fechados + buracos
+    if pares and fechados / pares < _FRACAO_MINIMA_PARES_FECHADOS:
+        raise ErroDeLeitura(
+            f"{caminho}: so {fechados} de {pares} pares consecutivos de blocos "
+            f"fecham com 1, 2, 4 ou 8 bytes por amostra (minimo "
+            f"{_FRACAO_MINIMA_PARES_FECHADOS:.0%}). A tabela decodificada nao e "
+            "confiavel."
+        )
+    return fechados, buracos
 
 
 class LeitorPiPds(LeitorDeInventario):
@@ -340,21 +383,23 @@ class LeitorPiPds(LeitorDeInventario):
                 "nao suporta ainda."
             )
 
-        erro_ultimo_candidato: ErroDeLeitura | None = None
+        erro_maior_candidato: ErroDeLeitura | None = None
         for offset_dicionario, n_dicionario in candidatos[:_MAX_CANDIDATOS_TENTADOS]:
             try:
                 return self._montar_cabecalho(
                     dados, base, offset_dicionario, n_dicionario, caminho
                 )
             except ErroDeLeitura as erro:
-                erro_ultimo_candidato = erro
+                if erro_maior_candidato is None:
+                    erro_maior_candidato = erro
                 continue
 
-        assert erro_ultimo_candidato is not None
+        assert erro_maior_candidato is not None
         raise ErroDeLeitura(
             f"{caminho}: {len(candidatos)} candidato(s) a dicionario "
             f"encontrado(s) nos ultimos {janela} B, nenhum passou na "
-            f"invariante de offset da tabela. Ultimo erro: {erro_ultimo_candidato}"
+            f"invariante de offset da tabela. Erro do maior candidato: "
+            f"{erro_maior_candidato}"
         )
 
     def _montar_cabecalho(
@@ -388,28 +433,42 @@ class LeitorPiPds(LeitorDeInventario):
                 nomes_por_idx[idx] = (nome, unidade or None)
 
         tabela_offset = offset_dicionario + n_dicionario * _ESTRIDE_DICIONARIO
-        entradas = _ler_tabela(dados, tabela_offset)
-        if not entradas:
+        blocos = _ler_tabela(
+            dados, tabela_offset, n_dicionario, offset_dicionario + base
+        )
+        if not blocos:
             raise ErroDeLeitura(
                 f"{caminho}: dicionario com {n_dicionario} canais em offset "
                 f"absoluto {offset_dicionario + base}, mas nenhum registro de "
                 f"tabela valido logo em seguida (offset absoluto "
                 f"{tabela_offset + base})"
             )
-        _checar_invariante_offset(entradas, caminho)
+        fechados, buracos = _checar_invariante_offset(blocos, caminho)
+
+        # Um canal pode ter varios blocos: soma as amostras, exige o mesmo
+        # intervalo em todos (medido: vale nos 2485 canais do 992.1).
+        por_idx: dict[int, list[_BlocoTabela]] = {}
+        for bloco in blocos:
+            por_idx.setdefault(bloco.idx, []).append(bloco)
 
         canais = []
-        for idx in sorted(entradas):
+        for idx in sorted(por_idx):
             if idx in idx_ambiguos or idx not in nomes_por_idx:
                 continue
             nome, unidade = nomes_por_idx[idx]
-            entrada = entradas[idx]
-            frequencia_hz = _TICK_S and 1.0 / (entrada.intervalo_ticks * _TICK_S)
+            intervalos = {b.intervalo_ticks for b in por_idx[idx]}
+            if len(intervalos) != 1:
+                raise ErroDeLeitura(
+                    f"{caminho}: canal {nome!r} (indice {idx}) tem blocos com "
+                    f"intervalos diferentes {sorted(intervalos)} ticks; este "
+                    "leitor nao decide a frequencia dele."
+                )
+            frequencia_hz = 1.0 / (intervalos.pop() * _TICK_S)
             canais.append(
                 CanalBruto(
                     nome_bruto=nome,
                     frequencia_hz=frequencia_hz,
-                    n_amostras=entrada.n_amostras,
+                    n_amostras=sum(b.n_amostras for b in por_idx[idx]),
                     unidade_declarada=unidade,
                 )
             )
@@ -419,7 +478,7 @@ class LeitorPiPds(LeitorDeInventario):
                 f"{caminho}: so {len(canais)} canal(is) sobrou(aram) depois "
                 f"de cruzar indice (minimo {_MIN_CANAIS_COM_DADO}): "
                 f"dicionario tinha {n_dicionario} canais, tabela tinha "
-                f"{len(entradas)} registros. Provavel candidato de ruido "
+                f"{len(blocos)} registros. Provavel candidato de ruido "
                 "(ver invariante de offset vazia com poucos registros na "
                 "docstring do modulo), nao um dicionario real."
             )
@@ -433,7 +492,9 @@ class LeitorPiPds(LeitorDeInventario):
             "n_canais_com_dado": str(len(canais)),
             "n_canais_sem_dado": str(n_dicionario - len(canais)),
             "offset_tabela": str(tabela_offset + base),
-            "n_registros_tabela": str(len(entradas)),
+            "n_registros_tabela": str(len(blocos)),
+            "n_pares_fechados": str(fechados),
+            "n_buracos": str(buracos),
         }
 
         return Cabecalho(
