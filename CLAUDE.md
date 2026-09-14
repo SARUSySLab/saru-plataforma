@@ -35,3 +35,4 @@ escrita mora em `~/.claude/CLAUDE.md`; aqui só o que é deste repositório.
 ## Comandos
 
 `make setup`, `make up`, `make migrate`, `make test`, `make doctor`. Banco só PostgreSQL.
+`make up` antes de `make test`: teste pulado por falta de banco reprova a suíte e não conta como verde.
