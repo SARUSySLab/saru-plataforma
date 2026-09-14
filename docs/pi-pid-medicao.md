@@ -109,3 +109,71 @@ Leitura da tabela: fator e offset dos canais que entram são idênticos em todos
 | `P.Piquet000995.pid` | 246 | 18547 | 65.9 |
 | `P.Piquet000996.pid` | 1744 | 65535 | 253.8 |
 | `P.Piquet000997.pid` | 1479 | 65535 | 252.5 |
+
+## 7. Calibração de zero por sessão de `Acc Long`/`Acc Lat` (issue #36, 2026-09-14)
+
+A seção 3 mediu que `Acc Long`/`Acc Lat` fecham com r = 1,000 contra o `.dat`
+em cada arquivo, com o MESMO fator (-0,02586 G por contagem), mas o offset
+(zero do sensor) muda de sessão para sessão (12,85 a 13,18 G no longitudinal,
+12,44 a 12,50 G no lateral): uma constante única erraria até 1,6 m/s².
+
+**Decisão de arquitetura.** `mapeamento_canal` é por PERFIL: o mesmo
+fator/offset vale pra toda gravação do `pi_pid`, não cabe um número que muda
+arquivo a arquivo. A migration 025 cria `calibracao_canal_gravado`, uma linha
+por (gravação, canal canônico), com o offset em CONTAGEM (não convertido). O
+pipeline de ingestão (`pipeline/calibracao.py`) mede o próprio arquivo: a
+média da contagem crua no maior trecho contíguo com `Speed` = 0 (mínimo 100
+amostras, 2 s a 50 Hz), depois que o leitor já escreveu a série bruta em
+Parquet. Sem trecho parado longo o bastante (`P.Piquet000991.pid`, sessão
+curta de 18 kB sem carro parado identificável), nenhuma linha é escrita e
+`lon_acc`/`lat_acc` ficam fora do inventário daquela gravação; o motivo fica
+em `gravacao.metadata` (`pi_pid.calibracao_acc_motivo`). `seeds/aliases.yaml`
+ganha `lon_acc`/`lat_acc` no perfil `pi_pid` com o fator fixo (-0,25360
+m/s²/contagem = -0,02586 × 9,80665) e offset 0 (identidade): o offset de
+verdade entra por `leitura.fator_do_canal`, que soma `-fator × offset_contagem`
+ao offset do perfil quando há calibração pra aquela gravação.
+
+**Validação: 21 dos 23 pares `.pid` × `.dat` do acervo F3, 2 canais cada (42
+séries).** `P.Piquet000991.pid` fica fora por falta de trecho parado (acima).
+Erro absoluto contra o `.dat` da mesma sessão, calibrado × referência, série
+inteira:
+
+| | valor |
+|---|---|
+| erro mínimo | 0,046 m/s² |
+| erro mediano | 0,330 m/s² |
+| erro médio | 0,349 m/s² |
+| **erro máximo (dos 42)** | **0,707 m/s²** |
+| séries com erro abaixo de 1 contagem (0,254 m/s²) | 11 de 42 |
+| séries com erro abaixo de 0,5 m/s² | 36 de 42 |
+
+**O critério de aceite da issue (erro máximo abaixo de 0,05 m/s²) NÃO foi
+atingido.** Investigado em `P.Piquet000974.pid` (sessão 100% parada, 22.200
+amostras, o caso mais favorável, sem nenhuma amostra em movimento pra
+confundir a janela): a contagem crua de `Acc Long` oscila entre 500 e 503 ao
+longo do arquivo inteiro (502 é o valor mais frequente, 72% das amostras), e
+o `.dat` mapeia a contagem 501, não a média 501,73 nem a moda 502, pro zero
+físico exato. Isso é medido, não suposição: filtrando o `.dat` pelas amostras
+com contagem 501, o valor é 0,0 G em todas; com contagem 502, é sempre
+-0,025641 G, o próprio passo de quantização. O offset que o Pi Toolbox usou
+não é a média de nenhuma janela deste arquivo; nenhuma janela testada (1 s a
+22.200 s) recupera exatamente 501.
+
+A causa provável é a resolução do sensor, não o método de calibração: o
+fator medido (-0,02586 G/contagem = -0,2536 m/s²/contagem) é o próprio passo
+de quantização do conversor. Uma contagem de diferença entre o offset medido
+e o offset "verdadeiro" do Pi Toolbox já vale 0,2536 m/s², cinco vezes o
+critério de 0,05 m/s². A própria seção 3 mediu isso pelo lado da melhor
+hipótese possível: o ajuste linear com fator e offset livres por arquivo
+(usando todas as amostras do arquivo, não só um trecho parado) já fecha só
+até 0,024 a 0,037 G de resíduo máximo (0,235 a 0,362 m/s²), acima de 0,05
+m/s² mesmo no melhor caso teórico. Nenhum offset recuperável deste sensor,
+calibrado por sessão ou não, bate abaixo do ruído de quantização dele.
+
+**Resultado prático.** A calibração por sessão troca um erro de até 1,6 m/s²
+(offset único fixo, o que a issue #26 mediu) por um erro de até 0,71 m/s²
+(mediana 0,33 m/s², calibrado por gravação), quatro vezes menor no pior caso
+e abaixo do limiar de frenagem de -3,5 m/s² com folga. O critério numérico de
+0,05 m/s² da issue fica abaixo da resolução do próprio sensor e não fecha;
+ver `docs/empresa/decisions.md` e o PR #36 para a decisão de seguir assim
+mesmo, sem inventar precisão que o hardware não tem.

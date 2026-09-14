@@ -57,6 +57,14 @@ def fator_do_canal(
     Nulo quando o perfil daquela ingestao nao mapeia aquele canal. Devolver
     (1, 0) como padrao seria supor que o nativo ja esta na unidade canonica, o
     que e falso na maioria dos loggers do acervo.
+
+    O offset do PERFIL (`mapeamento_canal`, estatico, igual em toda gravacao)
+    e somado ao offset POR GRAVACAO de `calibracao_canal_gravado`, quando
+    existir (issue #36: zero de `Acc Long`/`Acc Lat` do `.pid` muda por
+    sessao). A calibracao guarda a media da contagem crua no trecho de
+    referencia, nao um offset canonico ja convertido — converter aqui evita
+    duplicar o fator medido em dois lugares: `canonico = fator*bruto +
+    offset_perfil - fator*offset_contagem`.
     """
     linha = conn.execute(
         """select m.fator_escala, m."offset"
@@ -71,7 +79,18 @@ def fator_do_canal(
             order by m.mapa_versao desc limit 1""",
         (gravacao_id, canonico, nome_bruto),
     ).fetchone()
-    return (float(linha[0]), float(linha[1])) if linha else None
+    if linha is None:
+        return None
+    fator, offset = float(linha[0]), float(linha[1])
+
+    calibracao = conn.execute(
+        """select offset_contagem from calibracao_canal_gravado
+            where gravacao_id = %s and canal_canonico_id = %s""",
+        (gravacao_id, canonico),
+    ).fetchone()
+    if calibracao is not None:
+        offset -= fator * float(calibracao[0])
+    return (fator, offset)
 
 
 def escolher_canal(

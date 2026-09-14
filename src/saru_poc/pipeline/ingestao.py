@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from ..acervo import PERFIL_PARA_FORMATO
 from ..readers import FORMATOS_POR_ID, LEITORES, leitor_de
 from ..storage import caminho_de_uri, escrever_serie
+from .calibracao import CANONICOS_CALIBRADOS_POR_SESSAO, calibrar_offsets_pi_pid
 
 # Invertido do mapa de carga do catalogo: um formato pode ter mais de um perfil
 # no futuro (o mesmo container exportado por dois softwares), e ai a escolha
@@ -128,6 +129,22 @@ def _gravar_metadados(conn, gravacao_id, cabecalho, formato_id) -> None:
             "update gravacao set duracao_s = coalesce(duracao_s, %s) where id = %s",
             (cabecalho.duracao_s, gravacao_id),
         )
+
+
+def _registrar_motivo_calibracao(conn, gravacao_id, motivo: str) -> None:
+    """Declara em `gravacao.metadata` por que lon_acc/lat_acc ficaram de fora
+    (issue #36). O silencio de por que um canal esperado nao apareceu e o
+    mesmo defeito que motiva `ingestao.status='falhou'` ter `erro`.
+    """
+    import json
+
+    conn.execute(
+        "update gravacao set metadata = metadata || %s::jsonb where id = %s",
+        (
+            json.dumps({"pi_pid.calibracao_acc_motivo": motivo}, ensure_ascii=False),
+            gravacao_id,
+        ),
+    )
 
 
 def _resolver_perfil(conn, formato_id, cabecalho, mapa_versao):
@@ -252,7 +269,11 @@ def _mapa_do_perfil(conn, perfil_id: str | None, mapa_versao: str) -> dict[str, 
 
 
 def _escrever_canais(
-    conn, gravacao_id, cabecalho, mapa: dict[str, tuple]
+    conn,
+    gravacao_id,
+    cabecalho,
+    mapa: dict[str, tuple],
+    canais_calibrados: frozenset[str] = frozenset(),
 ) -> tuple[int, int]:
     """Cataloga os canais do arquivo. Devolve (sem mapa, unidade divergente).
 
@@ -262,10 +283,22 @@ def _escrever_canais(
     Num bundle, os arquivos dividem a mesma gravacao, entao o `on conflict`
     atualiza em vez de duplicar. E tambem o que permite reprocessar com leitor
     melhor e ver o inventario melhorar no lugar.
+
+    `canais_calibrados` (issue #36): canonico que so entra no vocabulario
+    DESTA gravacao quando o pipeline mediu um offset por sessao pra ele (ver
+    `pipeline/calibracao.py`). O mapa estatico do perfil (`mapa`) mapearia
+    `Acc Long`/`Acc Lat` em toda gravacao do `pi_pid` igual; sem trecho de
+    carro parado identificavel nesta gravacao especifica, o canonico e
+    descartado aqui e o canal fica sem mapa, nunca com offset adivinhado.
     """
     sem_mapa = divergentes = 0
     for c in cabecalho.canais:
         canonico, unidade_esperada = mapa.get(c.nome_bruto, (None, None))
+        if (
+            canonico in CANONICOS_CALIBRADOS_POR_SESSAO
+            and canonico not in canais_calibrados
+        ):
+            canonico, unidade_esperada = None, None
         if canonico is None:
             sem_mapa += 1
         # Unidade declarada pelo arquivo contra a que o mapa espera. Divergir
@@ -381,7 +414,28 @@ def ingerir(conn, arquivo_id: str, *, mapa_versao: str = "2026.08-1") -> Resulta
         conn, formato_id, cabecalho, mapa_versao
     )
     mapa = _mapa_do_perfil(conn, perfil_id, mapa_versao)
-    sem_mapa, divergentes = _escrever_canais(conn, gravacao_id, cabecalho, mapa)
+
+    # Issue #36: zero de Acc Long/Acc Lat do .pid muda por sessao. Mede o
+    # proprio arquivo (a serie bruta que acabou de ser escrita) antes de
+    # catalogar os canais, pra `_escrever_canais` saber se lon_acc/lat_acc
+    # entram no vocabulario canonico DESTA gravacao. So o formato pi_pid tem
+    # esse par fora do cabecalho (o .pds da Porsche Cup usa outro perfil e
+    # nao foi medido aqui); restrito por formato_id pra nao rodar sobre
+    # ponteiros que nunca vao ter Acc Long/Acc Lat.
+    canais_calibrados: frozenset[str] = frozenset()
+    if formato_id == "pi_pid" and ponteiros:
+        resultado_calibracao = calibrar_offsets_pi_pid(
+            conn, str(gravacao_id), ponteiros
+        )
+        canais_calibrados = resultado_calibracao.canonicos_calibrados
+        if resultado_calibracao.motivo_faltante:
+            _registrar_motivo_calibracao(
+                conn, gravacao_id, resultado_calibracao.motivo_faltante
+            )
+
+    sem_mapa, divergentes = _escrever_canais(
+        conn, gravacao_id, cabecalho, mapa, canais_calibrados
+    )
     amostras = sum(p.linhas for p in ponteiros)
 
     for p in ponteiros:
