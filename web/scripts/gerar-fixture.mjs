@@ -437,6 +437,9 @@ function montarRelatorio(volta, ref) {
     piloto: "M. Ferraz",
     layout: { id: "goiania-completo", nome: "Autódromo de Goiânia", comprimento_m: LEN },
     resolucao_pista: "alias",
+    // Captura de .xrk com amostra: o ramo degradado (`somente_inventario`) e
+    // o do .gpk/.rrk sozinho, que nem chega a ter volta cortada.
+    amostra_da_captura: { disponivel: true, arquivos_lidos: 3, arquivos_com_amostra: 1 },
 
     n0: {
       melhor_volta: {
