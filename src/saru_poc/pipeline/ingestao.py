@@ -18,7 +18,11 @@ from datetime import UTC, datetime
 from ..acervo import PERFIL_PARA_FORMATO
 from ..readers import FORMATOS_POR_ID, LEITORES, leitor_de
 from ..storage import caminho_de_uri, escrever_serie
-from .calibracao import CANONICOS_CALIBRADOS_POR_SESSAO, calibrar_offsets_pi_pid
+from .calibracao import (
+    CANONICOS_CALIBRADOS_POR_SESSAO,
+    FORMATOS_CALIBRADOS_POR_SESSAO,
+    calibrar_offsets_pi_pid,
+)
 
 # Invertido do mapa de carga do catalogo: um formato pode ter mais de um perfil
 # no futuro (o mesmo container exportado por dois softwares), e ai a escolha
@@ -290,12 +294,15 @@ def _escrever_canais(
     `Acc Long`/`Acc Lat` em toda gravacao do `pi_pid` igual; sem trecho de
     carro parado identificavel nesta gravacao especifica, o canonico e
     descartado aqui e o canal fica sem mapa, nunca com offset adivinhado.
+    A exigencia vale so para `FORMATOS_CALIBRADOS_POR_SESSAO`: nos outros
+    formatos o mapa do perfil basta (issue #51).
     """
     sem_mapa = divergentes = 0
     for c in cabecalho.canais:
         canonico, unidade_esperada = mapa.get(c.nome_bruto, (None, None))
         if (
-            canonico in CANONICOS_CALIBRADOS_POR_SESSAO
+            cabecalho.formato_id in FORMATOS_CALIBRADOS_POR_SESSAO
+            and canonico in CANONICOS_CALIBRADOS_POR_SESSAO
             and canonico not in canais_calibrados
         ):
             canonico, unidade_esperada = None, None
@@ -423,7 +430,7 @@ def ingerir(conn, arquivo_id: str, *, mapa_versao: str = "2026.08-1") -> Resulta
     # nao foi medido aqui); restrito por formato_id pra nao rodar sobre
     # ponteiros que nunca vao ter Acc Long/Acc Lat.
     canais_calibrados: frozenset[str] = frozenset()
-    if formato_id == "pi_pid" and ponteiros:
+    if formato_id in FORMATOS_CALIBRADOS_POR_SESSAO and ponteiros:
         resultado_calibracao = calibrar_offsets_pi_pid(
             conn, str(gravacao_id), ponteiros
         )
