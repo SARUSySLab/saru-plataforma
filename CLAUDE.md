@@ -2,7 +2,7 @@
 
 Repositório de código da SARU: leitores, modelos, pipeline, interfaces, testes e o documento preso
 ao código. A empresa (decisão, requisito, física documental, marca, negócio, processo, pesquisa,
-auditoria, mocks) mora em `vitormtt/saru`. Português em código, commit e documento.
+auditoria, mocks) mora em `SARUSySLab/saru-empresa`. Português em código, commit e documento.
 Foco: Engenheiro primeiro, depois Piloto; as outras famílias vêm a partir delas. Regra de operação e de
 escrita mora em `~/.claude/CLAUDE.md`; aqui só o que é deste repositório.
 
@@ -24,12 +24,12 @@ escrita mora em `~/.claude/CLAUDE.md`; aqui só o que é deste repositório.
 
 1. `main` só muda por PR; nenhum agente mescla; nada entra sem Vitor ter lido. Um PR por vez.
 2. Número de física só com tabela de medição no acervo (E-RN-02). Estimativa é rascunho.
-3. Issue fecha só com o protocolo de `vitormtt/saru` `docs/processo/validacao-de-issue.md`: roteiro de
+3. Issue fecha só com o protocolo de `SARUSySLab/saru-empresa` `docs/processo/validacao-de-issue.md`: roteiro de
    conferência de 3 a 5 passos, antes e depois em `docs/html/<issue>.html` e tabela de medição.
 4. Ordem das issues (portadas da PoC): #25 e #26, depois #27 e #28, depois #29, #30, #31, #32, #33.
 5. Nada em `src/` sem issue. Branch `<fam>/<issue>-<tema>` (pil, equ, eng, cam, alu, emp).
 6. Decisão de produto vai para `docs/decisions.md` na mesma sessão; decisão de empresa vai para
-   `vitormtt/saru` `docs/decisions.md`.
+   `SARUSySLab/saru-empresa` `docs/decisions.md`.
 7. Antigravity pesquisa, varre e mede; Claude escreve código e documento. Resposta R<n> não é
    aprovação de Vitor.
 8. Acervo de telemetria fica no Drive (`~/gdrive/Trabalho/`); nunca versionar gravação.
