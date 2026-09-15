@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from saru_poc.config import CONFIG
+from saru_poc.readers import pi_pds as pi_pds_mod
 from saru_poc.readers.base import Cabecalho, ErroDeLeitura
 from saru_poc.readers.pi_pds import LeitorPiPds
 
@@ -30,6 +32,34 @@ _N_CANAIS_FIXTURE = 10
 _OFF_DICIONARIO_FIXTURE = 4096 + 8 * sum(
     round(t * 2.0) for t in (100, 50, 20, 100, 10, 1, 1, 25, 5, 5)
 )
+
+
+#: Ordem da tabela das duas fixtures sinteticas: o gerador escreve os canais de
+#: `_CANAIS` em `tests/fixtures/pi_pds_gerar_sintetico.py` com indice igual a
+#: posicao na lista.
+_ORDEM_FIXTURE = (
+    "Steering",
+    "Speed",
+    "Throttle Position",
+    "RPM",
+    "Water Temp",
+    "Gear",
+    "Beacon Code",
+    "Lambda",
+    "Fuel Pressure",
+    "Oil Pressure",
+)
+
+
+@pytest.fixture(autouse=True)
+def ligacao_da_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
+    """As fixtures sinteticas nao tem assinatura medida no acervo: cada teste
+    ganha a ligacao da ordem do gerador, e os testes da issue #54 a trocam."""
+    monkeypatch.setattr(
+        pi_pds_mod,
+        "LIGACAO_MEDIDA",
+        {frozenset(_ORDEM_FIXTURE): _ORDEM_FIXTURE},
+    )
 
 
 @pytest.fixture
@@ -147,28 +177,60 @@ def test_arquivo_sem_dicionario_levanta_erro_de_leitura(
         leitor.inspecionar(so_cabecalho)
 
 
-def test_indice_duplicado_no_dicionario_exclui_os_dois_canais(
+def test_campo_de_indice_do_dicionario_nao_decide_o_nome(
     leitor: LeitorPiPds, tmp_path: Path
 ) -> None:
-    """Regressao do B2: quando dois registros do dicionario declaram o
-    mesmo indice com nomes diferentes (medido no acervo real: canal sem
-    dado grava indice 0 em vez de ficar de fora), nenhum dos dois pode
-    entrar no inventario por adivinhacao de qual e o certo."""
+    """Issue #54: o inteiro no offset 544 do registro de dicionario nao e o
+    indice da tabela. Mexer nele nao muda nome, taxa nem contagem de canal."""
     conteudo = bytearray(FIXTURE_PDS.read_bytes())
-    # Faz o segundo registro (Speed, indice 1) declarar indice 0, colidindo
-    # com o primeiro (Steering).
     off_indice_speed = (
         _OFF_DICIONARIO_FIXTURE + 1 * _ESTRIDE_DICIONARIO + _OFF_IDX_DICIONARIO
     )
     struct.pack_into("<i", conteudo, off_indice_speed, 0)
-    ambiguo = tmp_path / "indice_ambiguo.pds"
-    ambiguo.write_bytes(bytes(conteudo))
+    mexido = tmp_path / "indice_do_dicionario_mexido.pds"
+    mexido.write_bytes(bytes(conteudo))
 
-    cab = leitor.inspecionar(ambiguo)
-    nomes = {c.nome_bruto for c in cab.canais}
-    assert "Steering" not in nomes
-    assert "Speed" not in nomes
-    assert len(cab.canais) == _N_CANAIS_FIXTURE - 2
+    antes = {
+        c.nome_bruto: c.frequencia_hz for c in leitor.inspecionar(FIXTURE_PDS).canais
+    }
+    depois = {c.nome_bruto: c.frequencia_hz for c in leitor.inspecionar(mexido).canais}
+    assert depois == antes
+    assert len(depois) == _N_CANAIS_FIXTURE
+
+
+def test_nome_vem_da_ligacao_medida_pelo_indice_da_tabela(
+    leitor: LeitorPiPds, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue #54: com a ligacao trocando os dois primeiros indices, o bloco 0
+    (100 Hz) passa a se chamar Speed e o bloco 1 (50 Hz), Steering."""
+    trocada = ("Speed", "Steering", *_ORDEM_FIXTURE[2:])
+    monkeypatch.setattr(
+        pi_pds_mod, "LIGACAO_MEDIDA", {frozenset(_ORDEM_FIXTURE): trocada}
+    )
+    por_nome = {c.nome_bruto: c for c in leitor.inspecionar(FIXTURE_PDS).canais}
+    assert por_nome["Speed"].frequencia_hz == 100.0
+    assert por_nome["Steering"].frequencia_hz == 50.0
+
+
+def test_bloco_sem_ligacao_medida_fica_fora_e_e_contado(
+    leitor: LeitorPiPds, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sem_gear = tuple(None if n == "Gear" else n for n in _ORDEM_FIXTURE)
+    monkeypatch.setattr(
+        pi_pds_mod, "LIGACAO_MEDIDA", {frozenset(_ORDEM_FIXTURE): sem_gear}
+    )
+    cab = leitor.inspecionar(FIXTURE_PDS)
+    assert "Gear" not in {c.nome_bruto for c in cab.canais}
+    assert cab.bruto["n_blocos_sem_ligacao_medida"] == "1"
+
+
+def test_dicionario_sem_ligacao_medida_levanta_erro(
+    leitor: LeitorPiPds, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Assinatura sem medicao nao recebe nome adivinhado (issue #54)."""
+    monkeypatch.setattr(pi_pds_mod, "LIGACAO_MEDIDA", {})
+    with pytest.raises(ErroDeLeitura, match="ligacao"):
+        leitor.inspecionar(FIXTURE_PDS)
 
 
 def test_invariante_de_offset_quebrada_levanta_erro_de_leitura(
@@ -262,3 +324,24 @@ def test_acervo_real_le_pelo_menos_metade_dos_pds(leitor: LeitorPiPds) -> None:
         f"so {ok}/{len(arquivos)} arquivos .pds do acervo real leram: "
         "regressao no layout de 552 B (ver docstring do modulo)"
     )
+
+
+_PDS_F3_REAL = CONFIG.acervo_root / "F3/Geral/P.Piquet000977.pds"
+
+
+@pytest.mark.skipif(
+    not _PDS_F3_REAL.exists(), reason="P.Piquet000977.pds fora do acervo"
+)
+def test_pds_real_do_f3_bate_taxa_com_o_dat(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Issue #54: com a ligacao medida (sem a fixture automatica), nome e taxa
+    batem com o `.dat` do Pi Toolbox da mesma sessao: `Speed` e `RPM` a 50 Hz,
+    `Steering` e os amortecedores a 100 Hz. Antes, `Speed` saia a 20 Hz."""
+    from saru_poc.readers import pi_pds_ligacao
+
+    monkeypatch.setattr(pi_pds_mod, "LIGACAO_MEDIDA", pi_pds_ligacao.LIGACAO_MEDIDA)
+    por_nome = {c.nome_bruto: c for c in LeitorPiPds().inspecionar(_PDS_F3_REAL).canais}
+    assert por_nome["Speed"].frequencia_hz == 50.0
+    assert por_nome["RPM"].frequencia_hz == 50.0
+    assert por_nome["Steering"].frequencia_hz == 100.0
+    assert por_nome["Damper FL"].frequencia_hz == 100.0
+    assert por_nome["Acc Lat"].frequencia_hz == 50.0

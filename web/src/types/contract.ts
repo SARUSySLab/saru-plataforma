@@ -156,11 +156,25 @@ export interface Canal {
  * permite sobrepor duas series e integrar delta entre elas sem reamostrar no
  * cliente.
  */
+/**
+ * Veredito de qualidade de um canal dentro da volta (issue #59). Rotula, nunca
+ * esconde: `flat` e sensor gravado sem variacao, `no_data` e canal sem amostra
+ * finita na volta. `out_of_range` entra quando houver faixa de plausibilidade
+ * ratificada.
+ */
+export type QualidadeCanal = "ok" | "flat" | "no_data";
+
 export interface SerieAmostras {
   volta: number | "media";
   distancia_m: number[];
-  /** canal_id -> valores, um por ponto de `distancia_m`. */
+  /**
+   * canal_id -> valores, um por ponto de `distancia_m`. Traz todo canal do N3
+   * com amostra na volta: canal com de-para de apresentacao na unidade do
+   * front, canal cru no valor gravado, sem promessa de unidade.
+   */
   canais: Record<string, number[]>;
+  /** canal_id -> qualidade, para todo canal do N3 e todo canal de `canais`. */
+  qualidade: Record<string, QualidadeCanal>;
 }
 
 /**

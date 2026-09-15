@@ -10,7 +10,7 @@ Nenhum agente mescla PR; nenhum número de física sem tabela; nada de `src/` se
 Duas tarefas de leitura e medição, nada de edição:
 
 1. ADRs. Leia os sete ADRs em `docs/arquitetura/adr/` deste repositório e responda em tabela:
-   id, título, decisão de `vitormtt/saru` `docs/decisions.md` que o motiva (ou "nenhuma"), e se
+   id, título, decisão de `SARUSySLab/saru-empresa` `docs/decisions.md` que o motiva (ou "nenhuma"), e se
    ainda vale depois das decisões de 2026-09-14 (repositório novo, ordem Piloto, Equipe,
    Engenheiro, Campeonato, Aluno). É a base do ADR único em `saru/docs/adr/`.
 2. Issue #24 (leitor `.pds` não abre a referência do 992.1). Meça a estrutura do arquivo
