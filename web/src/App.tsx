@@ -221,7 +221,7 @@ function Analyzer({
     <TemperaturaDosPneus canais={relatorio.n3.canais} serie={par?.a ?? null} />
   );
   const bloco10 = par && (
-    <TracoNoTempo a={par.a} b={par.b} rotuloA={`Volta ${emEscopo}`} rotuloB={rotuloRef(refDoTraco)} trechos={relatorio.trechos} />
+    <TracoNoTempo a={par.a} b={par.b} rotuloA={`Volta ${emEscopo}`} rotuloB={rotuloRef(refDoTraco)} trechos={relatorio.trechos} canais={relatorio.n3.canais} />
   );
 
   return (

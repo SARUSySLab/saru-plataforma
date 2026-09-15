@@ -16,6 +16,7 @@ from saru_poc.relatorio import (
     APRESENTACAO,
     GRADE_PONTOS,
     ArquivoDaCaptura,
+    _qualidade,
     amostra_da_captura,
     captura_so_de_inventario,
     melhor_volta,
@@ -328,3 +329,28 @@ def test_motivo_novo_esta_no_contrato() -> None:
     if not CONTRATO_TS.exists():
         pytest.skip("contract.ts nao encontrado")
     assert "somente_inventario" in carregar().alias["MotivoDegradacao"]
+
+
+# --- qualidade por canal (issue #59) ---------------------------------------
+
+
+def test_qualidade_ok_quando_o_canal_varia() -> None:
+    assert _qualidade([0.0, 1.5, 3.0]) == "ok"
+
+
+def test_qualidade_flat_quando_o_sensor_nao_varia() -> None:
+    """Sensor gravado sem sinal (medido no acervo: `Oil Pressure` do `.pid`
+    todo zero) nao some da tela: vira `flat`."""
+    assert _qualidade([0.0, 0.0, 0.0]) == "flat"
+
+
+def test_qualidade_no_data_sem_amostra_finita() -> None:
+    assert _qualidade([]) == "no_data"
+    assert _qualidade([float("nan"), float("inf"), float("-inf")]) == "no_data"
+
+
+def test_qualidade_ignora_nao_finito_ao_medir_variacao() -> None:
+    """`EDL8_OILP` do `.xrk` traz +-inf no meio do dado: o que conta e a
+    variacao dos valores finitos."""
+    assert _qualidade([2.0, float("inf"), 2.0]) == "flat"
+    assert _qualidade([2.0, float("-inf"), 3.0]) == "ok"
