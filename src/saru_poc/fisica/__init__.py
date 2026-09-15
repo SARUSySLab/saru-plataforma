@@ -1,1 +1,1 @@
-"""Fisica de veiculo: parametros de catalogo (PR #6, pendente) e calibracao reversa (issue #49)."""
+"""Parametros e modelos de fisica do veiculo usados pelo E-RF-09 (estimacao e simulacao)."""

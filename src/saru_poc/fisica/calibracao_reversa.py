@@ -3,9 +3,8 @@
 Serve a PIL-RF-30 e E-RF-09. Arquitetura em ADR-008
 (`docs/arquitetura/adr/ADR-008-engenharia-reversa-e-simulacao-de-volta.md`).
 
-Depende de `fisica/parametros_gt3_cup.py` (PR #6, ainda nao mesclado em `main` em
-2026-09-15). Este modulo e um esqueleto: as funcoes existem para fixar a interface e
-serao implementadas depois que o PR #6 entrar.
+Consome `fisica/parametros_gt3_cup.py` (PR #6, mesclado em 2026-09-15). Este modulo e
+um esqueleto: as funcoes existem para fixar a interface e ainda nao foram implementadas.
 
 Entrada: series amostrais canonicas de uma volta ja ingerida (G_Lat, G_Long, Speed,
 Damper_Pos_FL/FR/RL/RR, Steering). Saida: os mesmos dataclasses de parametro do modulo
@@ -48,7 +47,7 @@ class ResultadoCalibracao:
 def calibrar(series: list[SerieCalibracao], gravacao_id: str, volta_numero: int) -> ResultadoCalibracao:
     """Ajusta os parametros do GT3 Cup contra as series de uma volta real.
 
-    TODO(#49): implementar depois do PR #6. Rascunho do roteiro:
+    TODO(#49): implementar. Rascunho do roteiro:
     1. Carregar `PorscheCupVehicle` de catalogo como ponto de partida (nunca do zero).
     2. Definir a funcao objetivo: soma dos residuos (seção 13, Tabela 5, G_Sum e
        Curvature) entre o canal medido e o canal simulado pelo QSS com os parametros
@@ -58,4 +57,4 @@ def calibrar(series: list[SerieCalibracao], gravacao_id: str, volta_numero: int)
     4. Nunca sobrescrever `Provenance.OFFICIAL_MANUAL`; o resultado e um veiculo novo,
        marcado `ENGINEERING_ESTIMATE`, nao uma edicao do catalogo.
     """
-    raise NotImplementedError("issue #49: implementar apos o PR #6 mesclar")
+    raise NotImplementedError("issue #49: calibracao reversa ainda nao implementada")

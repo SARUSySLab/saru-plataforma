@@ -6,8 +6,9 @@ pra regravar a fixture versionada. Nao roda como parte da suite de teste: o
 arquivo `.pid` gerado e o artefato versionado, este script e so a receita.
 
 Contra o layout medido no acervo real (ver `src/saru_poc/readers/pi_pid.py`):
-cabecalho de 16 B, corpo de `n_blocos*tamanho_bloco` bytes (zerado aqui, o
-leitor de inventario nunca le o corpo), marcador de fim, tres strings
+cabecalho de 16 B, corpo de `n_blocos*tamanho_bloco` bytes em layout
+intercalado por tick (ver `_corpo()`: valores conhecidos por canal, e o quadro
+do tick 1 ocupado pelo marcador de bloco medido no acervo), marcador de fim, tres strings
 (piloto/venue/veiculo) e um dicionario de 3 canais cuja soma
 `taxa_hz * largura` fecha exato no `tamanho_bloco`.
 
@@ -33,6 +34,9 @@ _CANAIS = [
     ("Throttle Position", "Thr", "%", 20, 2, 0.0, 100.0),
 ]
 N_BLOCOS = 2
+#: Escala declarada no registro, como no acervo: `Speed` grava 0,1 kph por
+#: contagem e declara 10 (divisor); os outros declaram 1 (sem conversao).
+_ESCALA = {"Speed": 10.0}
 
 
 def _string_prefixada(texto: str) -> bytes:
@@ -63,16 +67,56 @@ def _registro_canal(
     buf += struct.pack("<d", minimo)  # +17: minimo declarado
     buf += struct.pack("<d", maximo)  # +25: maximo declarado
     buf += b"\x00" * 14  # +33..47: campos nao usados por este leitor
-    buf += struct.pack("<d", 1.0)  # +47: escala (nao lida pelo inventario)
+    buf += struct.pack("<d", _ESCALA.get(nome, 1.0))  # +47: escala declarada
     assert len(buf) - inicio_campos == 55, "registro de canal fora do layout"
     return bytes(buf)
+
+
+_TICKS = 100
+#: Marcador do tick 1, medido no acervo F3 (12 B, com u16 variavel no meio).
+#: Aqui o quadro do tick 1 so tem `Steering` (100 Hz, 2 B), entao o marcador
+#: e o prefixo de 2 B: `00 00`.
+_MARCADOR_TICK_1 = b"\x00\x00"
+
+
+def contagem_esperada(nome: str, indice: int) -> int:
+    """Contagem gravada pra amostra `indice` (na serie concatenada) do canal.
+
+    Rampa distinta por canal, pra qualquer troca de posicao no quadro trocar
+    o valor lido: `Steering` = 400 + i, `Speed` = 10 * (100 + i) (0,1 kph por
+    contagem, como no acervo), `Throttle Position` = 5 * i.
+    """
+    return {
+        "Steering": 400 + indice,
+        "Speed": 1000 + 10 * indice,
+        "Throttle Position": 5 * indice,
+    }[nome]
+
+
+def _corpo(tamanho_bloco: int) -> bytes:
+    corpo = bytearray()
+    contador = {nome: 0 for nome, *_ in _CANAIS}
+    for _bloco in range(N_BLOCOS):
+        for tick in range(_TICKS):
+            for nome, _curto, _unidade, taxa, largura, _mn, _mx in _CANAIS:
+                if tick % (_TICKS // taxa):
+                    continue
+                if tick == 1:
+                    corpo += _MARCADOR_TICK_1[:largura]
+                else:
+                    corpo += contagem_esperada(nome, contador[nome]).to_bytes(
+                        largura, "big"
+                    )
+                contador[nome] += 1
+    assert len(corpo) == N_BLOCOS * tamanho_bloco
+    return bytes(corpo)
 
 
 def construir() -> bytes:
     tamanho_bloco = sum(taxa * largura for _, _, _, taxa, largura, _, _ in _CANAIS)
 
     cabecalho = _MAGIC + struct.pack("<III", N_BLOCOS, tamanho_bloco, tamanho_bloco)
-    corpo = b"\x00" * (N_BLOCOS * tamanho_bloco)
+    corpo = _corpo(tamanho_bloco)
 
     trailer = bytearray()
     trailer += _END_MARKER

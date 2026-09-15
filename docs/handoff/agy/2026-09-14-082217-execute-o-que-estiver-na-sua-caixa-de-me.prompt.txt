@@ -1,0 +1,4 @@
+Você foi acionado em modo headless pelo Claude Code, sem pessoa na tela. Regras de ~/.gemini/GEMINI.md valem. Trabalhe só dentro de /home/vitor/Desktop/Motorsport/SARU/saru-plataforma. Nunca sudo, rm, rclone destrutivo, git push ou --no-verify. Modo plan: em plan, não edite arquivo; descreva o que faria. Não faça pergunta interativa: se faltar decisão de Vitor, pare e liste em uma seção PERGUNTAS. Termine sempre com uma seção RESULTADO com uma linha por arquivo lido ou tocado (caminho absoluto) e uma linha de conclusão.
+
+TAREFA:
+Execute o que estiver na sua caixa de mensagens deste repositório. Se nenhuma mensagem chegou até você, responda exatamente: NENHUMA MENSAGEM RECEBIDA PELO HOOK. Comandos permitidos: ls, cat, find, head, grep, python3, wc, stat, git log, git status. Nada de edição.

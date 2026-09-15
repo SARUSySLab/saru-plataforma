@@ -1,0 +1,86 @@
+<title>Issue 25, leitor .pds</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#f4f5f2;--ink:#1b1f1c;--mute:#5c635e;--line:#d3d8d2;--panel:#ffffff;--antes:#8a2f1f;--antes-bg:#f7e9e5;--depois:#1f5a3a;--depois-bg:#e4f0e8;--acc:#b8471f;--code:#eceee9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151816;--ink:#e6e9e4;--mute:#a0a89f;--line:#333a34;--panel:#1d211e;--antes:#f0a48e;--antes-bg:#3a221c;--depois:#8fd3a8;--depois-bg:#1c3326;--acc:#f0946a;--code:#222723}}
+:root[data-theme="dark"]{--bg:#151816;--ink:#e6e9e4;--mute:#a0a89f;--line:#333a34;--panel:#1d211e;--antes:#f0a48e;--antes-bg:#3a221c;--depois:#8fd3a8;--depois-bg:#1c3326;--acc:#f0946a;--code:#222723}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 "IBM Plex Sans",system-ui,sans-serif;margin:0}
+main{max-width:44rem;margin:0 auto;padding:24px 16px 48px;display:flex;flex-direction:column;gap:32px}
+h1{font-size:1.6rem;line-height:1.2;margin:0 0 8px;text-wrap:balance}
+h2{font-size:1.2rem;margin:0 0 12px;text-wrap:balance}
+p{margin:0 0 12px;max-width:66ch}
+code{font:.85em "IBM Plex Mono",monospace;background:var(--code);padding:1px 4px;border-radius:3px;word-break:break-all}
+.eyebrow{font:500 .8rem/1 "IBM Plex Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:12px}
+.par{display:grid;grid-template-columns:1fr;gap:16px}
+@media (min-width:720px){.par{grid-template-columns:1fr 1fr}}
+.painel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.painel h3{margin:0;font-size:1rem;display:flex;align-items:center;gap:8px}
+.tag{font:500 .75rem/1 "IBM Plex Mono",monospace;letter-spacing:.05em;text-transform:uppercase;padding:6px 8px;border-radius:4px}
+.antes .tag{background:var(--antes-bg);color:var(--antes)} .depois .tag{background:var(--depois-bg);color:var(--depois)}
+.num{font:600 2rem/1.1 "IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+.num small{font:400 .85rem/1.3 "IBM Plex Sans",sans-serif;color:var(--mute);display:block;margin-top:6px}
+pre{background:var(--code);border-radius:4px;padding:12px;font:.8rem/1.45 "IBM Plex Mono",monospace;white-space:pre-wrap;word-break:break-word;margin:0;color:var(--antes)}
+.tab{overflow-x:auto} table{border-collapse:collapse;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap} th{color:var(--mute);font-weight:600;font-size:.8rem}
+.tab td:not(:first-child),.tab th:not(:first-child){text-align:right}
+.tab td:first-child{font-family:"IBM Plex Mono",monospace;font-size:.85rem}
+.destaque{color:var(--acc);font-weight:600}
+footer{color:var(--mute);font-size:.85rem;border-top:1px solid var(--line);padding-top:16px}
+footer p{margin:0 0 6px}
+</style>
+<main>
+<header>
+<div class="eyebrow">saru-plataforma · issue #25 · leitor pi_pds</div>
+<h1>O leitor .pds abre a gravação de referência do 992.1</h1>
+<p>Gravação real do acervo: <code>Trabalho/Porsche_Cup/Docs/Referencias/992.1/REF 992.pds.zst</code>, 105.802.306 bytes descomprimidos. Antes é a <code>main</code> em ccd5486; depois é este PR.</p>
+</header>
+<section>
+<h2>REF 992.pds</h2>
+<div class="par">
+<div class="painel antes"><h3><span class="tag">Antes</span> recusa</h3>
+<div class="num">0<small>canais no inventário</small></div>
+<pre>REF_992.pds: 1214 candidato(s) a dicionario encontrado(s) nos ultimos 4000000 B, nenhum passou na invariante de offset da tabela. Ultimo erro: REF_992.pds: dicionario com 34 canais em offset absoluto 105007944, mas nenhum registro de tabela valido logo em seguida (offset absoluto 105026712)</pre></div>
+<div class="painel depois"><h3><span class="tag">Depois</span> abre</h3>
+<div class="num">2484<small>canais com dado, de 2937 no dicionário</small></div>
+<div class="num">581 s<small>duração da gravação (9.7 min)</small></div>
+<p>4311 blocos de amostra na tabela, 4308 pares consecutivos fecham exato, 2 buracos, nenhuma sobreposição. Leitura em 10,4 s.</p></div>
+</div>
+</section>
+<section>
+<h2>Canais que a issue pedia, agora no inventário</h2>
+<div class="tab"><table><thead><tr><th>Canal</th><th>Hz</th><th>Amostras</th><th>Unidade</th></tr></thead><tbody>
+<tr><td>RPM</td><td>1</td><td>581</td><td>rad/s</td></tr>
+<tr><td>ecu_nmot</td><td>10</td><td>5810</td><td>rad/s</td></tr>
+<tr><td>abs_pbrake_f</td><td>100</td><td>58100</td><td>Pa</td></tr>
+<tr><td>abs_pbrake_r</td><td>10</td><td>5810</td><td>Pa</td></tr>
+<tr><td>NMEA RX RMC Speed Over Ground</td><td>10</td><td>5810</td><td>m/s</td></tr>
+<tr><td>NMEA RX RMC Latitude</td><td>10</td><td>5810</td><td>rad</td></tr>
+<tr><td>NMEA RX RMC Longitude</td><td>10</td><td>5810</td><td>rad</td></tr>
+<tr><td>Raw ecu_uaps_a Rx</td><td>20</td><td>11620</td><td></td></tr>
+<tr><td>Raw abs_acc_fa Rx</td><td>10</td><td>5810</td><td></td></tr>
+</tbody></table></div>
+<p>Unidade vazia é como o arquivo declara. O leitor continua sem ler amostra: o segundo critério da issue (série em unidade física) fica para a issue #26.</p>
+</section>
+<section>
+<h2>Taxas presentes no REF 992.pds</h2>
+<div class="tab"><table><thead><tr><th>Hz</th><th>Canais</th></tr></thead><tbody><tr><td>1000</td><td>1</td></tr><tr><td>500</td><td>3</td></tr><tr><td>200</td><td>1</td></tr><tr><td>100</td><td>263</td></tr><tr><td>50</td><td>219</td></tr><tr><td>20</td><td>144</td></tr><tr><td>10</td><td>766</td></tr><tr><td>5</td><td>145</td></tr><tr><td>2</td><td>108</td></tr><tr><td>1</td><td>834</td></tr></tbody></table></div>
+</section>
+<section>
+<h2>Arquivo F3 que já abria: P.Piquet000001-1.pds</h2>
+<div class="par">
+<div class="painel antes"><h3><span class="tag">Antes</span> abre</h3><div class="num">44<small>canais</small></div></div>
+<div class="painel depois"><h3><span class="tag">Depois</span> abre</h3><div class="num">45<small>canais, os 44 anteriores iguais</small></div>
+<p>O canal a mais é <span class="destaque">Fuel Pressure</span>, 1 Hz, 487 s, o último registro da tabela, que o leitor antigo descartava pelo campo de checagem. Conferir no Pi Toolbox se ele tem dado.</p></div>
+</div>
+</section>
+<section>
+<h2>Acervo inteiro: 71 arquivos .pds únicos</h2>
+<div class="tab"><table><thead><tr><th>Lote</th><th>Arquivos</th><th>Antes</th><th>Depois</th></tr></thead><tbody><tr><td>Estudo/Cursos/Bootcamp_FullTime/Analise de dados</td><td>10</td><td>0</td><td>0</td></tr><tr><td>Outras_Categorias/Estudo_outras_series/Formula 3/C.Grande/G.Samaia</td><td>1</td><td>1</td><td>1</td></tr><tr><td>Porsche_Cup/2025/Shakedown_2025-11</td><td>10</td><td>0</td><td>0</td></tr><tr><td>Porsche_Cup/2026/26ET07/telemetria/antigo/Engine Test</td><td>12</td><td>0</td><td>0</td></tr><tr><td>Porsche_Cup/2026/26ET07/telemetria/antigo/Outing</td><td>5</td><td>0</td><td>0</td></tr><tr><td>Porsche_Cup/2026/analise/Data Analysis/EXERCÍCIO ENGENHARIA EFICAZ</td><td>3</td><td>0</td><td>0</td></tr><tr><td>Porsche_Cup/2026/analise/Telemetria_Real/Formula_3/Geral</td><td>1</td><td>1</td><td>1</td></tr><tr><td>Porsche_Cup/2026/telemetria/Geral</td><td>3</td><td>1</td><td>2</td></tr><tr><td>Porsche_Cup/Docs/Dados_SSD_Windows</td><td>1</td><td>0</td><td>0</td></tr><tr><td>Porsche_Cup/Docs/Referencias/3.8 - 991.1</td><td>1</td><td>0</td><td>0</td></tr><tr><td>Porsche_Cup/Docs/Referencias/4.0 - 991.2</td><td>1</td><td>0</td><td>0</td></tr><tr><td>Telemetria/F3/Geral</td><td>23</td><td>23</td><td>23</td></tr>
+<tr><td><strong>Total</strong></td><td>71</td><td>26</td><td>27</td></tr></tbody></table></div>
+<p>Os 44 que continuam de fora têm dicionário com registro de 304 B ou dicionário fora dos últimos 4 MB. Lista por arquivo e motivo em <code>docs/pi-pds-medicao.md</code>.</p>
+</section>
+<footer>
+<p>Fontes: <code>docs/pi-pds-medicao.md</code>, <code>src/saru_poc/readers/pi_pds.py</code>, 71 arquivos do Drive (<code>Trabalho/</code> e <code>Estudo/</code>).</p>
+<p>2026-09-14. Atualizado no lugar a cada versão do PR.</p>
+</footer>
+</main>

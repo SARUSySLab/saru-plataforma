@@ -37,7 +37,7 @@ class ResultadoQSS:
 def simular(segmentos: list[SegmentoTracado], parametros: dict[str, float]) -> ResultadoQSS:
     """Resolve a velocidade limite por segmento pela elipse de Kamm e integra o tempo.
 
-    TODO(#49): implementar depois do PR #6 e de `fisica/calibracao_reversa.py` ter ao
+    TODO(#49): implementar depois de `fisica/calibracao_reversa.py` ter ao
     menos um `ResultadoCalibracao` real para testar contra. Rascunho do roteiro:
     1. Para cada segmento, resolver v_max tal que G_Lat(v_max, curvatura) fique na borda
        da elipse (Equação da seção 4, `a_y,lim` vindo de `parametros["a_y_lim"]`).
@@ -47,4 +47,4 @@ def simular(segmentos: list[SegmentoTracado], parametros: dict[str, float]) -> R
        ficar dentro de uma banda de erro que Vitor aprovar, medida contra o `Lap Time`
        do próprio arquivo, não contra suposição.
     """
-    raise NotImplementedError("issue #49: implementar apos o PR #6 e a calibracao reversa")
+    raise NotImplementedError("issue #49: implementar apos a calibracao reversa")

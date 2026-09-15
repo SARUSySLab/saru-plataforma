@@ -1673,16 +1673,77 @@ listhead_dat:
     unit_out: m/s2
     scale: 9.80665
 
-# `pi_pid` = núcleo SEM lat_acc/lon_acc, de propósito (cerimônia 2026-08-22,
-# Q3b). No binário `.pid` os canais `Acc Lat`/`Acc Long` declaram scale=0,0 no
-# dicionário e saem em CONTAGEM crua 10-bit (medido: 360..607, centro ≈ 512 =
-# provável 0 G); herdar o alias do `.dat` multiplicava contagem por 9,80665 e
-# emitia ~+4.600 m/s² de lixo com cara de dado — a causa raiz de "pi_pid nunca
-# vê frenagem" na calibração de 2026-08-22. Sem par offset/escala arbitrado, o
-# canal FICA FORA do canônico (análise degrada com aviso, como o desenho
-# prevê). Reabrir quando a bancada P1 (Pi Toolbox) entregar o par
-# binário↔export — mesmo gate da escala de damper.
-pi_pid: *pi_core
+# `pi_pid`: contagem crua do logger Pi (F3 P.Piquet e G.Samaia), NÃO herda o
+# `pi_core` porque o `.pid` grava nome completo (`Throttle Position`, não
+# `Throttle Positi`), distância como `QmDistance` e a maioria dos canais em
+# contagem sem fator no cabeçalho. O leitor `pi_pid` só converte o que o
+# cabeçalho declara (`Speed` ÷10 → kph, `RPM`, `Lap Number`); o resto sai em
+# contagem e o fator entra aqui.
+#
+# Fatores medidos em 2026-09-14 contra o `.dat` exportado pelo Pi Toolbox da
+# MESMA sessão, 23 pares do acervo F3 (`docs/pi-pid-medicao.md`): fator e
+# offset iguais em todos os pares, r = 1,000, resíduo máximo abaixo de 1e-3 na
+# unidade de saída. Só entra aqui o canal que fechou assim.
+# Os fatores valem para o logger do F3; a Porsche Cup grava `.pds`, outro
+# formato e outro perfil.
+pi_pid:
+  # `Acc Long`/`Acc Lat`: fator -0,02586 G/contagem × 9,80665 m/s² por G
+  # (23 pares, r = 1,000 em cada um), fixo aqui. O OFFSET não: ele é o zero
+  # do sensor, ajustado pelo Pi Toolbox por sessão (12,85 a 13,18 G no
+  # longitudinal, 12,44 a 12,50 G no lateral — uma constante única erraria
+  # até 1,6 m/s², quase metade do limiar de frenagem de -3,5 m/s²). Este
+  # arquivo é por PERFIL, estático; não cabe um offset que muda arquivo a
+  # arquivo. Fica 0 aqui (identidade) e o offset de verdade entra por
+  # gravação em `calibracao_canal_gravado` (migration 025, issue #36),
+  # medido pelo pipeline de ingestão contra o próprio arquivo (média da
+  # contagem crua com o carro parado). Sem trecho parado identificável, o
+  # canal fica fora do inventário daquela gravação — nunca adivinha.
+  # Ver `docs/pi-pid-medicao.md` seção 7 e `src/saru_poc/pipeline/calibracao.py`.
+  lon_acc:
+    col: Acc Long
+    unit_in: contagem
+    unit_out: m/s2
+    scale: -0.25359997
+  lat_acc:
+    col: Acc Lat
+    unit_in: contagem
+    unit_out: m/s2
+    scale: -0.25359997
+  speed:
+    col: Speed
+    unit_in: kph
+    unit_out: m/s
+    scale: 0.277778
+  distance_m:
+    # 0,01 m por contagem, 19 pares, resíduo máximo 0,001 m.
+    col: QmDistance
+    unit_in: contagem
+    unit_out: m
+    scale: 0.01
+  throttle:
+    # 0,1 % por contagem (0..1000 → 0..100 %), 23 pares, resíduo 3e-6.
+    col: Throttle Position
+    unit_in: contagem
+    unit_out: "0-1"
+    scale: 0.001
+  brake_press:
+    # bar = 0,199645 × contagem − 41,327 (21 pares, resíduo 4e-6 bar);
+    # em kPa: × 100.
+    col: Brake Press F
+    unit_in: contagem
+    unit_out: kPa
+    scale: 19.9645
+    offset: -4132.7
+  rpm:
+    col: RPM
+    unit_in: rpm
+    unit_out: rpm
+    scale: 1.0
+  lap_number:
+    col: Lap Number
+    unit_in: "-"
+    unit_out: "-"
+    scale: 1.0
 
 # ---------------------------------------------------------------------------
 # TrackAddict (HP Tuners) — Raw CSV de celular. source auto = "trackaddict".

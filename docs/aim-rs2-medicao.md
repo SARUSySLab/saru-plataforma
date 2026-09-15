@@ -330,3 +330,23 @@ Justificativa por item:
 4. **`readers/__init__.py` nao foi tocado** (fora do escopo desta tarefa):
    `LeitorAimDrk` existe mas nao esta registrado em `_registrar_embutidos`.
    Fica pra quem tiver permissao de editar esse arquivo.
+
+## Complemento (2026-09-14): reconfirmação com amostra nova, escopo de cobertura de dados
+
+Reconfirmação, no âmbito de `docs/cobertura-de-dados-resumo.md`, com 10
+`.drk` únicos novos (sorteio diferente do original), via
+`LeitorAimDrk.inspecionar()`:
+
+- 10/10 abriram sem erro.
+- `Cabecalho.canais` vazio nos 10/10, confirmando de novo a conclusão de
+  que a tabela de descritores em `0x800` não decodifica canal.
+- Correção da nota "4": `LeitorAimDrk` **já está** registrado em
+  `readers/__init__.py::_registrar_embutidos` (conferido nesta data); a
+  nota anterior ficou desatualizada.
+- `inspecionar()` na amostra nova: 23,8 a 956,6 MB/s (arquivo inteiro cabe
+  em memória, maior `.drk` do acervo é 1,8 MB por medição anterior; não há
+  indício de leitor lento ou de materialização desnecessária dado o
+  tamanho típico do formato).
+
+Sem issue nova de cobertura de canal para `.drk` pelo mesmo motivo do
+`.gpk`/`.rrk`: `canais=()` é resultado correto, não falha.
