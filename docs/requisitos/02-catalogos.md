@@ -40,6 +40,7 @@ A coluna "Núcleo" diz qual capacidade da empresa cada requisito da família usa
 | PIL-RF-27 | Ler telemetria de simuladores e e-sports | O sistema deve ler telemetria de simulação para sim drivers e equipes de e-sports: nativa MoTeC (.ld) de ACC e ACTI do Assetto Corsa, binário .ibt do iRacing e .ld de GT7 | usuário | E-RF-01 | Vitor 2026-09-13 (F14) | must | PIL-CT-44, PIL-CT-45 | 1.1 | parcial: ACC e GT7 leem; ACTI/AC via .ld compatível; .ibt em especificação |
 | PIL-RF-28 | Conscientizar o piloto sobre pneus e clima | O sistema deve permitir ao piloto registrar composto, pressão a frio e quente e voltas no jogo de pneus, exibindo resumo climático processado da pista (seco/molhado, temperatura estimada) | usuário | E-RF-05 | Vitor 2026-09-13 | should | PIL-CT-46 | 1 | pronto para implementar |
 | PIL-RF-26 | Exportar o relatório em HTML | O sistema deve gerar um HTML autossuficiente do relatório com N0 e N1 completos e N2 resumido, imprimível em PDF, sem interação | usuário | E-RF-05 | F1 decisão 3 e opção C | could | PIL-CT-33 | 1 | proposto |
+| PIL-RF-29 | Manter preset de veículo por geração | O sistema deve manter os parâmetros de veículo de cada geração do 911 GT3 Cup com proveniência por valor, para alimentar simulação e estimação | produto | E-RF-09, E-RF-08 | Vitor 2026-09-13, no chat; migração do `saru` | must | PIL-CT-47 | 1.1 | parcial: os três presets existem em `fisica/parametros_gt3_cup.py`, a proveniência por valor não |
 
 ### O que existe hoje por simulador
 
@@ -172,6 +173,7 @@ diz "demonstração" ou "a escrever".
 
 | PIL-CT-44 | PIL-RF-27 | uma gravação exportada por simulador da lista suportada | é enviada | o formato é identificado, as amostras lidas, e o relatório sai com os mesmos blocos do relatório de uma volta real | ACC e GT7 pelo `.ld`, sem teste dedicado de procedência; iRacing e Assetto Corsa a escrever, depois de haver arquivo real |
 | PIL-CT-45 | PIL-RF-07, PIL-RF-27, PIL-RN-17 | uma gravação de perfil simulado, que declara o circuito e traz coordenada de placeholder | a pista é resolvida | resolve pelo que o jogo declara, o degrau GPS não roda, e nenhum alias novo nasce de posição | a escrever; hoje em `xfail` estrito em `tests/test_resolucao_pista.py`, issue #10 |
+| PIL-CT-47 | PIL-RF-29 | o preset de uma das três gerações do 911 GT3 Cup | é consultado | cada valor traz a proveniência dele e os valores pendentes de manual estão marcados | a escrever; hoje a proveniência vive só em `docs/fisica-parametros-gt3-cup.md`, e `ParameterValue` não é usado (issue #19) |
 
 ## Critérios das exceções do E-UC-01
 

@@ -27,6 +27,7 @@ Status: proposto, aprovado, em andamento, implementado, validado, descartado.
 | PIL-RF-13 | funcional | PIL-OBJ-02 | E-RF-05 | PIL-RN-01, PIL-RN-11 | `contract.ts` `MotivoDegradacao` (8 motivos), `relatorio.py` | ADR-005 | #2, #7 | PIL-CT-19, PIL-CT-52, PIL-CT-60 | implementado |
 | PIL-RF-16 | funcional | PIL-OBJ-06 | E-RF-06 | | `auth.py`, `rotas/auth.py`, tabela usuario | ADR-002 | | PIL-CT-22, PIL-CT-23 | implementado |
 | PIL-RF-23 | funcional | PIL-OBJ-05 | E-RF-05 | PIL-RN-13 | `pipeline/decomposicao.py` | ADR-004 | | PIL-CT-30 | em andamento |
+| PIL-RF-29 | funcional | PIL-OBJ-06 | E-RF-09, E-RF-08 | | `fisica/parametros_gt3_cup.py`, presets 991.1, 991.2 e 992.1 do 911 GT3 Cup | | #19 | PIL-CT-47, `tests/test_parametros_gt3_cup.py` | parcial: os presets entraram sem validação contra manual e sem proveniência por valor, ver `docs/fisica-parametros-gt3-cup.md` |
 | PIL-RF-24 | funcional | PIL-OBJ-03 | E-RF-01 | PIL-RN-11 | a definir: `readers/fueltech_csv.py`, `readers/protune_csv.py` | ADR-001 | a abrir após amostra | PIL-CT-31 | proposto, bloqueado |
 | PIL-RF-26 | funcional | PIL-OBJ-01 | E-RF-05 | | a definir | | a abrir | PIL-CT-33 | proposto |
 | PIL-RF-27 | funcional | PIL-OBJ-01, PIL-OBJ-03 | E-RF-01 | PIL-RN-17 | `readers/ld.py` e perfis `acc` e `gt7_ld` em `acervo.py:85`; iRacing e Assetto Corsa a definir | ADR-006 | #10 | PIL-CT-44, PIL-CT-45 | parcial: ACC e GT7 leem, iRacing e Assetto Corsa sem leitor |
@@ -64,7 +65,8 @@ Uma linha por exceção do caso de uso da empresa, com o estado medido em 2026-0
 ## Issues abertas em 2026-09-13
 
 Uma issue por exceção do E-UC-01 que ainda não tem código ou teste fechando. As exceções 2e,
-5g, 5h e 6e não entraram porque já têm teste que as fecha.
+5g, 5h e 6e não entraram porque já têm teste que as fecha. A tabela também carrega issue que
+nasce de requisito e não de exceção, como a #19.
 
 | Issue | Título | Exceção | Rótulos |
 |---|---|---|---|
@@ -75,6 +77,7 @@ Uma issue por exceção do E-UC-01 que ainda não tem código ou teste fechando.
 | #6 | refinar o instante do corte de volta contra a série de maior taxa | 5i | PIL, tipo:feature, prio:media |
 | #7 | provar que os sete motivos de bloco sem dado chegam à tela | 7e | PIL, tipo:bug, prio:alta |
 | #10 | declarar a divergência entre venue declarado e posição GPS | 5g, no degrau do alias | PIL, tipo:bug, prio:media |
+| #19 | usar `ParameterValue` com proveniência por valor ou remover | nenhuma; vem de PIL-RF-29 e PIL-CT-47 | PIL, tipo:doc, prio:media |
 
 A issue #10 ganhou em 2026-09-13 o escopo da regra PIL-RN-17: para gravação de perfil
 simulado, a guarda não é declarar a divergência, é não entrar no degrau GPS. É o mesmo caso
@@ -112,5 +115,6 @@ Ao mudar uma linha, listar aqui o que precisa ser revisto.
 | 2026-09-13 | PIL-RF-27, PIL-RN-17 | mudança de núcleo: Vitor ampliou E-RF-01 para logger real ou simulador e criou E-RN-08. A família Piloto passa a atender o piloto virtual, com o mesmo relatório | `01-problema-e-objetivos.md` público e fonte F14; `02-catalogos.md` PIL-RF-27, PIL-RN-17, PIL-CT-44, PIL-CT-45; `03-backlog.md` PIL-US-30 no MVP; issue #10 | Vitor, 2026-09-13 |
 | 2026-09-13 | PIL-RN-06 | amadurecimento: a regra de ambiguidade sai de PIL-RN-06 e vira PIL-RN-16, porque o raio de 5,0 km tem aprovação de Vitor e a ambiguidade só tem um ADR proposto | `02-catalogos.md`, tabela de regras; tabela de aprovação desta matriz; `06-validacao.md` pergunta 6 e lição 5 | pendente: Vitor ratificar PIL-RN-16 |
 | 2026-09-13 | PIL-RF-05, PIL-RF-07, PIL-RF-08, PIL-RF-09, PIL-RNF-08 | criação dos mocks Desktop PC N0 (piloto trackday) e N1 (pitwall e engenharia) em `docs/mocks/` e especificação de UI em `docs/arquitetura/visao-mocks-ui.md` | `docs/mocks/`, `docs/arquitetura/visao-mocks-ui.md` | Vitor, 2026-09-13 |
+| 2026-09-13 | PIL-RF-29 | o módulo de parâmetros do 911 GT3 Cup sai de `saru/docs/fisica/` e entra na PoC como `src/saru_poc/fisica/`, ligando a família Piloto ao E-RF-09. Nenhum valor mudou na migração | `src/saru_poc/fisica/`, `tests/test_parametros_gt3_cup.py`, `docs/fisica-parametros-gt3-cup.md`; a auditoria de proveniência abriu sete perguntas para Vitor | Vitor, 2026-09-13, no chat |
 | 2026-09-13 | PIL-RF-03, PIL-RF-13, PIL-CT-52 | o vocabulário `MotivoDegradacao` ganha o oitavo motivo, `somente_inventario`, e o relatório ganha o bloco `amostra_da_captura`. A exceção 3e passa a ser declarada ao piloto, e fica parcial até a verificação em banco | `web/src/types/contract.ts`, `src/saru_poc/relatorio.py`, `src/saru_poc/api.py`, `docs/modelos/issue-2-inventario.md`; issue #2 | pendente: Vitor, na revisão do PR |
 

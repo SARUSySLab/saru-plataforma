@@ -1,4 +1,13 @@
-# saru-poc-trackday
+# saru-plataforma
+
+Código da plataforma SARU, todas as famílias: Piloto, Equipe, Engenheiro, Campeonato e Aluno.
+Criado em 2026-09-14 a partir da decisão em `vitormtt/saru`, `docs/decisions.md`. O ponto de partida é a PoC
+`saru-poc-trackday` na `main` 0776381, portada inteira com histórico; a PoC fica congelada como repositório do Lucas.
+
+Regras: `main` só muda por PR; nenhum agente mescla; número de física só com tabela de medição; toda issue
+é validada por Vitor pelo protocolo em `vitormtt/saru`, `docs/processo/validacao-de-issue.md`.
+
+## O que veio da PoC
 
 PoC core do SARU: do arquivo do piloto ao insight, ponta a ponta num track day.
 Repo proprio, **zero toque no `saru-app`** (decisao 3 do plano).
