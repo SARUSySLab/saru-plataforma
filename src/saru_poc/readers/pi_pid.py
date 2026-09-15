@@ -11,9 +11,12 @@ offsets de minimo/maximo/escala declarados (`_OFF_MIN`, `_OFF_MAX`,
 `_OFF_SCALE`) e a leitura das primeiras strings do trailer pra piloto/venue/
 veiculo (`_trailer_metadata`).
 
-DESCARTADO: tudo que materializa amostra. Isso inclui `_frame_layout` (posicao
-de cada amostra dentro do bloco intercalado por tick), `_as_signed_if_declared`
-e `_apply_scale` (conversao de contagem crua pra unidade fisica), o eixo mestre
+DESCARTADO no porte de inventario (2026-08-29) e RECUPERADO em `ler()`:
+`_frame_layout` (posicao de cada amostra dentro do bloco intercalado por tick,
+aqui `_layout_do_bloco`; de 2026-08-29 a 2026-09-14 o `ler()` usou um layout
+canal a canal contiguo que embaralhava todos os canais, ver
+`docs/pi-pid-medicao.md`), `_as_signed_if_declared` e `_apply_scale`
+(`_aplicar_escala`). Continuam descartados: o eixo mestre
 por `np.interp`, o `RawTelemetryBundle`/pandas inteiro, a deteccao de fronteira
 de volta (`_rlt_boundaries`, `_beacon_boundaries`, `_lap_numbers`, a etapa 5 do
 nosso pipeline) e a excecao de dominio `NoLapsInFileError`. Este leitor faz
@@ -252,6 +255,67 @@ def _aplicar_escala(valores: np.ndarray, registro: _RegistroCanal) -> np.ndarray
     return valores
 
 
+_TICKS_POR_BLOCO: int = 100
+#: O quadro do tick 1 de cada bloco nao traz amostra: e um marcador de bloco
+#: (medido em 2026-09-14 nos 25 `.pid` do acervo: nos 24 F3 vale
+#: `00 00 00 00 <u16 variavel> 03 e7 0b b8 00 01`, 12 B, exatamente o tamanho
+#: do quadro dos seis canais de 100 Hz; no G.Samaia, com um canal de 100 Hz,
+#: vale `00 20`, 2 B). Os canais de 100 Hz recebem nulo nesse slot; sem isso,
+#: `Steering` contra o `.dat` da mesma sessao da r = 0,75, com isso r = 1,000.
+_TICK_MARCADOR: int = 1
+
+
+def _layout_do_bloco(registros: list[_RegistroCanal]) -> list[list[tuple[int, int]]]:
+    """Onde cada amostra de cada canal cai dentro do bloco de 1 s.
+
+    O bloco e intercalado por tick de 10 ms, e o quadro de cada tick tem
+    tamanho diferente: so entram os canais cuja taxa cabe naquele instante
+    (tick 0 leva todos, tick 1 so os de 100 Hz, tick 2 os de 100 e 50 Hz).
+    A soma dos 100 quadros fecha no `tamanho_bloco`. Porte de
+    `_frame_layout` do `pid_file.py` do saru-app, la validado contra o
+    `.dat` da mesma sessao; a leitura canal a canal contigua que este
+    modulo usou de 2026-08-29 a 2026-09-14 embaralhava todos os canais
+    (medido: `Speed`, `RPM` e `Acc Long` com a mesma distribuicao de
+    contagem em cada arquivo, ver `docs/pi-pid-medicao.md`).
+
+    Indexado por posicao no dicionario, nao por nome: o acervo F3 repete
+    nome (`Oil Temp`, `Fuel Pressure`).
+    """
+    posicoes: list[list[tuple[int, int]]] = [[] for _ in registros]
+    offset = 0
+    for tick in range(_TICKS_POR_BLOCO):
+        for indice, r in enumerate(registros):
+            if tick % (_TICKS_POR_BLOCO // r.taxa_hz) == 0:
+                posicoes[indice].append((offset, r.largura))
+                offset += r.largura
+    return posicoes
+
+
+def _contagem_do_canal(
+    corpo_np: np.ndarray, janelas: list[tuple[int, int]], largura: int
+) -> np.ndarray:
+    """Contagem crua de um canal, na ordem bloco a bloco e tick a tick.
+
+    Junta de uma vez todos os bytes do canal em todos os blocos (indexacao
+    por lista de posicoes do `_layout_do_bloco`) e le cada amostra como
+    inteiro big-endian sem sinal de `largura` bytes. Devolve `int64` de
+    `n_blocos * len(janelas)` posicoes. Substitui o laco por janela e por
+    byte de 2026-09-14 com a mesma saida celula a celula nos 25 `.pid` do
+    acervo (medido em 2026-09-14, ver secao Desempenho de
+    `docs/pi-pid-medicao.md`).
+    """
+    inicios = np.fromiter((o for o, _ in janelas), dtype=np.intp, count=len(janelas))
+    posicoes = (inicios[:, None] + np.arange(largura, dtype=np.intp)).reshape(-1)
+    # `np.take` devolve bloco contiguo em C; `corpo_np[:, posicoes]` nao, e o
+    # `view` big-endian abaixo exige o ultimo eixo contiguo.
+    bytes_do_canal = np.take(corpo_np, posicoes, axis=1)
+    if largura == 1:
+        contagem = bytes_do_canal
+    else:
+        contagem = bytes_do_canal.view(f">u{largura}")  # (n_blocos, n_ticks)
+    return contagem.astype(np.int64).reshape(-1)
+
+
 class LeitorPiPid(LeitorDeInventario):
     """Inventario de canal do container Pi/Cosworth `.pid`.
 
@@ -361,14 +425,12 @@ class LeitorPiPid(LeitorDeInventario):
         """Le a amostra do corpo (offset 16 ate `16 + n_blocos*tamanho_bloco`),
         agrupada por taxa nativa.
 
-        Layout do corpo (medido/definido pra esta tarefa, DIFERENTE do
-        `_frame_layout` do leitor original, que intercala por tick): dentro
-        de cada bloco de 1 s, cada canal ocupa `taxa_hz * largura` bytes
-        CONTIGUOS, na ordem em que aparece no dicionario do trailer (a
-        mesma ordem que `inspecionar()` usa pra montar `canais`). Isso da
-        `taxa_hz` amostras consecutivas por canal por bloco. `t_s` de uma
-        amostra e `bloco + indice_dentro_do_bloco / taxa_hz`, que e o mesmo
-        que `indice_na_serie_concatenada / taxa_hz` (blocos empilhados).
+        Layout do corpo: intercalado por tick de 10 ms com quadro de tamanho
+        variavel, ver `_layout_do_bloco`; o quadro do tick 1 e marcador de
+        bloco, e os canais de 100 Hz saem nulos nesse slot (ver
+        `_TICK_MARCADOR`). `t_s` de uma amostra e
+        `bloco + indice_dentro_do_bloco / taxa_hz`, que e o mesmo que
+        `indice_na_serie_concatenada / taxa_hz` (blocos empilhados).
 
         Sinal: contagem vira complemento de dois quando o dicionario declara
         minimo negativo pro canal, porte de `_as_signed_if_declared` do
@@ -394,7 +456,11 @@ class LeitorPiPid(LeitorDeInventario):
         decidir bloco a bloco sem virar um algoritmo de dois passes bem
         mais complexo pra um formato que nunca chega perto do teto de
         memoria). A emissao de `Lote`, essa sim, sai em blocos de ate
-        `_LINHAS_POR_LOTE` linhas por taxa.
+        `_LINHAS_POR_LOTE` linhas por taxa. Medido em 2026-09-14 no
+        `P.Piquet000987.pid`: 59 ms e pico de 20,9 MB no tracemalloc. Ler
+        o corpo em pedacos de 64 KB (ideia do commit 66d9935) deu a mesma
+        saida em 155 ms e 29,3 MB, porque a contagem de todos os canais
+        fica alocada ao mesmo tempo; ver `docs/pi-pid-medicao.md`.
 
         # DECISAO PENDENTE (Lucas): o acervo F3 tem canal com nome_bruto
         # duplicado (dois "Oil Temp", dois "Fuel Pressure"; ver teste de
@@ -466,19 +532,14 @@ class LeitorPiPid(LeitorDeInventario):
             return
 
         corpo_np = np.frombuffer(corpo, dtype=np.uint8).reshape(n_blocos, tamanho_bloco)
+        posicoes = _layout_do_bloco(registros)
 
         grupos: dict[int, list[tuple[str, np.ndarray]]] = {}
-        cursor = 0
-        for r in registros:
-            n_bytes_canal = r.taxa_hz * r.largura
-            janela = corpo_np[:, cursor : cursor + n_bytes_canal]
-            cursor += n_bytes_canal
-
-            amostras = janela.reshape(n_blocos, r.taxa_hz, r.largura).astype(np.int64)
-            contagem = np.zeros((n_blocos, r.taxa_hz), dtype=np.int64)
-            for byte_idx in range(r.largura):  # big-endian
-                contagem = (contagem << 8) | amostras[:, :, byte_idx]
-            contagem = contagem.reshape(-1)
+        for r, janelas in zip(registros, posicoes, strict=True):
+            contagem = _contagem_do_canal(corpo_np, janelas, r.largura)
+            nulos = np.zeros(contagem.shape, dtype=bool)
+            if r.taxa_hz == _TICKS_POR_BLOCO:
+                nulos[_TICK_MARCADOR :: r.taxa_hz] = True
 
             if math.isfinite(r.minimo_declarado) and r.minimo_declarado < 0:
                 metade = np.int64(1) << (8 * r.largura - 1)
@@ -486,8 +547,10 @@ class LeitorPiPid(LeitorDeInventario):
                 contagem = np.where(contagem >= metade, contagem - cheio, contagem)
 
             valores = _aplicar_escala(contagem.astype(np.float64), r)
+            valores = np.where(nulos, np.nan, valores)
             grupos.setdefault(r.taxa_hz, []).append((r.nome, valores))
 
+        cursor = max(o + w for janelas in posicoes for o, w in janelas)
         if cursor != tamanho_bloco:
             raise ErroDeLeitura(
                 f"{caminho}: cursor de decodificacao terminou em {cursor} B, "
@@ -504,7 +567,13 @@ class LeitorPiPid(LeitorDeInventario):
             while inicio < n:
                 fim = min(inicio + _LINHAS_POR_LOTE, n)
                 t_s = pa.array(np.arange(inicio, fim, dtype=np.float64) / taxa_hz)
-                arrays = [t_s, *(pa.array(v[inicio:fim]) for v in valores_por_canal)]
+                arrays = [
+                    t_s,
+                    *(
+                        pa.array(v[inicio:fim], mask=np.isnan(v[inicio:fim]))
+                        for v in valores_por_canal
+                    ),
+                ]
                 tabela = pa.RecordBatch.from_arrays(arrays, names=["t_s", *nomes])
                 yield Lote(frequencia_hz=float(taxa_hz), tabela=tabela)
                 inicio = fim

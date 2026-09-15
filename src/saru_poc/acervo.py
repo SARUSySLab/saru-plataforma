@@ -132,7 +132,10 @@ def caminho_aliases() -> Path:
     versionado = REPO_ROOT / "seeds" / "aliases.yaml"
     if versionado.exists():
         return versionado
-    return CONFIG.app_ref / "services/telemetry-api/saru_lapanalyzer/infra/mapping/aliases.yaml"
+    return (
+        CONFIG.app_ref
+        / "services/telemetry-api/saru_lapanalyzer/infra/mapping/aliases.yaml"
+    )
 
 
 def _decompor(canal: str) -> tuple[str | None, str | None]:
@@ -248,6 +251,10 @@ def semear(conn, mapa_versao: str = "2026.08-1") -> Resumo:
                 colunas = spec["col"]
                 colunas = colunas if isinstance(colunas, list) else [colunas]
                 alvo, unidade_entrada, fator = canal, spec["unit_in"], spec.get("scale")
+                # Transformacao afim: canonico = bruto * fator + offset. O
+                # offset entra pelo aliases.yaml quando o logger grava
+                # contagem com zero deslocado (medido no `.pid` F3, 2026-09-14).
+                offset = float(spec.get("offset", 0.0))
                 if spec.get("normalize_by_max"):
                     alvo, fator = "brake_press", BAR_PARA_KPA
                     resumo.reescritos.append(f"{perfil}.{canal} -> brake_press")
@@ -275,7 +282,7 @@ def semear(conn, mapa_versao: str = "2026.08-1") -> Resumo:
                             alvo,
                             unidade_entrada,
                             float(fator),
-                            0.0,
+                            offset,
                             nota,
                         ),
                     )
