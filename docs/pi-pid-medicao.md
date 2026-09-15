@@ -110,17 +110,85 @@ Leitura da tabela: fator e offset dos canais que entram são idênticos em todos
 | `P.Piquet000996.pid` | 1744 | 65535 | 253.8 |
 | `P.Piquet000997.pid` | 1479 | 65535 | 252.5 |
 
-## 7. Desempenho
+## 7. Calibração de zero por sessão de `Acc Long`/`Acc Lat` (issue #36, 2026-09-14)
+
+A seção 3 mediu que `Acc Long`/`Acc Lat` fecham com r = 1,000 contra o `.dat`
+em cada arquivo, com o MESMO fator (-0,02586 G por contagem), mas o offset
+(zero do sensor) muda de sessão para sessão (12,85 a 13,18 G no longitudinal,
+12,44 a 12,50 G no lateral): uma constante única erraria até 1,6 m/s².
+
+**Decisão de arquitetura.** `mapeamento_canal` é por PERFIL: o mesmo
+fator/offset vale pra toda gravação do `pi_pid`, não cabe um número que muda
+arquivo a arquivo. A migration 025 cria `calibracao_canal_gravado`, uma linha
+por (gravação, canal canônico), com o offset em CONTAGEM (não convertido). O
+pipeline de ingestão (`pipeline/calibracao.py`) mede o próprio arquivo: a
+média da contagem crua no maior trecho contíguo com `Speed` = 0 (mínimo 100
+amostras, 2 s a 50 Hz), depois que o leitor já escreveu a série bruta em
+Parquet. Sem trecho parado longo o bastante (`P.Piquet000991.pid`, sessão
+curta de 18 kB sem carro parado identificável), nenhuma linha é escrita e
+`lon_acc`/`lat_acc` ficam fora do inventário daquela gravação; o motivo fica
+em `gravacao.metadata` (`pi_pid.calibracao_acc_motivo`). `seeds/aliases.yaml`
+ganha `lon_acc`/`lat_acc` no perfil `pi_pid` com o fator fixo (-0,25360
+m/s²/contagem = -0,02586 × 9,80665) e offset 0 (identidade): o offset de
+verdade entra por `leitura.fator_do_canal`, que soma `-fator × offset_contagem`
+ao offset do perfil quando há calibração pra aquela gravação.
+
+**Validação: 21 dos 23 pares `.pid` × `.dat` do acervo F3, 2 canais cada (42
+séries).** `P.Piquet000991.pid` fica fora por falta de trecho parado (acima).
+Erro absoluto contra o `.dat` da mesma sessão, calibrado × referência, série
+inteira:
+
+| | valor |
+|---|---|
+| erro mínimo | 0,046 m/s² |
+| erro mediano | 0,330 m/s² |
+| erro médio | 0,349 m/s² |
+| **erro máximo (dos 42)** | **0,707 m/s²** |
+| séries com erro abaixo de 1 contagem (0,254 m/s²) | 11 de 42 |
+| séries com erro abaixo de 0,5 m/s² | 36 de 42 |
+
+**O critério de aceite da issue (erro máximo abaixo de 0,05 m/s²) NÃO foi
+atingido.** Investigado em `P.Piquet000974.pid` (sessão 100% parada, 22.200
+amostras, o caso mais favorável, sem nenhuma amostra em movimento pra
+confundir a janela): a contagem crua de `Acc Long` oscila entre 500 e 503 ao
+longo do arquivo inteiro (502 é o valor mais frequente, 72% das amostras), e
+o `.dat` mapeia a contagem 501, não a média 501,73 nem a moda 502, pro zero
+físico exato. Isso é medido, não suposição: filtrando o `.dat` pelas amostras
+com contagem 501, o valor é 0,0 G em todas; com contagem 502, é sempre
+-0,025641 G, o próprio passo de quantização. O offset que o Pi Toolbox usou
+não é a média de nenhuma janela deste arquivo; nenhuma janela testada (1 s a
+22.200 s) recupera exatamente 501.
+
+A causa provável é a resolução do sensor, não o método de calibração: o
+fator medido (-0,02586 G/contagem = -0,2536 m/s²/contagem) é o próprio passo
+de quantização do conversor. Uma contagem de diferença entre o offset medido
+e o offset "verdadeiro" do Pi Toolbox já vale 0,2536 m/s², cinco vezes o
+critério de 0,05 m/s². A própria seção 3 mediu isso pelo lado da melhor
+hipótese possível: o ajuste linear com fator e offset livres por arquivo
+(usando todas as amostras do arquivo, não só um trecho parado) já fecha só
+até 0,024 a 0,037 G de resíduo máximo (0,235 a 0,362 m/s²), acima de 0,05
+m/s² mesmo no melhor caso teórico. Nenhum offset recuperável deste sensor,
+calibrado por sessão ou não, bate abaixo do ruído de quantização dele.
+
+**Resultado prático.** A calibração por sessão troca um erro de até 1,6 m/s²
+(offset único fixo, o que a issue #26 mediu) por um erro de até 0,71 m/s²
+(mediana 0,33 m/s², calibrado por gravação), quatro vezes menor no pior caso
+e abaixo do limiar de frenagem de -3,5 m/s² com folga. O critério numérico de
+0,05 m/s² da issue fica abaixo da resolução do próprio sensor e não fecha;
+ver `docs/empresa/decisions.md` e o PR #36 para a decisão de seguir assim
+mesmo, sem inventar precisão que o hardware não tem.
+
+## 8. Desempenho
 
 Medição de 2026-09-14, adiantando a issue #45 para os leitores Pi. O `ler()` do `.pid` ficou 39% mais rápido na mediana dos 25 arquivos do acervo, com a mesma saída célula a célula e o mesmo pico de memória. A mudança veio da análise do commit `66d9935` do Antigravity (branch `arquivo/antigravity-cosworth-66d9935`); a ideia que ele de fato propunha para memória, ler em pedaços de 64 KB, foi medida e deixou o leitor mais lento e mais pesado.
 
-### 7.1 O que mudou
+### 8.1 O que mudou
 
 O `ler()` montava a contagem de cada canal com um laço por janela do layout por tick e, dentro dele, um laço por byte. Um canal de 100 Hz com 2 B por amostra fazia 100 janelas e 200 operações por bloco de arquivo. O perfil de CPU do `P.Piquet000987.pid` mostrava 31 ms de 119 ms só em conversão de tipo dentro desse laço.
 
 Agora `_contagem_do_canal` junta de uma vez todos os bytes do canal em todos os blocos (`np.take` com a lista de posições do layout) e lê cada amostra como inteiro big-endian sem sinal. O resto do `ler()` não mudou: sinal, escala, slot nulo do tick 1, checagem de cursor e mensagens de erro com offset.
 
-### 7.2 Método
+### 8.2 Método
 
 1. Arquivos: os 25 `.pid` únicos do acervo, copiados do Drive para disco local.
 2. Variantes: o leitor publicado no PR #35 (`1823e72`), o `CosworthPidReader` de `66d9935`, o leitor vetorizado e uma variante que lê o corpo em pedaços de 64 KB com a mesma decodificação vetorizada.
@@ -128,9 +196,9 @@ Agora `_contagem_do_canal` junta de uma vez todos os bytes do canal em todos os 
 4. Memória: pico do `tracemalloc` numa segunda chamada de `ler()` no mesmo processo. A primeira chamada paga cerca de 25 MB de import tardio que ficam retidos e não são custo do leitor. RSS máximo por `/usr/bin/time -v` numa passada de `inspecionar()` e `ler()`; o processo só com imports tem 59 MB.
 5. Igualdade: cabeçalho igual e, em cada lote, mesma frequência, mesmos nomes na mesma ordem, mesmo tipo, mesma contagem de nulos e mesmos valores, com NaN igual a NaN. Máquina: Dell G15, 16 núcleos, Python 3.12.3, NumPy 2.5.2, PyArrow 25.0.1.
 
-### 7.3 Resultado por arquivo
+### 8.3 Resultado por arquivo
 
-Tabela 7. Tempo de `ler()` em ms, pico de memória de `ler()` em MB (tracemalloc, segunda chamada) e RSS máximo do processo em MB, do maior para o menor arquivo. "Igual" compara as três outras variantes contra a publicada. `inspecionar()` ficou em até 1,0 ms em todos os arquivos e variantes.
+Tabela 8. Tempo de `ler()` em ms, pico de memória de `ler()` em MB (tracemalloc, segunda chamada) e RSS máximo do processo em MB, do maior para o menor arquivo. "Igual" compara as três outras variantes contra a publicada. `inspecionar()` ficou em até 1,0 ms em todos os arquivos e variantes.
 
 | Arquivo | kB | ler ms publicado | ler ms Antigravity | ler ms vetorizado | ler ms 64 KB | pico MB publicado | pico MB vetorizado | pico MB 64 KB | RSS MB publicado | RSS MB vetorizado | Igual |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -162,7 +230,7 @@ Tabela 7. Tempo de `ler()` em ms, pico de memória de `ler()` em MB (tracemalloc
 
 Soma de `ler()` nos 25 arquivos: 0,947 s publicado, 0,576 s vetorizado, 1,314 s em pedaços de 64 KB. Razão vetorizado sobre publicado: mediana 0,61, de 0,42 a 0,77. As 16.760.808 células conferidas são iguais nas três variantes.
 
-### 7.4 O que foi e o que não foi portado do commit `66d9935`
+### 8.4 O que foi e o que não foi portado do commit `66d9935`
 
 | Ideia do commit | Portada | Motivo medido |
 |---|---|---|
@@ -174,7 +242,7 @@ Soma de `ler()` nos 25 arquivos: 0,947 s publicado, 0,576 s vetorizado, 1,314 s 
 | Leitura de amostra do `.pds` | não | tamanho de amostra escolhido por palpite quando a distância entre blocos não fecha; no `REF 992.pds` o `ler()` quebra com `ValueError: Arrays were not all the same length: 577 vs 581` depois de 3,9 s, com pico de 31,6 MB no tracemalloc; detalhe e caminho de medição na issue do `.pds` |
 | `inspecionar()` do `.pds` sem o filtro `_nome_valido` | não | recusa o `P.Piquet000997.pds`, que o leitor do PR #34 abre com 45 canais: ruído da amostra forma candidatos de 274 registros que passam na frente do dicionário real de 47. Medido nos 27 `.pds` que o PR #34 abre: recusa 16. Nos 11 que abre, o cabeçalho é igual e o pico de memória é maior (12,2 MB contra 8,4 MB no `REF 992.pds`; 10,6 contra 3,9 MB no `P.Piquet000987.pds`) |
 
-### 7.5 O que continua de fora
+### 8.5 O que continua de fora
 
 1. O restante do tempo do `ler()` vetorizado está no `np.percentile` de `_aplicar_escala` (24 ms de 66 ms no perfil do `P.Piquet000987.pid`), que calcula percentis da série dividida e da multiplicada. Não mudou aqui porque qualquer diferença de arredondamento pode trocar a direção da escala escolhida.
 2. A meta de tempo e memória por MB e a medição dos outros formatos continuam na issue #45.

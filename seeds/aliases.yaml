@@ -1683,12 +1683,32 @@ listhead_dat:
 # Fatores medidos em 2026-09-14 contra o `.dat` exportado pelo Pi Toolbox da
 # MESMA sessão, 23 pares do acervo F3 (`docs/pi-pid-medicao.md`): fator e
 # offset iguais em todos os pares, r = 1,000, resíduo máximo abaixo de 1e-3 na
-# unidade de saída. Só entra aqui o canal que fechou assim; `Acc Long` e
-# `Acc Lat` fecham com r = 1,000 mas o offset muda por sessão (12,85 a 13,18
-# G): ficam FORA até haver zero por sessão (issue #26, decisão de Vitor).
+# unidade de saída. Só entra aqui o canal que fechou assim.
 # Os fatores valem para o logger do F3; a Porsche Cup grava `.pds`, outro
 # formato e outro perfil.
 pi_pid:
+  # `Acc Long`/`Acc Lat`: fator -0,02586 G/contagem × 9,80665 m/s² por G
+  # (23 pares, r = 1,000 em cada um), fixo aqui. O OFFSET não: ele é o zero
+  # do sensor, ajustado pelo Pi Toolbox por sessão (12,85 a 13,18 G no
+  # longitudinal, 12,44 a 12,50 G no lateral — uma constante única erraria
+  # até 1,6 m/s², quase metade do limiar de frenagem de -3,5 m/s²). Este
+  # arquivo é por PERFIL, estático; não cabe um offset que muda arquivo a
+  # arquivo. Fica 0 aqui (identidade) e o offset de verdade entra por
+  # gravação em `calibracao_canal_gravado` (migration 025, issue #36),
+  # medido pelo pipeline de ingestão contra o próprio arquivo (média da
+  # contagem crua com o carro parado). Sem trecho parado identificável, o
+  # canal fica fora do inventário daquela gravação — nunca adivinha.
+  # Ver `docs/pi-pid-medicao.md` seção 7 e `src/saru_poc/pipeline/calibracao.py`.
+  lon_acc:
+    col: Acc Long
+    unit_in: contagem
+    unit_out: m/s2
+    scale: -0.25359997
+  lat_acc:
+    col: Acc Lat
+    unit_in: contagem
+    unit_out: m/s2
+    scale: -0.25359997
   speed:
     col: Speed
     unit_in: kph
