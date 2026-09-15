@@ -18,6 +18,13 @@ saíram os requisitos desta família.
 Validação com piloto de track day real: pendente para o N0 em campo. As personas P2 e P3
 vieram de pesquisa de mercado de 2026-07-15. É o próximo marco de validação externa.
 
+A validar: valores do módulo `src/saru_poc/fisica/parametros_gt3_cup.py` contra os
+manuais do Drive em `Trabalho/Porsche_Cup/Docs/`. Os presets das três gerações do 911
+GT3 Cup entraram na PoC em 2026-09-13 sem que nenhum manual técnico fosse aberto. A
+auditoria em `docs/fisica-parametros-gt3-cup.md` lista as sete perguntas que só o manual
+fecha, e marca 14 linhas como dependentes de Vitor. Enquanto isso não fechar, resultado
+de simulação com estes presets é exploratório, não calibração.
+
 ## Decisões ratificadas por Vitor em 2026-09-13
 
 Todas as nove perguntas anteriores foram respondidas e ratificadas formalmente:
