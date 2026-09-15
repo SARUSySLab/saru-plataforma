@@ -2,7 +2,7 @@
 
 Repositório único da SARU desde 2026-09-14: código de todas as famílias e, em `docs/empresa/`,
 decisões, requisitos, física e processo da empresa. Português em código, commit e documento.
-Ordem das famílias: Piloto, Equipe, Engenheiro, Campeonato, Aluno. Regra de operação e de
+Foco: Engenheiro primeiro, depois Piloto; as outras famílias vêm a partir delas. Regra de operação e de
 escrita mora em `~/.claude/CLAUDE.md`; aqui só o que é deste repositório.
 
 ## Onde está cada coisa
