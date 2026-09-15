@@ -236,6 +236,37 @@ def test_escrever_canais_aceita_lon_acc_quando_calibrado(conn) -> None:
     assert canonicos["Acc Lat"] == "lat_acc"
 
 
+def test_escrever_canais_mantem_aceleracao_de_outro_formato_sem_calibracao(
+    conn,
+) -> None:
+    """Issue #51: a calibracao por sessao vale so pro `pi_pid`. Um `.xrk` com
+    `LAT_ACC` e `InlineAcc` mapeados no perfil `aim_xrk` entra com o canonico
+    mesmo sem calibracao nenhuma."""
+    gravacao_id = _nova_gravacao(conn)
+    cabecalho = Cabecalho(
+        formato_id="aim_xrk",
+        leitor_versao="0.3.0",
+        canais=tuple(
+            CanalBruto(nome_bruto=n, frequencia_hz=20.0, n_amostras=400)
+            for n in ("LAT_ACC", "InlineAcc")
+        ),
+    )
+    mapa = {"LAT_ACC": ("lat_acc", "g"), "InlineAcc": ("lon_acc", "g")}
+
+    sem_mapa, _divergentes = _escrever_canais(conn, gravacao_id, cabecalho, mapa)
+    assert sem_mapa == 0
+
+    canonicos = {
+        r[0]: r[1]
+        for r in conn.execute(
+            "select nome_bruto, canal_canonico_id from canal_gravado where gravacao_id = %s",
+            (gravacao_id,),
+        ).fetchall()
+    }
+    assert canonicos["LAT_ACC"] == "lat_acc"
+    assert canonicos["InlineAcc"] == "lon_acc"
+
+
 def test_fator_do_canal_soma_offset_da_calibracao_ao_offset_do_perfil(
     conn, tmp_path
 ) -> None:

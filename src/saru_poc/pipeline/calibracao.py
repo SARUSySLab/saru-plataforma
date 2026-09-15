@@ -43,6 +43,12 @@ CANONICOS_CALIBRADOS_POR_SESSAO: frozenset[str] = frozenset(
     CANAL_BRUTO_PARA_CANONICO.values()
 )
 
+#: Formatos em que esses canonicos dependem da calibracao por sessao. Nos
+#: demais o mapa do perfil ja entrega o canal em unidade fisica e o canonico
+#: entra direto. Sem esta restricao, `.xrk`, `.dat` e `.ld` perdiam G lateral
+#: e longitudinal em toda gravacao (issue #51).
+FORMATOS_CALIBRADOS_POR_SESSAO: frozenset[str] = frozenset({"pi_pid"})
+
 _COLUNA_REFERENCIA = "Speed"
 #: Sensor de velocidade grava 0 exato quando parado (0,1 kph por contagem,
 #: divisao exata): a folga aqui e so pra reamostragem/instabilidade numerica,
