@@ -79,3 +79,20 @@ Arquivo real do acervo, erro reproduzível, não amostra sintética.
 
 Issues abertas para as duas lacunas (mapa de canal e falha de `ler()`): ver
 `docs/cobertura-de-dados-resumo.md`.
+
+## Tipos de dado (2026-09-15, issue #38)
+
+Dois arquivos do acervo falhavam em `ler()` com combinação `(dtype_a, dtype)` fora do mapa do leitor. Cada canal foi lido com todos os tipos de mesmo tamanho; o tipo certo é o único que dá valor fisicamente possível. Gabarito externo para `(8,8)`: o `ldparser` do saru-app (`services/telemetry-api/vendor/ldparser/ldparser.py`, linhas 359 a 366) também lê como float64.
+
+| Combinação | Arquivo | Canais | Canal de prova | int16 ou float64 | Alternativa |
+|---|---|---|---|---|---|
+| (4, 2) | `Sample.ld` (MoTeC, motor) | 56 de 123 | `Gear` | 0 a 5, 6 valores | float16: da ordem de 1e-7 |
+| (4, 2) | `Sample.ld` | | `Ground Speed` (1 casa) | 0 a 245,7 km/h | float16: 1,7e-5 |
+| (4, 2) | `Sample.ld` | | `Wheel Slip` (1 casa) | -47,7 a 38,8 | unsigned: 0 a 6.554, sem sinal |
+| (8, 8) | `20200930-0364202_1.ld` e `_2.ld` | 3 de 43 | `GPS Heading` | -0,01 a 360 graus | int64: da ordem de 4e18 |
+| (8, 8) | idem | | `GPS Latitude`, `GPS Longitude` | -45,06 e 169,2 | int64: da ordem de 4e18 |
+
+Resultado: `(4, 2)` entra como `<i2` e `(8, 8)` como `<f8`. `(4, 4)` não aparece em nenhum arquivo medido e fica fora do mapa.
+
+Os 59 arquivos `.ld` de 990 a 1.901 B do simulador ACC não são `.ld`: começam com `<?xml` e o `detectar` os classifica como `motec_ldx`. O teste de acervo passa a cobrar cabeçalho de `.ld` só de arquivo detectado como `motec_ld`.
+

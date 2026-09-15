@@ -107,11 +107,22 @@ MAX_CANAIS = 10_000
 # do campo: `inspecionar()` nao usa este mapa, entao arquivo com combinacao
 # nova continua sendo inventariado normalmente, so a leitura de amostra fica
 # bloqueada nele.
+#
+# Medido em 2026-09-15 (issue #38, `docs/motec-ld-medicao.md`, secao "Tipos
+# de dado"): (4,2) e int16 com sinal (56 canais do `Sample.ld`: `Gear` 0 a 5,
+# `Ground Speed` 0 a 245,7 km/h, `Wheel Slip` -47,7 a 38,8; float16 da valores
+# da ordem de 1e-7 e unsigned tira o sinal do `Wheel Slip`) e (8,8) e float64
+# (`GPS Heading` 0 a 360 graus, `GPS Latitude` -45,06 e `GPS Longitude` 169,2
+# nos dois `20200930-0364202_*.ld`; int64 da valores da ordem de 1e18). Mesmo
+# tipo que o `ldparser` do saru-app usa para (8,8). (4,4) nao aparece em
+# nenhum arquivo medido e fica fora ate aparecer.
 _NUMPY_DTYPE_POR_COMBO: dict[tuple[int, int], str] = {
     (7, 4): "<f4",
     (5, 4): "<i4",
     (3, 2): "<i2",
     (0, 2): "<i2",
+    (4, 2): "<i2",
+    (8, 8): "<f8",
 }
 
 # Linhas por lote emitido em `ler()`. Na taxa mais alta do acervo (500 Hz,
