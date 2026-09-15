@@ -29,8 +29,11 @@ fim):
    registro foi decifrado e validado (ver `_ESTRIDE_DICIONARIO`): nome em
    UTF-16LE no offset 0 do registro, o MESMO nome repetido no offset 88
    (usado aqui como assinatura de validacao, nao dado util), a unidade em
-   UTF-16LE no offset 152, e o indice do canal (inteiro, mesma base do
-   indice da tabela abaixo) nos ultimos 4 bytes do registro (offset 544).
+   UTF-16LE no offset 152, e um inteiro nos ultimos 4 bytes do registro
+   (offset 544) que NAO e o indice da tabela abaixo: medido em 2026-09-15
+   contra o `.dat` de 21 sessoes do F3, ligar bloco a nome por esse campo erra
+   todo canal (issue #54). O nome de cada bloco vem de `LIGACAO_MEDIDA`, ver a
+   secao LIGACAO INDICE -> NOME abaixo.
    Ha um segundo layout, de 552... na verdade 304 bytes por registro, visto
    nos 10 arquivos de `workbooks/pi-toolbox-bootcamp/`: layout DIFERENTE
    (sem o nome duplicado em +88, unidade em offset diferente, e SEM campo de
@@ -46,8 +49,9 @@ fim):
    canais: um canal pode ter varios blocos (ate 71), a tabela NAO vem em
    ordem de indice e os offsets de amostra nao sao monotonicos. Campos
    medidos (todos `<i` de 4 bytes, offsets relativos ao inicio do registro):
-   - offset 0: indice do canal (0-based, mesmo espaco do offset 544 do
-     dicionario).
+   - offset 0: indice do canal (0-based). Segue a ordem de aquisicao do
+     logger (a ordem de canais do `.pid` da mesma sessao), pulando canal que
+     o `.pds` nao gravou; nao e o espaco do offset 544 do dicionario.
    - offset 16: intervalo entre amostras, em unidades de 1e-7 s (100 ns).
      `frequencia_hz = 1e7 / intervalo`. Validado contra os 7 valores que
      aparecem no acervo (100, 50, 25, 20, 10, 5 e 1 Hz), todos frequencias
@@ -86,6 +90,17 @@ de bytes por bloco do `pi_pid` se este formato guardasse os canais
 intercalados. Aqui nao guarda: cada bloco e continuo, entao a invariante
 usada e a de offset consecutivo acima.
 
+LIGACAO INDICE -> NOME (issue #54, medido em 2026-09-15): nenhum campo do
+registro de dicionario nem a ordem alfabetica reproduz o indice da tabela. A
+ligacao foi medida por correlacao: cada bloco de 8 bytes lido como `float64`
+casa com o canal de mesma contagem do `.dat` exportado pelo Pi Toolbox da
+mesma sessao com r > 0,999, e a ligacao se repete identica em todas as
+sessoes de mesma assinatura de dicionario (o conjunto de nomes). Ela mora em
+`pi_pds_ligacao.py`, uma tupla por assinatura. Bloco sem ancora medida (canal
+constante em toda sessao, ou casado com dois nomes de dado identico) fica
+fora do inventario e so e contado em `bruto`. Assinatura sem ligacao medida
+levanta `ErroDeLeitura`: nome adivinhado e o mesmo erro que a issue corrigiu.
+
 BUSCA SEM PONTEIRO DE CABECALHO: nao foi identificado, no cabecalho fixo do
 arquivo, um ponteiro explicito pro inicio do dicionario (ao contrario do
 `.ld`, que tem `ptr_canais` no offset 0x08). Em vez disso, ESTE LEITOR
@@ -116,6 +131,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .base import Cabecalho, CanalBruto, ErroDeLeitura, LeitorDeInventario
+from .pi_pds_ligacao import LIGACAO_MEDIDA
 
 _MAGIC: bytes = b"\x1a\x12\x40\xf7"
 _OFF_MAGIC: int = 4
@@ -410,8 +426,7 @@ class LeitorPiPds(LeitorDeInventario):
         n_dicionario: int,
         caminho: Path,
     ) -> Cabecalho:
-        nomes_por_idx: dict[int, tuple[str, str | None]] = {}
-        idx_ambiguos: set[int] = set()
+        unidade_por_nome: dict[str, str | None] = {}
         for i in range(n_dicionario):
             registro = offset_dicionario + i * _ESTRIDE_DICIONARIO
             nome = _ler_string_u16(dados, registro + _OFF_NOME, _LEN_NOME_MAX)
@@ -421,16 +436,17 @@ class LeitorPiPds(LeitorDeInventario):
                     f"{registro + base} sem nome legivel"
                 )
             unidade = _ler_string_u16(dados, registro + _OFF_UNIDADE, 20)
-            idx = struct.unpack_from("<i", dados, registro + _OFF_IDX_DICIONARIO)[0]
-            if idx in nomes_por_idx and nomes_por_idx[idx][0] != nome:
-                # Indice repetido com nome diferente: pelo menos um dos dois
-                # canais nao tem dado nesta captura e o campo de indice do
-                # dicionario ficou com um valor de preenchimento (medido:
-                # sempre 0). Nenhum dos dois entra no inventario: escolher
-                # um seria adivinhar qual tem o dado de verdade.
-                idx_ambiguos.add(idx)
-            else:
-                nomes_por_idx[idx] = (nome, unidade or None)
+            unidade_por_nome[nome] = unidade or None
+
+        ligacao = LIGACAO_MEDIDA.get(frozenset(unidade_por_nome))
+        if ligacao is None:
+            raise ErroDeLeitura(
+                f"{caminho}: dicionario com {n_dicionario} canais em offset "
+                f"absoluto {offset_dicionario + base} sem ligacao indice -> nome "
+                "medida para este conjunto de canais (issue #54). O campo de "
+                "indice do dicionario nao e o indice da tabela, entao o leitor "
+                "nao da nome a bloco nenhum sem medicao contra o .dat irmao."
+            )
 
         tabela_offset = offset_dicionario + n_dicionario * _ESTRIDE_DICIONARIO
         blocos = _ler_tabela(
@@ -452,10 +468,13 @@ class LeitorPiPds(LeitorDeInventario):
             por_idx.setdefault(bloco.idx, []).append(bloco)
 
         canais = []
+        sem_ligacao = 0
         for idx in sorted(por_idx):
-            if idx in idx_ambiguos or idx not in nomes_por_idx:
+            nome = ligacao[idx] if idx < len(ligacao) else None
+            if nome is None:
+                sem_ligacao += 1
                 continue
-            nome, unidade = nomes_por_idx[idx]
+            unidade = unidade_por_nome[nome]
             intervalos = {b.intervalo_ticks for b in por_idx[idx]}
             if len(intervalos) != 1:
                 raise ErroDeLeitura(
@@ -491,6 +510,7 @@ class LeitorPiPds(LeitorDeInventario):
             "n_canais_dicionario": str(n_dicionario),
             "n_canais_com_dado": str(len(canais)),
             "n_canais_sem_dado": str(n_dicionario - len(canais)),
+            "n_blocos_sem_ligacao_medida": str(sem_ligacao),
             "offset_tabela": str(tabela_offset + base),
             "n_registros_tabela": str(len(blocos)),
             "n_pares_fechados": str(fechados),
