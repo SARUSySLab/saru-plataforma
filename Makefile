@@ -35,7 +35,7 @@ psql:
 	psql "postgresql://$${SARU_PG_USER:-saru}:$${SARU_PG_PASSWORD:-saru}@127.0.0.1:$${SARU_PG_PORT:-5442}/$${SARU_PG_DB:-saru_poc}"
 
 test:
-	uv run pytest -q
+	SARU_EXIGIR_BANCO=1 uv run pytest -q -rs
 
 fmt:
 	uv run ruff format src tests && uv run ruff check --fix src tests
