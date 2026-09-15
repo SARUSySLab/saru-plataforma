@@ -1,0 +1,11 @@
+{
+  "caixa-por-repositorio": {
+    "enabled": false,
+    "PreInvocation": [
+      {
+        "command": "bash .agents/hooks/caixa-antigravity.sh"
+      }
+    ],
+    "_nota": "Desativado em 2026-09-14: o hook global ~/.gemini/config/hooks.json (caixa) já injeta docs/handoff/caixa-antigravity.md do workspace."
+  }
+}

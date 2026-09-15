@@ -44,7 +44,13 @@ from .auth import Dono
 from .config import CONFIG
 from .contrato import carregar, validar
 from .db import connect
-from .relatorio import ReferenciaDePistaDiferente, amostras, montar
+from .relatorio import (
+    ReferenciaDePistaDiferente,
+    amostras,
+    arquivos_da_captura,
+    captura_so_de_inventario,
+    montar,
+)
 from .rotas import auth as rotas_auth
 from .rotas import campeonato as rotas_campeonato
 from .rotas import clima as rotas_clima
@@ -328,19 +334,75 @@ def estado_da_gravacao(gravacao_id: str, dono: Dono) -> dict:
                         and i.status = 'falhou'),
                       (select count(*) from ingestao i2 where i2.gravacao_id = g.id),
                       (select max(i3.erro) from ingestao i3 where i3.gravacao_id = g.id
-                        and i3.erro is not null)
+                        and i3.erro is not null),
+                      (select count(*) from ingestao i4 where i4.gravacao_id = g.id
+                        and i4.status = 'parcial')
                  from gravacao g where g.id = %s""",
             (gravacao_id,),
         ).fetchone()
-    layout, arquivos, voltas, trechos, falhas, ingestoes, erro = linha
+        arquivos_cap = arquivos_da_captura(conn, gravacao_id)
+    layout, arquivos, voltas, trechos, falhas, ingestoes, erro, parciais = linha
+
+    # Excecao 3e do E-UC-01 (issue #2, PIL-CT-52): a captura foi lida INTEIRA e
+    # nenhum arquivo dela virou amostra. E o caso do `.gpk` e do `.rrk`, cujo
+    # leitor so faz inventario (PIL-RN-11). Sem esta pergunta, a cascata abaixo
+    # culpava a pista, que e verdade menor: a pista nao resolve porque nao ha
+    # nada decodificado onde procurar o venue.
+    #
+    # "Inteira" e exigencia, nao detalhe: a recepcao ingere arquivo a arquivo,
+    # com commit entre eles, e sem ela um bundle correto respondia "envie o
+    # arquivo principal" no intervalo entre o `.gpk` entrar e o `.xrk` entrar.
+    so_inventario = not falhas and captura_so_de_inventario(arquivos_cap)
+    formatos_inventario = ", ".join(
+        sorted({a.formato_id for a in arquivos_cap if not a.suporta_amostra})
+    ) or "deste arquivo"
+    if ingestoes == 0:
+        ingestao = None
+    elif falhas:
+        ingestao = {"status": "falhou", "motivo": erro or "a leitura do arquivo falhou"}
+    elif parciais:
+        ingestao = {
+            "status": "parcial",
+            "motivo": (
+                f"o leitor de {formatos_inventario} lê o cabeçalho e conta os "
+                "registros, e não decodifica canal: a gravação entrou só como "
+                "inventário"
+                if so_inventario
+                else "parte dos canais do arquivo ficou sem tradução no vocabulário canônico"
+            ),
+        }
+    else:
+        ingestao = {"status": "ok", "motivo": None}
 
     if ingestoes == 0:
         return {"etapa": "recebido", "concluido": False, "voltas": 0, "trechos": 0,
-                "motivo": None, "sugestao": None, "arquivos": arquivos}
+                "motivo": None, "sugestao": None, "arquivos": arquivos,
+                "ingestao": ingestao}
     if falhas and voltas == 0:
         return {"etapa": "ingestao", "concluido": True, "voltas": 0, "trechos": 0,
                 "motivo": erro or "a leitura do arquivo falhou",
-                "sugestao": "confira se o arquivo não está truncado.", "arquivos": arquivos}
+                "sugestao": "confira se o arquivo não está truncado.", "arquivos": arquivos,
+                "ingestao": ingestao}
+    if voltas == 0 and so_inventario:
+        # Entra ANTES do degrau da pista porque e causa mais especifica: sem
+        # canal decodificado nao ha venue pra resolver nem serie pra cortar, e
+        # dizer "a pista nao foi resolvida" manda o piloto procurar o problema
+        # no lugar errado.
+        return {
+            "etapa": "ingestao", "concluido": True, "voltas": 0, "trechos": 0,
+            "motivo": (
+                f"o formato {formatos_inventario} entrou só como inventário: o "
+                "leitor lê o cabeçalho e conta os registros, e não decodifica canal"
+            ),
+            "sugestao": (
+                "envie também o arquivo principal do logger, que é o que carrega "
+                "as amostras (.xrk no AiM RS2, .ld no MoTeC, .vbo no VBOX). "
+                "Sozinhos, o .gpk e o .rrk registram a sessão, e não há canal "
+                "nenhum de onde tirar volta ou tempo."
+            ),
+            "arquivos": arquivos,
+            "ingestao": ingestao,
+        }
     if voltas == 0:
         # A cascata de causa, do mais especifico pro mais geral. A sugestao e o
         # que diferencia um erro util de um erro decorativo.
@@ -355,15 +417,17 @@ def estado_da_gravacao(gravacao_id: str, dono: Dono) -> dict:
                     "o nome do autódromo declarado no arquivo não bate com nenhuma pista do catálogo."
                 ),
                 "arquivos": arquivos,
+                "ingestao": ingestao,
             }
         return {"etapa": "corte_voltas", "concluido": True, "voltas": 0, "trechos": 0,
                 "motivo": "a pista resolveu, mas não foi possível cortar voltas nesta captura",
                 "sugestao": ("o arquivo não tem canal de contagem de volta, índice de voltas "
                              "nem GPS utilizável perto da linha de chegada. A gravação fica "
                              "registrada e dá para enviar outro arquivo normalmente."),
-                "arquivos": arquivos}
+                "arquivos": arquivos, "ingestao": ingestao}
     return {"etapa": "pronto", "concluido": True, "voltas": voltas, "trechos": trechos,
-            "motivo": None, "sugestao": None, "arquivos": arquivos}
+            "motivo": None, "sugestao": None, "arquivos": arquivos,
+            "ingestao": ingestao}
 
 
 # --- escrita -------------------------------------------------------------

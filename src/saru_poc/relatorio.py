@@ -28,6 +28,7 @@ ideal e SUPRIMIDA com `ideal_suprimida: true`, em vez de sair um "potencial de
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 # Comprimento do micro-setor do N2. Micro-setor NAO e entidade do banco: e
 # recorte de analise por distancia, calculado aqui, e por isso nao polui o
@@ -143,6 +144,145 @@ def _degradado(motivo: str, texto: str) -> dict:
 
 def _disponivel(**campos) -> dict:
     return {"disponivel": True, **campos}
+
+
+# --- captura: a gravacao chegou a virar amostra? -------------------------
+# Excecao 3e do E-UC-01, issue #2, criterio PIL-CT-52, regra PIL-RN-11.
+#
+# `aim_gpk` e `aim_rrk` tem leitor de INVENTARIO: leem cabecalho e contagem de
+# registros e nao decodificam canal. A ingestao ja sabia disso e gravava
+# `status = 'parcial'` (pipeline/ingestao.py:476), e o piloto nao via em lugar
+# nenhum: o relatorio saia sem os blocos e sem dizer por que. Bloco vazio sem
+# motivo e a mesma doenca do B2, so que vinda da leitura em vez da pista.
+
+
+@dataclass(frozen=True)
+class ArquivoDaCaptura:
+    """Um arquivo do bundle, do ponto de vista da leitura.
+
+    `ingerido` e falso enquanto nenhum leitor rodou sobre o arquivo. E a
+    diferenca entre "foi lido e nao tinha amostra" e "ainda nao foi lido", e
+    confundir as duas e o defeito que este tipo existe pra impedir: a recepcao
+    ingere arquivo a arquivo, com commit entre eles, entao um bundle correto
+    passa por um estado em que o `.gpk` ja entrou e o `.xrk` ainda nao.
+    """
+
+    formato_id: str
+    suporta_amostra: bool
+    amostras_escritas: int
+    ingerido: bool
+
+
+def arquivos_da_captura(conn, gravacao_id: str) -> list[ArquivoDaCaptura]:
+    """Um item por arquivo do bundle desta gravacao.
+
+    `ingestao` e append-only (uma linha por execucao de leitor sobre o arquivo,
+    ver migration 005), entao o estado atual de um arquivo e o MAIOR
+    `amostras_escritas` entre as linhas dele, nao a ultima: reprocessar com um
+    leitor pior nao pode apagar amostra que ja existe no Parquet.
+
+    `suporta_amostra` sai do registro de leitores, nao da contagem de amostra.
+    Sao perguntas diferentes: um `.vbo` vazio escreve zero amostra e nao e
+    inventario, e tratar os dois como a mesma coisa acusaria o formato errado.
+    """
+    from .readers import leitor_de
+
+    linhas = conn.execute(
+        """select ab.formato_id,
+                  coalesce(max(i.amostras_escritas), 0),
+                  count(i.id) > 0
+             from arquivo_bruto ab
+             left join ingestao i
+               on i.arquivo_id = ab.id and i.status <> 'falhou'
+            where ab.gravacao_id = %s
+            group by ab.id, ab.formato_id
+            order by ab.formato_id""",
+        (gravacao_id,),
+    ).fetchall()
+    saida = []
+    for formato_id, amostras, ingerido in linhas:
+        leitor = leitor_de(formato_id)
+        saida.append(
+            ArquivoDaCaptura(
+                formato_id=formato_id,
+                suporta_amostra=bool(leitor and leitor.suporta_amostra),
+                amostras_escritas=int(amostras),
+                ingerido=bool(ingerido),
+            )
+        )
+    return saida
+
+
+def captura_so_de_inventario(arquivos: list[ArquivoDaCaptura]) -> bool:
+    """A captura inteira foi lida e nenhum arquivo dela virou amostra.
+
+    Exige que TODO arquivo do bundle ja tenha linha de ingestao, e essa exigencia
+    e o ponto. A recepcao ingere arquivo a arquivo, com commit entre eles, entao
+    um bundle correto de `.gpk` mais `.xrk` passa por um estado em que so o
+    `.gpk` entrou. Sem a exigencia, esse estado intermediario respondia ao piloto
+    "envie o arquivo principal do logger", que e justamente o arquivo que ele ja
+    tinha enviado e que estava na fila.
+
+    Bundle vazio nao e inventario: nao ha evidencia de nada.
+    """
+    if not arquivos:
+        return False
+    if not all(a.ingerido for a in arquivos):
+        return False
+    return not any(a.amostras_escritas > 0 for a in arquivos)
+
+
+def amostra_da_captura(arquivos: list[ArquivoDaCaptura]) -> dict:
+    """Bloco `amostra_da_captura` do contrato, a partir de `arquivos_da_captura`.
+
+    Disponivel quando pelo menos um arquivo materializou serie. Degradado com
+    motivo `somente_inventario` quando nenhum materializou.
+
+    O texto do ramo degradado e montado a partir do que foi medido, nunca
+    afirmando mais do que se sabe. Sao tres situacoes diferentes com a mesma
+    consequencia, e o texto separa as tres: leitura ainda em curso, formato de
+    leitor de inventario, e formato que suporta amostra e mesmo assim nao
+    escreveu nenhuma.
+    """
+    com_amostra = [a for a in arquivos if a.amostras_escritas > 0]
+    if com_amostra:
+        return _disponivel(
+            arquivos_lidos=len(arquivos), arquivos_com_amostra=len(com_amostra)
+        )
+
+    lidos = [a for a in arquivos if a.ingerido]
+    if arquivos and len(lidos) < len(arquivos):
+        # Leitura em curso. Dizer "entrou só como inventário" aqui seria afirmar
+        # sobre arquivo que ninguém abriu ainda.
+        return _degradado(
+            "somente_inventario",
+            f"a leitura desta captura ainda não terminou: {len(lidos)} de "
+            f"{len(arquivos)} arquivos lidos, nenhum com amostra até agora",
+        )
+
+    inventario = sorted({a.formato_id for a in arquivos if not a.suporta_amostra})
+    sem_escrever = sorted({a.formato_id for a in arquivos if a.suporta_amostra})
+    partes = []
+    if inventario:
+        partes.append(
+            f"{', '.join(inventario)}: o leitor lê o cabeçalho e conta os "
+            "registros, e não decodifica canal"
+        )
+    if sem_escrever:
+        partes.append(
+            f"{', '.join(sem_escrever)}: o leitor suporta amostra e não escreveu nenhuma"
+        )
+    # A frase de abertura muda com o que foi medido. "Entrou só como inventário"
+    # só é verdade quando TODO arquivo veio de leitor de inventário; com um
+    # formato que lê amostra no meio, o que se sabe é menos que isso.
+    texto = (
+        "esta captura entrou só como inventário: nenhum arquivo dela entregou amostra"
+        if inventario and not sem_escrever
+        else "nenhum arquivo desta captura entregou amostra"
+    )
+    if partes:
+        texto = f"{texto} ({'; '.join(partes)})"
+    return _degradado("somente_inventario", texto)
 
 
 # --- N0: melhor volta e volta ideal --------------------------------------
@@ -992,6 +1132,9 @@ def montar(
         # `layout_origem` nulo com layout preenchido e gravacao anterior a
         # migration 016: o unico degrau que existia era o alias, entao e ele.
         "resolucao_pista": (layout_origem or "alias") if layout_id is not None else "nao_resolvida",
+        "amostra_da_captura": amostra_da_captura(
+            arquivos_da_captura(conn, gravacao_id)
+        ),
         "n0": {"melhor_volta": mv, "perdas_top3": n0_perdas},
         "n1": {
             "voltas": voltas,

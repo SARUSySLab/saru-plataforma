@@ -14,7 +14,7 @@ Status: proposto, aprovado, em andamento, implementado, validado, descartado.
 |---|---|---|---|---|---|---|---|---|---|
 | PIL-RF-01 | funcional | PIL-OBJ-06 | E-RF-01 | PIL-RN-05 | `pipeline/recepcao.py`, tabelas gravacao e arquivo_bruto | ADR-001, ADR-005 | | PIL-CT-01, PIL-CT-02, PIL-CT-51 | implementado |
 | PIL-RF-02 | funcional | PIL-OBJ-03 | E-RF-01 | PIL-RN-11 | `readers/formatos.py` | ADR-001 | | PIL-CT-03 | implementado |
-| PIL-RF-03 | funcional | PIL-OBJ-03 | E-RF-01 | PIL-RN-11 | `readers/` (12 leitores) | ADR-001 | #2 | PIL-CT-04, PIL-CT-52 | implementado, exceção 3e aberta |
+| PIL-RF-03 | funcional | PIL-OBJ-03 | E-RF-01 | PIL-RN-11 | `readers/` (12 leitores), `relatorio.py::amostra_da_captura` | ADR-001 | #2 | PIL-CT-04, PIL-CT-52 | implementado, exceção 3e declarada no relatório e no `/estado` |
 | PIL-RF-04 | funcional | PIL-OBJ-06 | E-RF-04 | PIL-RN-04 | `pipeline/ingestao.py`, tabela ingestao | ADR-001 | | PIL-CT-05, PIL-CT-06 | implementado |
 | PIL-RF-05 | funcional | PIL-OBJ-06 | E-RF-02 | PIL-RN-10 | `pipeline/leitura.py`, `acervo.py`, `seeds/aliases.yaml` | ADR-003 | #3 | PIL-CT-07, PIL-CT-53 | implementado, exceção 4e aberta |
 | PIL-RF-06 | funcional | PIL-OBJ-06 | E-RF-04 | PIL-RN-04 | `storage.py`, tabela serie_amostral | ADR-002 | | PIL-CT-08 | implementado |
@@ -24,9 +24,10 @@ Status: proposto, aprovado, em andamento, implementado, validado, descartado.
 | PIL-RF-10 | funcional | PIL-OBJ-01, PIL-OBJ-02 | E-RF-05 | PIL-RN-02, PIL-RN-03, PIL-RN-12 | `relatorio.py`, `contract.ts` | ADR-007 | | PIL-CT-15, PIL-CT-16, PIL-CT-59 | implementado |
 | PIL-RF-11 | funcional | PIL-OBJ-01 | E-RF-05, E-RF-07 | PIL-RN-14 | `relatorio.py`, `api.py` rota relatorio | ADR-001 | | PIL-CT-17 | implementado |
 | PIL-RF-12 | funcional | PIL-OBJ-01 | E-RF-05 | | `api.py` rota amostras, `pipeline/leitura.py` | ADR-002 | | PIL-CT-18 | implementado |
-| PIL-RF-13 | funcional | PIL-OBJ-02 | E-RF-05 | PIL-RN-01 | `contract.ts` `MotivoDegradacao`, `relatorio.py` | ADR-005 | #7 | PIL-CT-19, PIL-CT-60 | implementado |
+| PIL-RF-13 | funcional | PIL-OBJ-02 | E-RF-05 | PIL-RN-01, PIL-RN-11 | `contract.ts` `MotivoDegradacao` (8 motivos), `relatorio.py` | ADR-005 | #2, #7 | PIL-CT-19, PIL-CT-52, PIL-CT-60 | implementado |
 | PIL-RF-16 | funcional | PIL-OBJ-06 | E-RF-06 | | `auth.py`, `rotas/auth.py`, tabela usuario | ADR-002 | | PIL-CT-22, PIL-CT-23 | implementado |
 | PIL-RF-23 | funcional | PIL-OBJ-05 | E-RF-05 | PIL-RN-13 | `pipeline/decomposicao.py` | ADR-004 | | PIL-CT-30 | em andamento |
+| PIL-RF-29 | funcional | PIL-OBJ-06 | E-RF-09, E-RF-08 | | `fisica/parametros_gt3_cup.py`, presets 991.1, 991.2 e 992.1 do 911 GT3 Cup | | #19 | PIL-CT-47, `tests/test_parametros_gt3_cup.py` | parcial: os presets entraram sem validação contra manual e sem proveniência por valor, ver `docs/fisica-parametros-gt3-cup.md` |
 | PIL-RF-24 | funcional | PIL-OBJ-03 | E-RF-01 | PIL-RN-11 | a definir: `readers/fueltech_csv.py`, `readers/protune_csv.py` | ADR-001 | a abrir após amostra | PIL-CT-31 | proposto, bloqueado |
 | PIL-RF-26 | funcional | PIL-OBJ-01 | E-RF-05 | | a definir | | a abrir | PIL-CT-33 | proposto |
 | PIL-RF-27 | funcional | PIL-OBJ-01, PIL-OBJ-03 | E-RF-01 | PIL-RN-17 | `readers/ld.py` e perfis `acc` e `gt7_ld` em `acervo.py:85`; iRacing e Assetto Corsa a definir | ADR-006 | #10 | PIL-CT-44, PIL-CT-45 | parcial: ACC e GT7 leem, iRacing e Assetto Corsa sem leitor |
@@ -51,7 +52,7 @@ Uma linha por exceção do caso de uso da empresa, com o estado medido em 2026-0
 | Exceção | Critério | Requisito | Código que já existe | Teste | Issue | Estado |
 |---|---|---|---|---|---|---|
 | 2e dois primários do mesmo formato | PIL-CT-51 | PIL-RF-01 | `pipeline/recepcao.py` | `test_duas_capturas_do_mesmo_formato_nao_fundem` | | fechada, com a ressalva de o teste exigir acervo real e Postgres |
-| 3e leitor só de inventário | PIL-CT-52 | PIL-RF-03 | `readers/aim_gpk.py`, `readers/aim_rrk.py`, status parcial em `pipeline/ingestao.py:476` | leitor sim, relatório não | #2 | aberta |
+| 3e leitor só de inventário | PIL-CT-52 | PIL-RF-03 | `readers/aim_gpk.py`, `readers/aim_rrk.py`, status parcial em `pipeline/ingestao.py:476`, bloco `amostra_da_captura` em `relatorio.py` e degrau novo em `api.py::estado_da_gravacao` | decisão coberta sem banco em `tests/test_relatorio.py`; ponta a ponta em `tests/test_api.py`, que pula sem Postgres | #2 | parcial: relatório e `/estado` implementados, verificação em banco pendente e o critério 1 da issue segue inalcançável (ver `docs/modelos/issue-2-inventario.md`) |
 | 4e canal sem unidade provada | PIL-CT-53 | PIL-RF-05 | `pipeline/ingestao.py:254` conta `sem_mapa` | não | #3 | aberta |
 | 5e corte dentro do arquivo Pi | PIL-CT-54 | PIL-RF-08 | nenhum | não | #4 | aberta |
 | 5f comprimento do layout que não bate | PIL-CT-55 | PIL-RF-09 | `pipeline/decomposicao.py:141` | sim, desde 2026-09-13 | #5 | fechada: Curitiba nominal 3.695 m ratificado por Vitor |
@@ -64,7 +65,8 @@ Uma linha por exceção do caso de uso da empresa, com o estado medido em 2026-0
 ## Issues abertas em 2026-09-13
 
 Uma issue por exceção do E-UC-01 que ainda não tem código ou teste fechando. As exceções 2e,
-5g, 5h e 6e não entraram porque já têm teste que as fecha.
+5g, 5h e 6e não entraram porque já têm teste que as fecha. A tabela também carrega issue que
+nasce de requisito e não de exceção, como a #19.
 
 | Issue | Título | Exceção | Rótulos |
 |---|---|---|---|
@@ -75,6 +77,7 @@ Uma issue por exceção do E-UC-01 que ainda não tem código ou teste fechando.
 | #6 | refinar o instante do corte de volta contra a série de maior taxa | 5i | PIL, tipo:feature, prio:media |
 | #7 | provar que os sete motivos de bloco sem dado chegam à tela | 7e | PIL, tipo:bug, prio:alta |
 | #10 | declarar a divergência entre venue declarado e posição GPS | 5g, no degrau do alias | PIL, tipo:bug, prio:media |
+| #19 | usar `ParameterValue` com proveniência por valor ou remover | nenhuma; vem de PIL-RF-29 e PIL-CT-47 | PIL, tipo:doc, prio:media |
 
 A issue #10 ganhou em 2026-09-13 o escopo da regra PIL-RN-17: para gravação de perfil
 simulado, a guarda não é declarar a divergência, é não entrar no degrau GPS. É o mesmo caso
@@ -112,5 +115,7 @@ Ao mudar uma linha, listar aqui o que precisa ser revisto.
 | 2026-09-13 | PIL-RF-27, PIL-RN-17 | mudança de núcleo: Vitor ampliou E-RF-01 para logger real ou simulador e criou E-RN-08. A família Piloto passa a atender o piloto virtual, com o mesmo relatório | `01-problema-e-objetivos.md` público e fonte F14; `02-catalogos.md` PIL-RF-27, PIL-RN-17, PIL-CT-44, PIL-CT-45; `03-backlog.md` PIL-US-30 no MVP; issue #10 | Vitor, 2026-09-13 |
 | 2026-09-13 | PIL-RN-06 | amadurecimento: a regra de ambiguidade sai de PIL-RN-06 e vira PIL-RN-16, porque o raio de 5,0 km tem aprovação de Vitor e a ambiguidade só tem um ADR proposto | `02-catalogos.md`, tabela de regras; tabela de aprovação desta matriz; `06-validacao.md` pergunta 6 e lição 5 | pendente: Vitor ratificar PIL-RN-16 |
 | 2026-09-13 | PIL-RF-05, PIL-RF-07, PIL-RF-08, PIL-RF-09, PIL-RNF-08 | criação dos mocks Desktop PC N0 (piloto trackday) e N1 (pitwall e engenharia) em `docs/mocks/` e especificação de UI em `docs/arquitetura/visao-mocks-ui.md` | `docs/mocks/`, `docs/arquitetura/visao-mocks-ui.md` | Vitor, 2026-09-13 |
+| 2026-09-13 | PIL-RF-29 | o módulo de parâmetros do 911 GT3 Cup sai de `saru/docs/fisica/` e entra na PoC como `src/saru_poc/fisica/`, ligando a família Piloto ao E-RF-09. Nenhum valor mudou na migração | `src/saru_poc/fisica/`, `tests/test_parametros_gt3_cup.py`, `docs/fisica-parametros-gt3-cup.md`; a auditoria de proveniência abriu sete perguntas para Vitor | Vitor, 2026-09-13, no chat |
+| 2026-09-13 | PIL-RF-03, PIL-RF-13, PIL-CT-52 | o vocabulário `MotivoDegradacao` ganha o oitavo motivo, `somente_inventario`, e o relatório ganha o bloco `amostra_da_captura`. A exceção 3e passa a ser declarada ao piloto, e fica parcial até a verificação em banco | `web/src/types/contract.ts`, `src/saru_poc/relatorio.py`, `src/saru_poc/api.py`, `docs/modelos/issue-2-inventario.md`; issue #2 | pendente: Vitor, na revisão do PR |
 | 2026-09-13 | PIL-RF-08, PIL-RNF-10, PIL-CT-41, PIL-CT-58 | o corte por canal de volta de taxa baixa passa a ser realinhado contra a série de velocidade. Tolerância de 0,05 s e alerta de 0,20 s entram como constante nomeada, com a pendência de medição declarada na docstring | `src/saru_poc/pipeline/corte_voltas.py`, `docs/modelos/issue-6-refino-corte.md`; issue #6 | pendente: Vitor, medição no acervo (E-RN-02) e se a tolerância de GPS vale para o canal de volta |
 
