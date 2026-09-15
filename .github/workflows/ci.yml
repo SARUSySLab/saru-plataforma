@@ -1,0 +1,66 @@
+# CI da plataforma: testes Python contra PostgreSQL de verdade e build do front.
+#
+# Testes de acervo pulam no runner (o acervo mora no Drive, regra 8 do
+# CLAUDE.md). Teste de banco nao pula: SARU_EXIGIR_BANCO=1 reprova a suite se
+# algum teste for pulado por falta de PostgreSQL (tests/conftest.py).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: saru
+          POSTGRES_PASSWORD: saru
+          POSTGRES_DB: saru_poc
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U saru -d saru_poc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SARU_PG_HOST: localhost
+      SARU_PG_PORT: "5432"
+      SARU_PG_DB: saru_poc
+      SARU_PG_USER: saru
+      SARU_PG_PASSWORD: saru
+      SARU_EXIGIR_BANCO: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: dependencias
+        run: uv sync --extra dev
+      - name: migrations
+        run: uv run saru-poc migrate
+      - name: catalogos
+        run: |
+          uv run saru-poc seed
+          uv run saru-poc seed-pistas
+      - name: testes
+        run: uv run pytest -q -rs
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run build
