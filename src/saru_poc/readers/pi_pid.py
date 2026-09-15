@@ -291,6 +291,31 @@ def _layout_do_bloco(registros: list[_RegistroCanal]) -> list[list[tuple[int, in
     return posicoes
 
 
+def _contagem_do_canal(
+    corpo_np: np.ndarray, janelas: list[tuple[int, int]], largura: int
+) -> np.ndarray:
+    """Contagem crua de um canal, na ordem bloco a bloco e tick a tick.
+
+    Junta de uma vez todos os bytes do canal em todos os blocos (indexacao
+    por lista de posicoes do `_layout_do_bloco`) e le cada amostra como
+    inteiro big-endian sem sinal de `largura` bytes. Devolve `int64` de
+    `n_blocos * len(janelas)` posicoes. Substitui o laco por janela e por
+    byte de 2026-09-14 com a mesma saida celula a celula nos 25 `.pid` do
+    acervo (medido em 2026-09-14, ver secao Desempenho de
+    `docs/pi-pid-medicao.md`).
+    """
+    inicios = np.fromiter((o for o, _ in janelas), dtype=np.intp, count=len(janelas))
+    posicoes = (inicios[:, None] + np.arange(largura, dtype=np.intp)).reshape(-1)
+    # `np.take` devolve bloco contiguo em C; `corpo_np[:, posicoes]` nao, e o
+    # `view` big-endian abaixo exige o ultimo eixo contiguo.
+    bytes_do_canal = np.take(corpo_np, posicoes, axis=1)
+    if largura == 1:
+        contagem = bytes_do_canal
+    else:
+        contagem = bytes_do_canal.view(f">u{largura}")  # (n_blocos, n_ticks)
+    return contagem.astype(np.int64).reshape(-1)
+
+
 class LeitorPiPid(LeitorDeInventario):
     """Inventario de canal do container Pi/Cosworth `.pid`.
 
@@ -431,7 +456,11 @@ class LeitorPiPid(LeitorDeInventario):
         decidir bloco a bloco sem virar um algoritmo de dois passes bem
         mais complexo pra um formato que nunca chega perto do teto de
         memoria). A emissao de `Lote`, essa sim, sai em blocos de ate
-        `_LINHAS_POR_LOTE` linhas por taxa.
+        `_LINHAS_POR_LOTE` linhas por taxa. Medido em 2026-09-14 no
+        `P.Piquet000987.pid`: 59 ms e pico de 20,9 MB no tracemalloc. Ler
+        o corpo em pedacos de 64 KB (ideia do commit 66d9935) deu a mesma
+        saida em 155 ms e 29,3 MB, porque a contagem de todos os canais
+        fica alocada ao mesmo tempo; ver `docs/pi-pid-medicao.md`.
 
         # DECISAO PENDENTE (Lucas): o acervo F3 tem canal com nome_bruto
         # duplicado (dois "Oil Temp", dois "Fuel Pressure"; ver teste de
@@ -507,14 +536,7 @@ class LeitorPiPid(LeitorDeInventario):
 
         grupos: dict[int, list[tuple[str, np.ndarray]]] = {}
         for r, janelas in zip(registros, posicoes, strict=True):
-            amostras_por_tick = []
-            for offset, largura in janelas:
-                janela = corpo_np[:, offset : offset + largura].astype(np.int64)
-                contagem = np.zeros(n_blocos, dtype=np.int64)
-                for byte_idx in range(largura):  # big-endian
-                    contagem = (contagem << 8) | janela[:, byte_idx]
-                amostras_por_tick.append(contagem)
-            contagem = np.stack(amostras_por_tick, axis=1).reshape(-1)
+            contagem = _contagem_do_canal(corpo_np, janelas, r.largura)
             nulos = np.zeros(contagem.shape, dtype=bool)
             if r.taxa_hz == _TICKS_POR_BLOCO:
                 nulos[_TICK_MARCADOR :: r.taxa_hz] = True

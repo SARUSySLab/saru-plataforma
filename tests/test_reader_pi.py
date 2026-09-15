@@ -124,6 +124,43 @@ def test_pid_ler_decodifica_o_layout_por_tick(leitor_pid: LeitorPiPid) -> None:
     assert steering[199] == 400.0 + 199
 
 
+def test_pid_contagem_do_canal_igual_ao_laco_por_byte() -> None:
+    """A leitura vetorizada de 2026-09-14 (secao Desempenho de
+    `docs/pi-pid-medicao.md`) tem que dar a mesma contagem que o laco por
+    janela e por byte que ela substituiu, nas tres larguras do acervo.
+    A fixture sintetica so tem canal de 2 B; os de 1 e 4 B so apareciam
+    no acervo real."""
+    import numpy as np
+
+    from saru_poc.readers.pi_pid import (
+        _contagem_do_canal,
+        _layout_do_bloco,
+        _RegistroCanal,
+    )
+
+    registros = [
+        _RegistroCanal(f"c{largura}_{taxa}", "", taxa, largura, 0.0, 1.0, 0.0)
+        for largura, taxa in ((1, 100), (2, 50), (4, 20), (4, 1), (1, 5))
+    ]
+    tamanho_bloco = sum(r.taxa_hz * r.largura for r in registros)
+    n_blocos = 7
+    corpo_np = np.random.default_rng(26).integers(
+        0, 256, size=(n_blocos, tamanho_bloco), dtype=np.uint8
+    )
+    for r, janelas in zip(registros, _layout_do_bloco(registros), strict=True):
+        esperado = []
+        for offset, largura in janelas:
+            janela = corpo_np[:, offset : offset + largura].astype(np.int64)
+            contagem = np.zeros(n_blocos, dtype=np.int64)
+            for byte_idx in range(largura):
+                contagem = (contagem << 8) | janela[:, byte_idx]
+            esperado.append(contagem)
+        esperado_np = np.stack(esperado, axis=1).reshape(-1)
+        obtido = _contagem_do_canal(corpo_np, janelas, r.largura)
+        assert obtido.dtype == np.int64
+        assert np.array_equal(obtido, esperado_np), r.nome
+
+
 def test_pid_fixture_caminho_feliz(leitor_pid: LeitorPiPid) -> None:
     cab = leitor_pid.inspecionar(FIXTURE_PID)
 
