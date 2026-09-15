@@ -19,6 +19,7 @@ import pytest
 from saru_poc.config import CONFIG
 from saru_poc.readers import ld as ld_mod
 from saru_poc.readers.base import Cabecalho, ErroDeLeitura, Lote
+from saru_poc.readers.formatos import detectar
 from saru_poc.readers.ld import TAMANHO_REGISTRO_CANAL, LeitorLd
 from saru_poc.storage import escrever_serie
 
@@ -441,9 +442,67 @@ def test_invariantes_na_fixture_sintetica(leitor: LeitorLd) -> None:
 
 
 def _todos_ld_do_acervo() -> list[Path]:
+    """Todo `.ld` do acervo que a assinatura reconhece como `motec_ld`.
+
+    O acervo tem 59 arquivos de 990 a 1.901 B com extensao `.ld` que sao XML
+    de voltas (`<?xml ...`), isto e, `.ldx` com a extensao trocada; o
+    `detectar` ja os classifica como `motec_ldx`. Cobrar cabecalho de `.ld`
+    deles era falha do teste, nao do leitor (medido em 2026-09-15, issue #38).
+    """
     if not CONFIG.acervo_root.exists():
         return []
-    return sorted(CONFIG.acervo_root.rglob("*.ld"))
+    return [
+        f
+        for f in sorted(CONFIG.acervo_root.rglob("*.ld"))
+        if (d := detectar(f)).formato is not None and d.formato.id == "motec_ld"
+    ]
+
+
+_SAMPLE_LD = "MoTeC_Workspaces/MoTeC/Logged Data/Samples/Engine/Sample.ld"
+_EXEMPLO_GPS_LD = (
+    "SSD_Windows_CLAUDE/Motorsport/02_Outras_categorias/Sim_Racing/I2/"
+    "03 - MOTEC EXAMPLE LOGGED DATA/20200930-0364202_2.ld"
+)
+
+
+def _coluna_lida(leitor: LeitorLd, caminho: Path, nome: str):
+    """Valores de uma coluna em todos os lotes de `ler()`, concatenados."""
+    import numpy as np
+
+    partes = [
+        lote.tabela.column(nome).to_numpy(zero_copy_only=False)
+        for lote in leitor.ler(caminho)
+        if nome in lote.tabela.column_names
+    ]
+    return np.concatenate(partes) if partes else np.array([])
+
+
+@pytest.mark.skipif(
+    not (CONFIG.acervo_root / _SAMPLE_LD).exists(), reason="Sample.ld fora do acervo"
+)
+def test_ler_combo_4_2_como_int16_com_sinal(leitor: LeitorLd) -> None:
+    """(dtype_a=4, dtype=2): `Gear` so tem marchas inteiras e `Wheel Slip`
+    tem valor negativo, o que so int16 com sinal produz (issue #38)."""
+    caminho = CONFIG.acervo_root / _SAMPLE_LD
+    import numpy as np
+
+    marcha = _coluna_lida(leitor, caminho, "Gear")
+    assert marcha.size > 0
+    assert set(np.unique(marcha).tolist()) <= {0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0}
+    assert _coluna_lida(leitor, caminho, "Wheel Slip").min() < 0
+
+
+@pytest.mark.skipif(
+    not (CONFIG.acervo_root / _EXEMPLO_GPS_LD).exists(),
+    reason="exemplo MoTeC com GPS Heading fora do acervo",
+)
+def test_ler_combo_8_8_como_float64(leitor: LeitorLd) -> None:
+    """(dtype_a=8, dtype=8): `GPS Heading` fica dentro de uma volta completa,
+    o que so float64 produz; int64 da valores da ordem de 1e18 (issue #38)."""
+    rumo = _coluna_lida(leitor, CONFIG.acervo_root / _EXEMPLO_GPS_LD, "GPS Heading")
+    assert rumo.size > 0
+    assert rumo.min() >= -1.0
+    assert rumo.max() <= 360.0
 
 
 @pytest.mark.skipif(not CONFIG.acervo_root.exists(), reason="acervo nao montado")
