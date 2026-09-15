@@ -47,3 +47,63 @@ custódia pela vigência do plano, Aluno fora de 2026) não foram medidos nem di
 O que aproveitar: o item 14, referências externas por família, vira pauta de leitura para Vitor.
 Regra a partir de agora: resposta de pergunta dirigida a Vitor fica em branco; agente entrega
 dado, medição e lista de fontes. M2 continua valendo, na ordem 1, 2, 3.
+
+## M4, 2026-09-14
+
+Documentação antes do código. Vitor aprovou cinco tarefas de preparação; nenhuma escreve
+requisito ou arquitetura nova, porque a decisão de 2026-09-14 reserva isso para depois das 17
+respostas de `docs/empresa/negocio/direcao-2026-09-14.md`. Cada entrega vai em R4 como
+tabela; nada entra em `docs/` sem passar pelo Claude e por Vitor. Ordem: 1, 2, 5 agora;
+3 e 4 quando Vitor responder as perguntas. Estimativas por tarefa em minutos de agente.
+
+### 1. Auditoria de `docs/requisitos/` e `docs/empresa/requisitos/` (60 min)
+
+Molde: `~/.claude/skills/requisitos/SKILL.md` (problema, objetivos, catálogos RF/RNF/RN,
+backlog, casos de uso, critérios de aceitação, rastreabilidade, validação). Para cada um dos
+13 arquivos (7 da Piloto em `docs/requisitos/`, 6 da empresa em `docs/empresa/requisitos/`):
+
+| arquivo | seção do molde que falta | id sem dono (citado e não definido) | contradição com outro arquivo ou com `decisions.md` | caminho de código citado que não existe neste repositório |
+
+Contradição inclui: ordem das famílias antiga (Campeonato em segundo), repositório `saru`
+como destino, PoC como repositório da Piloto, "uma semana de documentação". Cada linha cita
+o arquivo e a linha. Sem reescrever nada.
+
+### 2. Matriz de rastreabilidade conferida (45 min)
+
+Fonte: `docs/requisitos/05-rastreabilidade.md` e `docs/empresa/requisitos/05-rastreabilidade.md`.
+Para cada requisito da matriz: existe? o caminho de código existe em `src/`? o teste citado
+existe em `tests/`? alguma issue (#25 a #33) o cita? algum ADR de `docs/arquitetura/adr/` o
+cita? Tabela: id, caminho citado, existe (sim/não), caminho real se mudou, issues, ADRs.
+Já sabido: `docs/fisica/parameters_gt3_cup.py` não existe aqui; achar onde o código foi parar
+(PR #6 `pil/fisica-parametros-cup` ou PoC congelada).
+
+### 3. ADR único (90 min, depois das respostas)
+
+Reescrever os sete ADRs de `docs/arquitetura/adr/` no molde de
+`~/.claude/skills/arquitetura/SKILL.md`, um arquivo por ADR em `docs/arquitetura/adr/`,
+mantendo número e título. Campos novos obrigatórios: decisão de `docs/empresa/decisions.md`
+que o motiva (data e texto) ou "sem decisão registrada"; requisito(s) de origem; famílias a
+que se aplica. Sua tabela do R1 é o ponto de partida; o ADR-006 já tem decisão de
+2026-09-13. Sem criar ADR novo e sem mudar decisão. Entregar como PR em rascunho na branch
+`emp/adr-unico`, nunca em `main`.
+
+### 4. Glossário do domínio (60 min, depois das respostas)
+
+Arquivo proposto: `docs/empresa/glossario.md`. Uma tabela: termo em português, definição em
+uma frase para leigo, termo em inglês quando consagrado (slip angle, downforce, understeer,
+oversteer, outing, beacon, apex), onde aparece no código (`src/saru_poc/`, um caminho) e em
+qual família importa. Fonte: `seeds/aliases.yaml`, `migrations/*.sql`, `docs/requisitos/`,
+`docs/empresa/fisica/`. Mínimo 60 termos. Decisão de 2026-09-14: português em tudo, termo
+técnico consagrado fica em inglês.
+
+### 5. Inventário do acervo de telemetria (120 min, roda em segundo plano)
+
+Fonte: `~/.cache/rclone/drive-index.tsv`, nunca `find` no mount. Extensões: xrk drk rrk xrz
+gpk bmsbin pds pwb pid ld ldx i2wkb vbo mf4 csv de simulador (skill `saru-telemetria`).
+Tabela por arquivo: caminho, tamanho, hash md5 (via `rclone md5sum` ou `rclone lsjson --hash`),
+logger, extensão, pista, carro, data e sessão quando o nome ou a pasta diz, duplicata de
+(mesmo hash). Entregar como TSV em `docs/handoff/agy/inventario-telemetria-2026-09-14.tsv`
+mais um resumo em R4: arquivos únicos por formato, MB por formato, quantas duplicatas.
+É a base das tabelas de medição de toda issue de leitor (E-RN-02) e substitui o item 1 do M2.
+
+M2 (itens 2 e 3) e M3 continuam valendo.

@@ -1,4 +1,8 @@
-"""Gera a fixture sintetica `pi_pds_sintetico.pds`, usada por
+"""Gera as fixtures sinteticas `pi_pds_sintetico.pds` (layout dos arquivos
+F3: um bloco por canal, float64, tabela em ordem de indice) e
+`pi_pds_sintetico_992.pds` (layout medido no `REF 992.pds` do 992.1 em
+2026-09-14: varios blocos por canal, amostra de 1, 2 ou 4 bytes, tabela fora
+de ordem, campo 56 como numero de serie, um buraco entre blocos), usadas por
 `tests/test_reader_pi_pds.py`.
 
 Roda uma vez so, manualmente (`python tests/fixtures/pi_pds_gerar_sintetico.py`),
@@ -66,7 +70,11 @@ def _registro_dicionario(nome: str, unidade: str, idx: int) -> bytes:
 
 
 def _registro_tabela(
-    idx: int, taxa_hz: int, n_amostras: int, byte_offset: int
+    idx: int,
+    taxa_hz: int,
+    n_amostras: int,
+    byte_offset: int,
+    serie: int | None = None,
 ) -> bytes:
     buf = bytearray(_TAMANHO_REGISTRO_TABELA)
     intervalo_ticks = round(1e7 / taxa_hz)
@@ -74,33 +82,90 @@ def _registro_tabela(
     struct.pack_into("<i", buf, 16, intervalo_ticks)
     struct.pack_into("<i", buf, 20, n_amostras)
     struct.pack_into("<i", buf, 48, byte_offset)
-    struct.pack_into("<i", buf, 56, idx + 1)
+    struct.pack_into("<i", buf, 56, idx + 1 if serie is None else serie)
     struct.pack_into("<i", buf, 60, idx + 1)
     return bytes(buf)
 
 
-def construir() -> bytes:
-    cabecalho = bytearray(64)
+_CABECALHO = 64
+#: Os blocos de amostra comecam aqui, logo depois do cabecalho fixo.
+_INICIO_AMOSTRA = 4096
+
+
+def _montar(dicionario: bytes, tabela: bytes, fim_amostra: int) -> bytes:
+    """Cabecalho, corpo de amostra zerado ate `fim_amostra` (nunca lido por
+    `inspecionar()`, mas os offsets da tabela tem que caber antes do
+    dicionario), dicionario e tabela."""
+    cabecalho = bytearray(_CABECALHO)
     cabecalho[0:4] = b"\x01\x00\x00\x00"
     cabecalho[_OFF_MAGIC : _OFF_MAGIC + 4] = _MAGIC
+    corpo_amostra = b"\x00" * (fim_amostra - _CABECALHO)
+    return bytes(cabecalho) + corpo_amostra + dicionario + tabela
 
-    corpo_amostra = b"\x00" * 256  # nunca lido por inspecionar(), so preenche.
 
+def construir() -> bytes:
+    """Layout F3: um bloco float64 por canal, tabela em ordem de indice."""
     dicionario = bytearray()
     for idx, (nome, unidade, _taxa) in enumerate(_CANAIS):
         dicionario += _registro_dicionario(nome, unidade, idx)
 
     tabela = bytearray()
-    byte_offset = 4096
+    byte_offset = _INICIO_AMOSTRA
     for idx, (_nome, _unidade, taxa_hz) in enumerate(_CANAIS):
         n_amostras = round(taxa_hz * _DURACAO_S)
         tabela += _registro_tabela(idx, taxa_hz, n_amostras, byte_offset)
         byte_offset += n_amostras * 8
 
-    return bytes(cabecalho) + corpo_amostra + bytes(dicionario) + bytes(tabela)
+    return _montar(bytes(dicionario), bytes(tabela), byte_offset)
+
+
+#: Bytes por amostra de cada canal no layout 992.1 (medido: 4 na maioria,
+#: 1 e 2 nos discretos). Indice = posicao em `_CANAIS`.
+_BYTES_992 = [4, 4, 4, 4, 2, 1, 1, 4, 2, 4]
+#: Canais gravados em dois blocos (segunda saida de pista).
+_DOIS_BLOCOS_992 = {0, 1, 3}
+#: Buraco de bytes deixado antes do bloco do canal 7 (padding medido no
+#: acervo entre segmentos: 2 buracos em 4310 pares no REF 992).
+_BURACO_992 = 16
+
+
+def construir_992() -> bytes:
+    """Layout 992.1: varios blocos por canal, amostra de 1, 2 ou 4 bytes,
+    tabela embaralhada, campo 56 e numero de serie do registro."""
+    dicionario = bytearray()
+    for idx, (nome, unidade, _taxa) in enumerate(_CANAIS):
+        dicionario += _registro_dicionario(nome, unidade, idx)
+
+    blocos: list[tuple[int, int, int, int]] = []  # idx, taxa, n, offset
+    byte_offset = _INICIO_AMOSTRA
+    for segmento in (0, 1):
+        for idx, (_nome, _unidade, taxa_hz) in enumerate(_CANAIS):
+            if segmento == 1 and idx not in _DOIS_BLOCOS_992:
+                continue
+            if idx == 7:
+                byte_offset += _BURACO_992
+            n_amostras = (
+                round(taxa_hz * _DURACAO_S) // 2
+                if idx in _DOIS_BLOCOS_992
+                else round(taxa_hz * _DURACAO_S)
+            )
+            blocos.append((idx, taxa_hz, n_amostras, byte_offset))
+            byte_offset += n_amostras * _BYTES_992[idx]
+
+    # Tabela fora de ordem de offset e de indice, como no arquivo real.
+    ordem = [blocos[i] for i in (3, 0, 12, 7, 1, 10, 5, 2, 11, 8, 4, 9, 6)]
+    tabela = bytearray()
+    for serie, (idx, taxa_hz, n_amostras, off) in enumerate(ordem):
+        tabela += _registro_tabela(idx, taxa_hz, n_amostras, off, serie=serie + 2122)
+
+    return _montar(bytes(dicionario), bytes(tabela), byte_offset)
 
 
 if __name__ == "__main__":
-    destino = Path(__file__).parent / "pi_pds_sintetico.pds"
-    destino.write_bytes(construir())
-    print(f"escrito {destino} ({destino.stat().st_size} B)")
+    for nome, fabrica in (
+        ("pi_pds_sintetico.pds", construir),
+        ("pi_pds_sintetico_992.pds", construir_992),
+    ):
+        destino = Path(__file__).parent / nome
+        destino.write_bytes(fabrica())
+        print(f"escrito {destino} ({destino.stat().st_size} B)")
