@@ -1020,38 +1020,17 @@ def montar(
     # senao o N3 lista um canal que o front nao consegue buscar. Canal com
     # de-para de apresentacao leva o id do front; o resto leva o nome bruto
     # normalizado, e continua achavel em vez de sumir da lista.
-    apresentacao_por_canonico = {c: v[0] for c, v in APRESENTACAO.items()}
-    usados: set[str] = set()
-    canais = []
-    for cid, nome_bruto, unidade, hz, n, uri, canonico in conn.execute(
-        """select cg.id, cg.nome_bruto, cg.unidade_declarada, cg.frequencia_hz,
-                  cg.n_amostras, s.uri, cg.canal_canonico_id
-             from canal_gravado cg join serie_amostral s on s.id = cg.serie_id
-            where cg.gravacao_id = %s order by s.frequencia_hz desc, cg.nome_bruto""",
-        (gravacao_id,),
-    ).fetchall():
-        nome_front = apresentacao_por_canonico.get(canonico or "")
-        if nome_front and nome_front not in usados:
-            ident = nome_front
-            unidade_saida = APRESENTACAO[canonico][2]
-        else:
-            ident = re.sub(r"[^a-z0-9]+", "_", nome_bruto.lower()).strip("_") or str(
-                cid
-            )
-            unidade_saida = unidade or ""
-        if ident in usados:
-            ident = f"{ident}_{str(cid)[:8]}"
-        usados.add(ident)
-        canais.append(
-            {
-                "id": ident,
-                "rotulo": nome_bruto,
-                "unidade": unidade_saida,
-                "uri": uri,
-                "frequencia_hz": float(hz),
-                "n_amostras": int(n),
-            }
-        )
+    canais = [
+        {
+            "id": c["id"],
+            "rotulo": c["rotulo"],
+            "unidade": c["unidade"],
+            "uri": c["uri"],
+            "frequencia_hz": c["frequencia_hz"],
+            "n_amostras": c["n_amostras"],
+        }
+        for c in _canais_da_captura(conn, gravacao_id)
+    ]
 
     # --- contexto de sessao (tabela `contexto`, dono polimorfico)
     #
@@ -1187,6 +1166,69 @@ def montar(
 
 
 # --- serie de amostras na grade comum ------------------------------------
+
+
+def _canais_da_captura(conn, gravacao_id: str) -> list[dict]:
+    """Todo canal da gravacao com serie guardada, com o `id` que o front usa.
+
+    E a regra do N3 e de `amostras()` ao mesmo tempo, porque `Canal.id` tem que
+    ser a MESMA chave de `SerieAmostras.canais`: canal com de-para de
+    apresentacao leva o id do front; o resto leva o nome bruto normalizado.
+    """
+    apresentacao_por_canonico = {c: v[0] for c, v in APRESENTACAO.items()}
+    usados: set[str] = set()
+    canais = []
+    for cid, nome_bruto, unidade, hz, n, uri, canonico in conn.execute(
+        """select cg.id, cg.nome_bruto, cg.unidade_declarada, cg.frequencia_hz,
+                  cg.n_amostras, s.uri, cg.canal_canonico_id
+             from canal_gravado cg join serie_amostral s on s.id = cg.serie_id
+            where cg.gravacao_id = %s order by s.frequencia_hz desc, cg.nome_bruto""",
+        (gravacao_id,),
+    ).fetchall():
+        nome_front = apresentacao_por_canonico.get(canonico or "")
+        if nome_front and nome_front not in usados:
+            ident = nome_front
+            unidade_saida = APRESENTACAO[canonico][2]
+        else:
+            ident = re.sub(r"[^a-z0-9]+", "_", nome_bruto.lower()).strip("_") or str(
+                cid
+            )
+            unidade_saida = unidade or ""
+        if ident in usados:
+            ident = f"{ident}_{str(cid)[:8]}"
+        usados.add(ident)
+        canais.append(
+            {
+                "id": ident,
+                "rotulo": nome_bruto,
+                "unidade": unidade_saida,
+                "uri": uri,
+                "frequencia_hz": float(hz),
+                "n_amostras": int(n),
+                "nome_bruto": nome_bruto,
+                "canonico": canonico,
+            }
+        )
+    return canais
+
+
+def _qualidade(valores) -> str:
+    """Rotulo de qualidade de um canal dentro da volta (issue #59).
+
+    `no_data`: nenhuma amostra finita na janela. `flat`: amostra existe mas nao
+    varia (sensor gravado sem sinal). `ok`: o resto. O rotulo nunca remove o
+    canal: quem desenha decide mostrar o aviso em vez do traco. `out_of_range`
+    fica de fora ate existir faixa de plausibilidade ratificada por Vitor.
+    """
+    import numpy as np
+
+    v = np.asarray(valores, dtype=float)
+    finitos = v[np.isfinite(v)]
+    if finitos.size == 0:
+        return "no_data"
+    if float(np.ptp(finitos)) == 0.0:
+        return "flat"
+    return "ok"
 
 
 def _canais_de_apresentacao(conn, gravacao_id: str) -> dict[str, tuple]:
@@ -1331,6 +1373,33 @@ def amostras(conn, gravacao_id: str, volta: int | str) -> dict:
         if canal.nome_bruto in dados
     }
 
+    # Todo canal do N3 que nao saiu por APRESENTACAO vai no valor gravado, sem
+    # fator nem promessa de unidade (issue #59: canal com dado tem que chegar a
+    # tela). Um Parquet por taxa guarda varios canais: le cada um uma vez so.
+    from .pipeline.leitura import CanalEscolhido
+
+    crus = [
+        c for c in _canais_da_captura(conn, gravacao_id) if c["id"] not in canais_fonte
+    ]
+    por_uri: dict[str, list[dict]] = {}
+    for c in crus:
+        por_uri.setdefault(c["uri"], []).append(c)
+    for uri, lista in por_uri.items():
+        dados_uri = ler_colunas(uri, [c["nome_bruto"] for c in lista])
+        for c in lista:
+            if c["nome_bruto"] not in dados_uri:
+                continue
+            canal_cru = CanalEscolhido(
+                canonico=c["canonico"] or "",
+                nome_bruto=c["nome_bruto"],
+                uri=uri,
+                frequencia_hz=c["frequencia_hz"],
+                fator=1.0,
+                offset=0.0,
+            )
+            leituras[c["id"]] = (canal_cru, 1.0, dados_uri)
+    ids_da_captura = [c["id"] for c in _canais_da_captura(conn, gravacao_id)]
+
     # Freio de PRESSAO -> % por normalizacao declarada. O canonico
     # `brake_press` guarda kPa (acervo.py descartou o normalize_by_max do
     # aliases de proposito: "quem precisa de 0 a 1 normaliza na analise,
@@ -1362,6 +1431,7 @@ def amostras(conn, gravacao_id: str, volta: int | str) -> dict:
                 regua_freio = (base, pico)
 
     acumulado: dict[str, list] = {nome: [] for nome in leituras}
+    vistos: dict[str, list] = {nome: [] for nome in leituras}
     for v in alvo:
         if v["n"] not in eixos:
             continue
@@ -1378,7 +1448,9 @@ def amostras(conn, gravacao_id: str, volta: int | str) -> dict:
             # ganharam volta com o degrau GPS). Interpolar SO nos pontos
             # medidos e a leitura honesta: os buracos viram interpolacao
             # declarada, igual ao alinhamento de taxa logo abaixo.
-            m = (t >= v["t_inicio_s"]) & (t <= v["t_fim_s"]) & np.isfinite(todos)
+            na_volta = (t >= v["t_inicio_s"]) & (t <= v["t_fim_s"])
+            vistos[nome].append(todos[na_volta])
+            m = na_volta & np.isfinite(todos)
             if not m.any():
                 continue
             if nome == "freio" and regua_freio is not None:
@@ -1432,8 +1504,17 @@ def amostras(conn, gravacao_id: str, volta: int | str) -> dict:
         raise ValueError(
             f"volta {volta} sem canal com eixo de distancia fechado: rode a etapa 6"
         )
+    qualidade = {
+        nome: _qualidade(np.concatenate(partes)) if partes else "no_data"
+        for nome, partes in vistos.items()
+    }
+    for ident in ids_da_captura:
+        qualidade.setdefault(ident, "no_data")
+    for nome in canais:
+        qualidade.setdefault(nome, "ok")
     return {
         "volta": volta,
         "distancia_m": [round(float(x), 3) for x in grade],
         "canais": canais,
+        "qualidade": qualidade,
     }
