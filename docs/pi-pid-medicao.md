@@ -109,3 +109,72 @@ Leitura da tabela: fator e offset dos canais que entram são idênticos em todos
 | `P.Piquet000995.pid` | 246 | 18547 | 65.9 |
 | `P.Piquet000996.pid` | 1744 | 65535 | 253.8 |
 | `P.Piquet000997.pid` | 1479 | 65535 | 252.5 |
+
+## 7. Desempenho
+
+Medição de 2026-09-14, adiantando a issue #45 para os leitores Pi. O `ler()` do `.pid` ficou 39% mais rápido na mediana dos 25 arquivos do acervo, com a mesma saída célula a célula e o mesmo pico de memória. A mudança veio da análise do commit `66d9935` do Antigravity (branch `arquivo/antigravity-cosworth-66d9935`); a ideia que ele de fato propunha para memória, ler em pedaços de 64 KB, foi medida e deixou o leitor mais lento e mais pesado.
+
+### 7.1 O que mudou
+
+O `ler()` montava a contagem de cada canal com um laço por janela do layout por tick e, dentro dele, um laço por byte. Um canal de 100 Hz com 2 B por amostra fazia 100 janelas e 200 operações por bloco de arquivo. O perfil de CPU do `P.Piquet000987.pid` mostrava 31 ms de 119 ms só em conversão de tipo dentro desse laço.
+
+Agora `_contagem_do_canal` junta de uma vez todos os bytes do canal em todos os blocos (`np.take` com a lista de posições do layout) e lê cada amostra como inteiro big-endian sem sinal. O resto do `ler()` não mudou: sinal, escala, slot nulo do tick 1, checagem de cursor e mensagens de erro com offset.
+
+### 7.2 Método
+
+1. Arquivos: os 25 `.pid` únicos do acervo, copiados do Drive para disco local.
+2. Variantes: o leitor publicado no PR #35 (`1823e72`), o `CosworthPidReader` de `66d9935`, o leitor vetorizado e uma variante que lê o corpo em pedaços de 64 KB com a mesma decodificação vetorizada.
+3. Tempo: mediana de 7 execuções de `inspecionar()` e de `ler()` consumindo todos os lotes, cada variante em processo Python novo.
+4. Memória: pico do `tracemalloc` numa segunda chamada de `ler()` no mesmo processo. A primeira chamada paga cerca de 25 MB de import tardio que ficam retidos e não são custo do leitor. RSS máximo por `/usr/bin/time -v` numa passada de `inspecionar()` e `ler()`; o processo só com imports tem 59 MB.
+5. Igualdade: cabeçalho igual e, em cada lote, mesma frequência, mesmos nomes na mesma ordem, mesmo tipo, mesma contagem de nulos e mesmos valores, com NaN igual a NaN. Máquina: Dell G15, 16 núcleos, Python 3.12.3, NumPy 2.5.2, PyArrow 25.0.1.
+
+### 7.3 Resultado por arquivo
+
+Tabela 7. Tempo de `ler()` em ms, pico de memória de `ler()` em MB (tracemalloc, segunda chamada) e RSS máximo do processo em MB, do maior para o menor arquivo. "Igual" compara as três outras variantes contra a publicada. `inspecionar()` ficou em até 1,0 ms em todos os arquivos e variantes.
+
+| Arquivo | kB | ler ms publicado | ler ms Antigravity | ler ms vetorizado | ler ms 64 KB | pico MB publicado | pico MB vetorizado | pico MB 64 KB | RSS MB publicado | RSS MB vetorizado | Igual |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `P.Piquet000987.pid` | 4011 | 91,5 | 89,4 | 58,5 | 155,2 | 20,9 | 20,9 | 29,3 | 129,3 | 129,1 | sim |
+| `P.Piquet000981.pid` | 2081 | 54,0 | 52,8 | 32,5 | 83,4 | 10,8 | 10,8 | 15,3 | 119,9 | 120,0 | sim |
+| `P.Piquet000000.pid` | 1960 | 50,2 | 50,1 | 32,6 | 78,6 | 10,2 | 10,2 | 14,4 | 119,6 | 119,6 | sim |
+| `P.Piquet000993.pid` | 1795 | 47,6 | 49,9 | 36,5 | 79,8 | 9,3 | 9,3 | 13,2 | 118,8 | 118,8 | sim |
+| `P.Piquet000996.pid` | 1744 | 52,1 | 48,0 | 30,0 | 77,9 | 9,1 | 9,1 | 12,8 | 118,5 | 118,3 | sim |
+| `P.Piquet000994.pid` | 1734 | 48,0 | 54,0 | 28,4 | 70,8 | 9,0 | 9,0 | 12,7 | 118,7 | 118,4 | sim |
+| `P.Piquet000979.pid` | 1707 | 45,0 | 46,1 | 29,9 | 70,1 | 8,9 | 8,9 | 12,5 | 118,5 | 117,9 | sim |
+| `P.Piquet000977.pid` | 1689 | 45,9 | 45,9 | 28,3 | 69,5 | 8,8 | 8,8 | 12,4 | 118,5 | 118,4 | sim |
+| `P.Piquet000001.pid` | 1491 | 39,9 | 41,7 | 25,0 | 62,7 | 7,8 | 7,7 | 11,0 | 117,3 | 117,4 | sim |
+| `P.Piquet000997.pid` | 1479 | 41,5 | 42,6 | 25,7 | 60,3 | 7,7 | 7,7 | 10,9 | 117,8 | 117,8 | sim |
+| `P.Piquet000980.pid` | 1473 | 40,9 | 42,4 | 25,4 | 60,4 | 7,7 | 7,7 | 10,8 | 117,4 | 117,0 | sim |
+| `P.Piquet000990.pid` | 1457 | 40,5 | 40,0 | 24,6 | 60,0 | 7,6 | 7,6 | 10,7 | 117,3 | 117,7 | sim |
+| `P.Piquet000974.pid` | 1360 | 39,8 | 40,6 | 24,7 | 59,3 | 7,1 | 7,1 | 10,0 | 117,0 | 117,1 | sim |
+| `P.Piquet000982.pid` | 1327 | 38,5 | 38,2 | 23,2 | 54,2 | 6,9 | 6,9 | 9,8 | 116,9 | 116,9 | sim |
+| `P.Piquet000988.pid` | 1238 | 40,8 | 38,5 | 23,3 | 51,7 | 6,5 | 6,4 | 9,1 | 116,7 | 116,2 | sim |
+| `P.Piquet000985.pid` | 1092 | 34,1 | 36,2 | 20,7 | 46,3 | 5,7 | 5,7 | 8,0 | 116,0 | 115,6 | sim |
+| `P.Piquet000986.pid` | 776 | 30,3 | 32,3 | 18,5 | 37,9 | 4,2 | 4,2 | 5,7 | 113,9 | 114,1 | sim |
+| `P.Piquet000992.pid` | 559 | 25,8 | 28,9 | 14,8 | 27,2 | 3,1 | 3,1 | 4,2 | 113,0 | 113,2 | sim |
+| `P.Piquet000975.pid` | 468 | 23,9 | 25,1 | 13,0 | 23,2 | 2,6 | 2,6 | 3,5 | 112,9 | 112,3 | sim |
+| `P.Piquet000976.pid` | 459 | 23,5 | 25,8 | 13,2 | 22,6 | 2,5 | 2,5 | 3,4 | 112,4 | 112,6 | sim |
+| `P.Piquet000978.pid` | 395 | 21,8 | 22,1 | 12,0 | 20,8 | 2,2 | 2,2 | 3,0 | 112,1 | 112,1 | sim |
+| `G.Samaia003073 (2022_12_18 20_23_00 UTC).pid` | 250 | 15,3 | 15,4 | 9,7 | 12,7 | 1,5 | 1,5 | 1,8 | 112,0 | 111,7 | sim |
+| `P.Piquet000995.pid` | 246 | 25,0 | 19,4 | 10,4 | 15,0 | 1,4 | 1,4 | 1,9 | 112,0 | 111,8 | sim |
+| `P.Piquet000989.pid` | 33 | 15,7 | 16,0 | 7,6 | 7,6 | 0,2 | 0,2 | 0,3 | 111,4 | 110,6 | sim |
+| `P.Piquet000991.pid` | 18 | 15,2 | 15,2 | 7,4 | 7,1 | 0,1 | 0,1 | 0,2 | 109,1 | 109,2 | sim |
+
+Soma de `ler()` nos 25 arquivos: 0,947 s publicado, 0,576 s vetorizado, 1,314 s em pedaços de 64 KB. Razão vetorizado sobre publicado: mediana 0,61, de 0,42 a 0,77. As 16.760.808 células conferidas são iguais nas três variantes.
+
+### 7.4 O que foi e o que não foi portado do commit `66d9935`
+
+| Ideia do commit | Portada | Motivo medido |
+|---|---|---|
+| Decodificação do `.pid` por tick | não havia o que portar | o `ler()` dele é cópia do publicado: mesma saída nos 25 arquivos e mesmo tempo (89 ms contra 92 ms no `P.Piquet000987.pid`), sem a checagem de cursor e sem os offsets nas mensagens de erro |
+| Laço por janela e por byte trocado por leitura vetorizada | sim | é a leitura que o layout pré-calculado permite; 0,61 do tempo, memória igual |
+| Corpo lido em pedaços de 64 KB | não | 2,7 vezes o tempo da leitura vetorizada inteira e pico 40% maior (29,3 MB contra 20,9 MB no `P.Piquet000987.pid`), porque a contagem de todos os canais fica alocada ao mesmo tempo; o corpo inteiro do maior `.pid` tem 4 MB |
+| `TransformacaoLinear` e `calibracoes` | não | sem chamador; o fator medido vive no perfil `pi_pid` de `seeds/aliases.yaml` (seção 3), e o teste dele usa 0,125 sem fonte onde o medido é 0,1 |
+| Pacote `src/telemetria/` ao lado de `src/saru_poc/readers/` | não | segunda pilha de leitores fora do registro, sem ADR e com importação circular |
+| Leitura de amostra do `.pds` | não | tamanho de amostra escolhido por palpite quando a distância entre blocos não fecha; no `REF 992.pds` o `ler()` quebra com `ValueError: Arrays were not all the same length: 577 vs 581` depois de 3,9 s, com pico de 31,6 MB no tracemalloc; detalhe e caminho de medição na issue do `.pds` |
+| `inspecionar()` do `.pds` sem o filtro `_nome_valido` | não | recusa o `P.Piquet000997.pds`, que o leitor do PR #34 abre com 45 canais: ruído da amostra forma candidatos de 274 registros que passam na frente do dicionário real de 47. Medido nos 27 `.pds` que o PR #34 abre: recusa 16. Nos 11 que abre, o cabeçalho é igual e o pico de memória é maior (12,2 MB contra 8,4 MB no `REF 992.pds`; 10,6 contra 3,9 MB no `P.Piquet000987.pds`) |
+
+### 7.5 O que continua de fora
+
+1. O restante do tempo do `ler()` vetorizado está no `np.percentile` de `_aplicar_escala` (24 ms de 66 ms no perfil do `P.Piquet000987.pid`), que calcula percentis da série dividida e da multiplicada. Não mudou aqui porque qualquer diferença de arredondamento pode trocar a direção da escala escolhida.
+2. A meta de tempo e memória por MB e a medição dos outros formatos continuam na issue #45.
