@@ -20,13 +20,16 @@ from saru_poc.readers.pi_pds import LeitorPiPds
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE_PDS = FIXTURES / "pi_pds_sintetico.pds"
+FIXTURE_PDS_992 = FIXTURES / "pi_pds_sintetico_992.pds"
 
 _OFF_MAGIC = 4
 _ESTRIDE_DICIONARIO = 552
 _OFF_IDX_DICIONARIO = 544
 _TAMANHO_REGISTRO_TABELA = 64
 _N_CANAIS_FIXTURE = 10
-_OFF_DICIONARIO_FIXTURE = 320
+_OFF_DICIONARIO_FIXTURE = 4096 + 8 * sum(
+    round(t * 2.0) for t in (100, 50, 20, 100, 10, 1, 1, 25, 5, 5)
+)
 
 
 @pytest.fixture
@@ -171,20 +174,60 @@ def test_indice_duplicado_no_dicionario_exclui_os_dois_canais(
 def test_invariante_de_offset_quebrada_levanta_erro_de_leitura(
     leitor: LeitorPiPds, tmp_path: Path
 ) -> None:
-    """Regressao do B2: se o offset de bytes entre dois registros
-    consecutivos da tabela nao fechar com `n_amostras * 8`, decodificamos
-    campo errado, e o arquivo inteiro tem que ser rejeitado (mesma postura
-    da soma de bytes por bloco do `pi_pid`)."""
+    """Regressao do B2: se dois blocos consecutivos (em ordem de offset) se
+    sobrepoem, decodificamos campo errado, e o arquivo inteiro tem que ser
+    rejeitado (mesma postura da soma de bytes por bloco do `pi_pid`)."""
     conteudo = bytearray(FIXTURE_PDS.read_bytes())
     offset_tabela = _OFF_DICIONARIO_FIXTURE + _N_CANAIS_FIXTURE * _ESTRIDE_DICIONARIO
-    # Estraga o campo de byte_offset (offset 48) do segundo registro da
-    # tabela, quebrando a invariante com o primeiro.
+    # Faz o segundo bloco comecar 8 B depois do primeiro (que tem 200
+    # amostras): sobreposicao.
     off_byte_offset_2o_registro = offset_tabela + 1 * _TAMANHO_REGISTRO_TABELA + 48
-    struct.pack_into("<i", conteudo, off_byte_offset_2o_registro, 999_999)
+    struct.pack_into("<i", conteudo, off_byte_offset_2o_registro, 4096 + 8)
     quebrado = tmp_path / "invariante_quebrada.pds"
     quebrado.write_bytes(bytes(conteudo))
 
-    with pytest.raises(ErroDeLeitura, match="invariante de offset"):
+    with pytest.raises(ErroDeLeitura, match="sobrepostos"):
+        leitor.inspecionar(quebrado)
+
+
+# ---------------------------------------------------------------------------
+# layout do 992.1 (issue #25): varios blocos por canal, amostra de 1, 2 ou 4 B,
+# tabela fora de ordem, campo 56 como numero de serie
+# ---------------------------------------------------------------------------
+
+
+def test_layout_992_varios_blocos_por_canal(leitor: LeitorPiPds) -> None:
+    cab = leitor.inspecionar(FIXTURE_PDS_992)
+    por_nome = {c.nome_bruto: c for c in cab.canais}
+
+    assert len(cab.canais) == _N_CANAIS_FIXTURE
+    assert cab.bruto["n_registros_tabela"] == "13"
+    assert cab.bruto["n_pares_fechados"] == "11"
+    assert cab.bruto["n_buracos"] == "1"
+    # Dois blocos de 100 amostras somam as 200 de 2,0 s a 100 Hz.
+    assert por_nome["Steering"].n_amostras == 200
+    assert por_nome["Steering"].frequencia_hz == 100.0
+    # Um bloco de 1 B por amostra (canal discreto) le igual ao de 4 B.
+    assert por_nome["Gear"].n_amostras == 2
+    assert cab.duracao_s == pytest.approx(2.0)
+
+
+def test_layout_992_intervalo_diferente_entre_blocos_levanta_erro(
+    leitor: LeitorPiPds, tmp_path: Path
+) -> None:
+    """Dois blocos do mesmo canal com intervalos diferentes: o leitor nao
+    escolhe a frequencia por ele."""
+    conteudo = bytearray(FIXTURE_PDS_992.read_bytes())
+    offset_tabela = int(leitor.inspecionar(FIXTURE_PDS_992).bruto["offset_tabela"])
+    # O segundo registro da tabela embaralhada e o primeiro bloco do canal 0
+    # (Steering, 100 Hz): troca o intervalo pra 50 Hz.
+    registro = offset_tabela + 1 * _TAMANHO_REGISTRO_TABELA
+    assert struct.unpack_from("<i", conteudo, registro)[0] == 0
+    struct.pack_into("<i", conteudo, registro + 16, 200_000)
+    quebrado = tmp_path / "intervalo_diferente.pds"
+    quebrado.write_bytes(bytes(conteudo))
+
+    with pytest.raises(ErroDeLeitura, match="intervalos diferentes"):
         leitor.inspecionar(quebrado)
 
 
