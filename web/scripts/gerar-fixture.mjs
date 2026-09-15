@@ -527,19 +527,22 @@ function montarRelatorio(volta, ref) {
 
 function serieAmostras(ref) {
   const S = serieDe(ref);
+  const canais = {
+    velocidade: S.v.map((x) => +(x * 3.6).toFixed(2)),
+    acelerador: S.thr.map((x) => +x.toFixed(1)),
+    freio: S.brk.map((x) => +x.toFixed(1)),
+    direcao: S.str.map((x) => +x.toFixed(1)),
+    marcha: S.gear.slice(0, N),
+    rpm: S.rpm.map((x) => Math.round(x)),
+    acel_lat: S.latA.map((x) => +x.toFixed(3)),
+    acel_lon: S.lonA.map((x) => +x.toFixed(3)),
+  };
   return {
     volta: ref,
     distancia_m: PISTA.dist.slice(0, N).map((d) => +d.toFixed(2)),
-    canais: {
-      velocidade: S.v.map((x) => +(x * 3.6).toFixed(2)),
-      acelerador: S.thr.map((x) => +x.toFixed(1)),
-      freio: S.brk.map((x) => +x.toFixed(1)),
-      direcao: S.str.map((x) => +x.toFixed(1)),
-      marcha: S.gear.slice(0, N),
-      rpm: S.rpm.map((x) => Math.round(x)),
-      acel_lat: S.latA.map((x) => +x.toFixed(3)),
-      acel_lon: S.lonA.map((x) => +x.toFixed(3)),
-    },
+    canais,
+    // Fixture sintetica: todo canal varia na volta (issue #59).
+    qualidade: Object.fromEntries(Object.keys(canais).map((id) => [id, "ok"])),
   };
 }
 

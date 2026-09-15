@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { Relatorio, SerieAmostras } from "../types/contract";
+import type { Canal, Relatorio, SerieAmostras } from "../types/contract";
 import { useSelecao } from "../state/selection";
 import { CardFlutuante } from "../componentes/CardFlutuante";
 import { useLargura } from "../graficos/useLargura";
@@ -19,12 +19,26 @@ const FAIXAS = [
   { id: "direcao", nome: "Direção", unidade: "%", lo: -105, hi: 105 },
 ];
 
-export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
+// Ids que o backend emite com de-para de apresentacao (APRESENTACAO em
+// relatorio.py): na lista de canais eles vem primeiro, antes dos crus.
+const PADRAO = new Set([
+  "velocidade", "acelerador", "freio", "direcao", "marcha", "rpm", "acel_lat", "acel_lon",
+  "temp_pneu_fl", "temp_pneu_fr", "temp_pneu_rl", "temp_pneu_rr",
+]);
+
+const AVISO_QUALIDADE: Record<string, string> = {
+  flat: "sem variação na volta",
+  no_data: "não gravado nesta volta",
+};
+
+export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos, canais = [] }: {
   a: SerieAmostras;
   b: SerieAmostras;
   rotuloA: string;
   rotuloB: string;
   trechos: Relatorio["trechos"];
+  /** relatorio.n3.canais: todo canal da captura, para acrescentar faixa (issue #59). */
+  canais?: Canal[];
 }) {
   const { trecho, intervalo, setIntervalo } = useSelecao();
   const host = useRef<HTMLDivElement>(null);
@@ -37,6 +51,7 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
   const gesto = useRef<{ de: number; ate: number } | null>(null);
   const [faixa, setFaixa] = useState<{ de: number; ate: number } | null>(null);
   const [cursor, setCursor] = useState<{ k: number; xPx: number; yPx: number } | null>(null);
+  const [extras, setExtras] = useState<string[]>([]);
   // AQUI, antes do return de degradacao: hook depois de return condicional
   // muda a contagem entre renders e derruba o app inteiro (regra de hooks).
   // Foi exatamente o par deste bug em AppComSessao que causou a tela branca
@@ -86,9 +101,33 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
   })();
 
   const idx = a.distancia_m.map((_, i) => i).filter((i) => a.distancia_m[i] >= janela.d0 && a.distancia_m[i] <= janela.d1);
+
+  // Faixa acrescentada pelo engenheiro: escala tirada do proprio dado das duas
+  // series na janela, com 5% de folga. Canal cru chega sem promessa de unidade,
+  // entao a unidade exibida e a que o arquivo declarou.
+  const extrasComEscala = extras
+    .map((id) => canais.find((c) => c.id === id))
+    .filter((c): c is Canal => c !== undefined)
+    .map((c) => {
+      let lo = Infinity, hi = -Infinity;
+      for (const s of [a, b]) for (const i of idx) {
+        const v = s.canais[c.id]?.[i];
+        if (v != null && Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+      }
+      if (!Number.isFinite(lo)) { lo = 0; hi = 1; }
+      const folga = (hi - lo) * 0.05 || 1;
+      return { id: c.id, nome: c.rotulo, unidade: c.unidade, lo: +(lo - folga).toPrecision(3), hi: +(hi + folga).toPrecision(3) };
+    });
+  const faixas = [...FAIXAS, ...extrasComEscala];
+  const opcoes = canais.filter((c) => !faixas.some((f) => f.id === c.id));
+  const rotuloOpcao = (c: Canal) => {
+    const aviso = AVISO_QUALIDADE[a.qualidade?.[c.id] ?? ""];
+    return `${c.rotulo}${c.unidade ? ` (${c.unidade})` : ""}${aviso ? ` · ${aviso}` : ""}`;
+  };
+
   const alturaFaixa = 84, vao = 10, PL = 62, PR = 14, PT = 8;
-  const H = PT + FAIXAS.length * (alturaFaixa + vao) + 24; // folga para a régua de 100 m
-  const base = PT + FAIXAS.length * (alturaFaixa + vao) - vao;
+  const H = PT + faixas.length * (alturaFaixa + vao) + 24; // folga para a régua de 100 m
+  const base = PT + faixas.length * (alturaFaixa + vao) - vao;
   const x = escala(0, idx.length - 1, PL, W - PR);
   const passo = Math.max(1, Math.floor(idx.length / 520));
 
@@ -148,6 +187,27 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
           {intervalo && (
             <button type="button" className="limpar" onClick={() => setIntervalo(null)}>limpar intervalo</button>
           )}
+          {opcoes.length > 0 && (
+            <select
+              aria-label="Acrescentar canal ao traço"
+              value=""
+              onChange={(e) => e.target.value && setExtras((x) => [...x, e.target.value])}
+              style={{ minHeight: 44 }}
+            >
+              <option value="">acrescentar canal ({opcoes.length})</option>
+              <optgroup label="canais padrão">
+                {opcoes.filter((c) => PADRAO.has(c.id)).map((c) => <option key={c.id} value={c.id}>{rotuloOpcao(c)}</option>)}
+              </optgroup>
+              <optgroup label="canais do arquivo">
+                {opcoes.filter((c) => !PADRAO.has(c.id)).map((c) => <option key={c.id} value={c.id}>{rotuloOpcao(c)}</option>)}
+              </optgroup>
+            </select>
+          )}
+          {extras.map((id) => (
+            <button key={id} type="button" className="limpar" style={{ minHeight: 44 }} onClick={() => setExtras((x) => x.filter((e) => e !== id))}>
+              {canais.find((c) => c.id === id)?.rotulo ?? id} ×
+            </button>
+          ))}
         </span>
       </header>
 
@@ -202,7 +262,7 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
               fill="var(--brand)" opacity={0.14} pointerEvents="none"
             />
           )}
-          {FAIXAS.map((f, li) => {
+          {faixas.map((f, li) => {
             const topo = PT + li * (alturaFaixa + vao);
             const y = escala(f.lo, f.hi, topo + alturaFaixa, topo);
             const serie = (s: SerieAmostras) => {
@@ -219,6 +279,11 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
                 <text className="eixo" x={PL - 8} y={topo + 10} textAnchor="end" style={{ fontWeight: 700, fill: "var(--text)", fontSize: 10 }}>{f.nome}</text>
                 <text className="eixo" x={PL - 8} y={topo + 22} textAnchor="end">{f.hi} {f.unidade}</text>
                 <text className="eixo" x={PL - 8} y={topo + alturaFaixa} textAnchor="end">{f.lo}</text>
+                {AVISO_QUALIDADE[a.qualidade?.[f.id] ?? ""] && (
+                  <text className="eixo" x={W - PR} y={topo + 12} textAnchor="end" style={{ fill: "var(--d-loss)" }}>
+                    {AVISO_QUALIDADE[a.qualidade?.[f.id] ?? ""]}
+                  </text>
+                )}
               </g>
             );
           })}
@@ -262,7 +327,7 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
             <div className="lin"><span>diferença</span>
               <span style={{ color: resumo.tA > resumo.tB ? "var(--d-loss)" : "var(--d-gain)" }}>{sinal(resumo.tA - resumo.tB)} s</span>
             </div>
-            {FAIXAS.map((f) => (
+            {faixas.map((f) => (
               <div className="lin" key={f.id}><span>{f.nome} méd</span><span>
                 <b style={{ color: "var(--lap-a)" }}>{resumo.media(a, f.id).toFixed(f.unidade === "%" ? 0 : 1)}</b>{" "}
                 <b style={{ color: "var(--lap-b)" }}>{resumo.media(b, f.id).toFixed(f.unidade === "%" ? 0 : 1)}</b>
@@ -278,7 +343,7 @@ export function TracoNoTempo({ a, b, rotuloA, rotuloB, trechos }: {
             titulo={`${a.distancia_m[idx[cursor.k]].toFixed(0)} m`}
             linhas={[
               { rot: "", unico: <><b style={{ color: "var(--lap-a)" }}>{rotuloA}</b> <b style={{ color: "var(--lap-b)" }}>{rotuloB}</b></> },
-              ...FAIXAS.map((f) => ({
+              ...faixas.map((f) => ({
                 rot: f.nome,
                 a: (a.canais[f.id]?.[idx[cursor!.k]] ?? 0).toFixed(f.unidade === "%" ? 0 : 1),
                 b: (b.canais[f.id]?.[idx[cursor!.k]] ?? 0).toFixed(f.unidade === "%" ? 0 : 1),

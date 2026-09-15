@@ -195,3 +195,54 @@ Colunas: tamanho em MB, resultado antes e depois, canais do dicionário, blocos 
 | `P.Piquet000995.pds` | 1.0 | abre (44) | abre (45 canais) | 47 | 47 | 0 | 78 | 1.2 |
 | `P.Piquet000996.pds` | 6.7 | abre (44) | abre (45 canais) | 47 | 47 | 0 | 570 | 4.9 |
 | `P.Piquet000997.pds` | 5.7 | abre (44) | abre (45 canais) | 47 | 47 | 0 | 483 | 8.0 |
+
+## Ligação índice → nome (2026-09-15, issue #54)
+
+O leitor de 2026-09-14 ligava cada bloco da tabela ao nome do dicionário pelo inteiro no offset 544 do registro. Medido contra o `.dat` exportado pelo Pi Toolbox da mesma sessão, essa ligação erra todo canal: `Speed` saía a 20 Hz e `RPM` a 1 Hz, e os dois estão a 50 Hz no `.dat`.
+
+### Método
+
+1. Em cada sessão de `Telemetria/F3/Geral` com `.pds`, `.pid` e `.dat`, cada bloco de 8 bytes foi lido como `float64` no `byte_offset` da tabela.
+2. Cada bloco foi correlacionado com todo canal do `.dat` de mesma contagem; entra o nome com |r| > 0,999.
+3. As sessões foram agrupadas pela assinatura do dicionário (o conjunto de nomes) e a ligação conferida índice a índice entre elas.
+
+### Resultado
+
+| Assinatura | Sessões | Blocos | Com nome medido | Sem nome | Conflito entre sessões |
+|---|---|---|---|---|---|
+| 46 canais (P.Piquet000001, 000974 a 000981) | 9 | 46 | 34 | 12 | 0 |
+| 47 canais (P.Piquet000985 a 000997) | 12 | 47 | 35 | 12 | 0 |
+
+Hipóteses testadas contra as âncoras, nas sessões 974 e 977:
+
+| Hipótese | Acertos (974) | Acertos (977) |
+|---|---|---|
+| nome do dicionário pelo campo +544 | 0 de 24 | 0 de 36 |
+| ordem de canais do `.pid` na mesma posição | 14 de 24 | 21 de 36 |
+
+O índice da tabela segue a ordem de aquisição do `.pid`, pulando canal que o `.pds` não gravou (medido: o `Fuel Pressure` de 10 Hz e `Lap Time`). Nenhum campo do registro de 552 B nem a ordem alfabética reproduz o índice, por isso a ligação é uma tabela medida por assinatura (`src/saru_poc/readers/pi_pds_ligacao.py`).
+
+Ficam sem nome: os blocos constantes em todas as sessões medidas (a correlação não os ancora) e os dois blocos que casam com `Cumulative Time`, de dado idêntico.
+
+### Unidade da amostra
+
+O `.pds` grava em SI. Ganho do ajuste linear `.dat = ganho × .pds + offset` nas âncoras:
+
+| Canal | Ganho ou offset | Unidade no `.pds` |
+|---|---|---|
+| amortecedores, `Steering` | ganho 1.000 | m |
+| `Acc Lat`, `Acc Long` | ganho 0,102 | m/s² |
+| `Brake Press F`, `Brake Press R` | ganho 1e-5 | Pa |
+| `RPM` | ganho 9,549 | rad/s |
+| `Throttle Position` | ganho 57,3 | rad |
+| `Speed`, `WS_FL`, `WS_FR` | ganho 3,6 | m/s |
+| temperaturas | offset −273,1 | K |
+
+### Conferência depois da correção
+
+Leitor novo em todo `.pds` de `Telemetria/F3/Geral`: 23 arquivos abrem, e a taxa de `Speed`, `RPM`, `Steering`, `Acc Lat`, `Damper FL` e `Throttle Position` bate com o `.dat` em 138 de 138 comparações.
+
+### O que muda fora do F3
+
+Arquivo cuja assinatura não está na tabela passa a ser recusado com `ErroDeLeitura`, em vez de sair com nome errado. Isso inclui o `REF 992.pds`, que abria desde a issue #25 com a mesma ligação pelo campo +544. A contagem de 27 de 71 arquivos da seção "Resultado" não foi medida de novo com a regra nova; fora do F3 falta `.dat` irmão para medir a ligação.
+
