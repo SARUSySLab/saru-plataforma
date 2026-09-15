@@ -213,3 +213,26 @@ Nenhuma bifurcacao de arquitetura apareceu nesta tarefa (o contrato
 `Cabecalho.canais=()` ja era o comportamento estabelecido pra formato sem
 canal confirmado, seguindo `LeitorLdx` e `LeitorAimDrk`). Sem decisao
 pendente pra levar a mesa desta vez.
+
+## Complemento (2026-09-14): reconfirmação com amostra nova, escopo de cobertura de dados
+
+Reconfirmação, no âmbito da auditoria de `docs/cobertura-de-dados-resumo.md`,
+com uma amostra nova de 10 `.gpk` e 10 `.rrk` únicos (sorteio aleatório
+diferente do original), copiados do Drive e passados por
+`LeitorAimGpk.inspecionar()` / `LeitorAimRrk.inspecionar()`:
+
+- 10/10 `.gpk` e 10/10 `.rrk` abriram sem erro.
+- `Cabecalho.canais` saiu vazio nos 20/20, confirmando a conclusão original
+  ("`Cabecalho.canais` sai sempre como tupla vazia"): não é regressão nem
+  amostra insuficiente, é o comportamento medido de novo.
+- Correção da nota "3" da seção anterior: `LeitorAimGpk` e `LeitorAimRrk`
+  **já estão** registrados em `readers/__init__.py::_registrar_embutidos`
+  (conferido nesta data). A nota estava desatualizada frente ao código
+  atual; a issue de registro que ela citava foi resolvida em algum commit
+  posterior não rastreado por este documento.
+
+Como `canais=()` é o resultado correto e não uma falha de leitura, não abro
+issue de "cobertura de canal" para `.gpk`/`.rrk` nesta auditoria: não há
+canal decodificável a mapear. O item em aberto continua sendo a semântica de
+payload (itens 1-4 da seção anterior), fora do escopo de coleta de dados
+desta tarefa.
