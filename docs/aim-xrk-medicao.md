@@ -66,3 +66,46 @@ daquela taxa). Não há evidência, nesta medição, de perda de amostra em
 `.pds`/`.pid` já têm, fora do escopo desta auditoria.
 
 Issue aberta para a lacuna de cobertura: ver `docs/cobertura-de-dados-resumo.md`.
+
+## `.xrk` e `.xrz` da mesma captura (2026-09-15, issue #53)
+
+O `.xrz` guarda o mesmo stream do `.xrk` comprimido em zlib. Em nenhuma dupla
+do acervo o conteúdo diverge. A diferença, quando existe, é um rodapé de
+metadados que só o `.xrk` carrega, ou um `.xrz` truncado.
+
+Tabela 1. Comparação byte a byte das duplas `.xrk`/`.xrz` com o mesmo radical
+no catálogo local (406 radicais, 407 comparações).
+
+| caso | mesma gravação | gravações separadas |
+|---|---|---|
+| `.xrz` descomprimido idêntico ao `.xrk` | 1 | 42 |
+| `.xrz` descomprimido é prefixo do `.xrk`; o resto é rodapé de metadados | 356 | 2 |
+| `.xrz` truncado (zlib incompleto), stream é prefixo do `.xrk` | 6 | 0 |
+| conteúdo diferente | 0 | 0 |
+
+O rodapé tem de 0 a 199 bytes e é feito só de blocos `<hXXX` de metadado
+(`RCR` piloto, `VEH` veículo, `CMP` campeonato, `VTY` tipo de sessão, `TRK`
+pista), sempre terminando em `NTE` (nota). A combinação mais comum é
+`VTY-NTE`, em 157 duplas.
+
+As 44 comparações em gravações separadas são cópias em pastas diferentes do
+F3 e da AiM, por exemplo `F3/Geral/<radical>.xrk` contra
+`F3/<piloto>/<carro>/<data>/<radical>.xrz`. O agrupamento de bundle é por
+pasta e radical, então essas cópias viravam duas gravações com as mesmas
+voltas, e a derivação de traçado parava em `uq_tracado_sha256`.
+
+Método: para cada dupla listada em `arquivo_bruto`, o `.xrz` foi
+descomprimido com `zlib.decompressobj()`, que devolve o stream até onde o
+arquivo chega, e comparado com os bytes do `.xrk` por igualdade e por prefixo.
+
+Regra adotada em `pipeline/recepcao.py` (`mesma_captura_aim`): duas cópias
+são a mesma captura quando o stream menor é prefixo do maior e vale uma de
+duas condições.
+
+1. A diferença de tamanho é de até 1 KiB, o que cobre o rodapé medido de até
+   199 bytes. Vale para qualquer tamanho, porque o menor `.xrk` do catálogo
+   tem 28 KiB.
+2. O stream menor tem pelo menos 64 KiB. É o caso do `.xrz` truncado; o piso
+   impede que um truncado quase vazio case com outra captura do mesmo logger.
+
+O nome igual só escolhe o candidato.

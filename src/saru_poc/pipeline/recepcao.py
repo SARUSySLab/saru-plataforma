@@ -16,10 +16,12 @@ mesmo arquivo devolve a gravacao que ja existe, nunca cria a segunda.
 from __future__ import annotations
 
 import hashlib
+import zlib
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 from ..readers import detectar
 
@@ -70,6 +72,9 @@ class Recepcao:
     arquivos: list[ArquivoRecebido] = field(default_factory=list)
     ja_existia: bool = False
     recusados: list[str] = field(default_factory=list)
+    # nome do primario da gravacao existente quando o bundle e copia da mesma
+    # captura guardada em outra pasta (ex.: .xrz de uma pasta, .xrk de outra)
+    copia_de: str | None = None
 
 
 def sha256_de(caminho: Path) -> str:
@@ -78,6 +83,83 @@ def sha256_de(caminho: Path) -> str:
         for bloco in iter(lambda: fh.read(_CHUNK), b""):
             h.update(bloco)
     return h.hexdigest()
+
+
+# Copia completa difere no maximo pelo rodape de metadados (medido ate 199 B)
+# e casa em qualquer tamanho: o menor .xrk do catalogo tem 28 KiB. Copia
+# truncada precisa do piso, senao um .xrz com poucos KiB seria prefixo de
+# qualquer captura que comece igual e fundiria gravacoes diferentes.
+_RODAPE_MAXIMO_AIM = 1024
+_PREFIXO_MINIMO_AIM = 64 * 1024
+
+
+def _fluxo_aim(caminho: Path) -> bytes:
+    """Stream XRK do arquivo: o proprio `.xrk`, ou o `.xrz` descomprimido ate
+    onde o zlib chegar (o acervo tem `.xrz` truncado)."""
+    dados = caminho.read_bytes()
+    if dados[:1] == b"\x78" and dados[1:2] in (b"\x01", b"\x5e", b"\x9c", b"\xda"):
+        try:
+            return zlib.decompressobj().decompress(dados)
+        except zlib.error:
+            return b""
+    return dados
+
+
+def mesma_captura_aim(a: Path, b: Path) -> bool:
+    """Duas copias AiM sao a mesma captura quando o stream menor e prefixo do
+    maior. Medido em 407 comparacoes .xrk/.xrz do acervo, nenhuma divergente:
+    identico, prefixo com rodape de metadados ate 199 B, ou .xrz truncado
+    (tabela em `docs/aim-xrk-medicao.md`)."""
+    curto, longo = sorted((_fluxo_aim(a), _fluxo_aim(b)), key=len)
+    if not curto or not longo.startswith(curto):
+        return False
+    completa = len(longo) - len(curto) <= _RODAPE_MAXIMO_AIM
+    return completa or len(curto) >= _PREFIXO_MINIMO_AIM
+
+
+def _gravacao_da_mesma_captura(
+    conn, candidato: ArquivoRecebido
+) -> tuple[str, str] | None:
+    """Gravacao existente cujo primario AiM e a mesma captura do candidato.
+
+    O nome so escolhe quem comparar; a igualdade e decidida pelo byte. Devolve
+    (gravacao_id, nome do primario) ou None.
+    """
+    radical = candidato.caminho.stem
+    linhas = conn.execute(
+        """select gravacao_id, nome_arquivo, objeto_uri from arquivo_bruto
+            where formato_id = 'aim_xrk' and papel = 'primario' and sha256 <> %s
+              and lower(nome_arquivo) in (lower(%s), lower(%s))
+            order by lower(nome_arquivo) like '%%.xrk' desc, importado_em""",
+        (candidato.sha256, f"{radical}.xrk", f"{radical}.xrz"),
+    ).fetchall()
+    for gravacao_id, nome, uri in linhas:
+        existente = Path(unquote(urlparse(uri).path))
+        if existente.exists() and mesma_captura_aim(candidato.caminho, existente):
+            return str(gravacao_id), nome
+    return None
+
+
+def _inserir_arquivos(conn, gravacao_id: str, lidos: list[ArquivoRecebido]) -> None:
+    for a in lidos:
+        linha = conn.execute(
+            """insert into arquivo_bruto
+                 (gravacao_id, papel, formato_id, nome_arquivo, sha256, bytes,
+                  objeto_uri)
+               values (%s,%s,%s,%s,%s,%s,%s)
+               on conflict do nothing
+               returning id""",
+            (
+                gravacao_id,
+                a.papel,
+                a.formato_id,
+                a.caminho.name,
+                a.sha256,
+                a.bytes_,
+                a.caminho.resolve().as_uri(),
+            ),
+        ).fetchone()
+        a.id = str(linha[0]) if linha else None
 
 
 def _papel(formato_id: str | None, caminho: Path, primario: str | None) -> str:
@@ -189,28 +271,23 @@ def receber(conn, caminhos: list[Path], *, label: str | None = None) -> Recepcao
             a.id = por_sha.get(a.sha256)
         return Recepcao(str(gravacao_id), lidos, ja_existia=True, recusados=recusados)
 
+    principal = next(a for a in lidos if a.papel == "primario")
+    if principal.formato_id == "aim_xrk":
+        mesma = _gravacao_da_mesma_captura(conn, principal)
+        if mesma is not None:
+            # A captura ja virou gravacao a partir de outra pasta (#53). O
+            # agrupamento e por pasta, entao so aqui da pra ver a copia; ela
+            # entra como backup e o primario da gravacao existente continua.
+            gravacao_id, nome = mesma
+            principal.papel = "backup"
+            _inserir_arquivos(conn, gravacao_id, lidos)
+            return Recepcao(
+                gravacao_id, lidos, ja_existia=True, recusados=recusados, copia_de=nome
+            )
+
     gravacao_id = conn.execute(
         "insert into gravacao (label) values (%s) returning id", (label,)
     ).fetchone()[0]
-
-    for a in lidos:
-        linha = conn.execute(
-            """insert into arquivo_bruto
-                 (gravacao_id, papel, formato_id, nome_arquivo, sha256, bytes,
-                  objeto_uri)
-               values (%s,%s,%s,%s,%s,%s,%s)
-               on conflict (gravacao_id, sha256) do nothing
-               returning id""",
-            (
-                gravacao_id,
-                a.papel,
-                a.formato_id,
-                a.caminho.name,
-                a.sha256,
-                a.bytes_,
-                a.caminho.resolve().as_uri(),
-            ),
-        ).fetchone()
-        a.id = str(linha[0]) if linha else None
+    _inserir_arquivos(conn, str(gravacao_id), lidos)
 
     return Recepcao(str(gravacao_id), lidos, recusados=recusados)

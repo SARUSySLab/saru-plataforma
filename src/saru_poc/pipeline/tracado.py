@@ -24,11 +24,10 @@ duas sozinha separa "GPS bom" de "GPS de outro continente com tamanho parecido".
 
 from __future__ import annotations
 
-import shutil
-
 import hashlib
 import math
 import os
+import shutil
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -225,6 +224,24 @@ def derivar_volta(conn, volta_id: str, *, rederivar: bool = False) -> TracadoDaV
         return r
 
     uri, sha, n = _escrever(volta_id, pontos)
+    gemeo = conn.execute(
+        "select volta_id from tracado where sha256 = %s", (sha,)
+    ).fetchone()
+    if gemeo is not None:
+        # A mesma captura recebida em duas gravacoes (.xrk e .xrz em pastas
+        # diferentes, #53) produz voltas e objeto identicos. O tracado ja esta
+        # gravado na outra volta; gravar de novo fura `uq_tracado_sha256`.
+        if str(gemeo[0]) != volta_id:
+            (
+                CONFIG.data_root
+                / "tracado"
+                / f"volta={volta_id}"
+                / f"{sha[:12]}.parquet"
+            ).unlink(missing_ok=True)
+        r.motivo = (
+            f"tracado identico ao da volta {gemeo[0]}: mesma captura em outra gravacao"
+        )
+        return r
     tracado_id = conn.execute(
         """insert into tracado (volta_id, layout_id, tipo, metodo, metodo_versao,
                                 n_pontos, uri, sha256)
@@ -290,6 +307,10 @@ _FAMILIAS = (
     ("perimetro do GPS", "perimetro do GPS discorda do comprimento do layout"),
     ("nao se desloca", "GPS parado na janela"),
     ("pontos de GPS", "poucos pontos de GPS na volta"),
+    (
+        "mesma captura em outra gravacao",
+        "mesma captura em outra gravacao (tracado identico)",
+    ),
 )
 
 
